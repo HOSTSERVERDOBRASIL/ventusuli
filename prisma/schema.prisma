@@ -1,0 +1,828 @@
+// Ventu Suli - Prisma Schema
+// Fase 1: Auth + Multi-tenant + Events
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["public"]
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  COACH
+  ATHLETE
+
+  @@schema("public")
+}
+
+enum AccountStatus {
+  ACTIVE
+  PENDING_INVITE
+  PENDING_APPROVAL
+  SUSPENDED
+
+  @@schema("public")
+}
+
+enum AthleteStatus {
+  PENDING_APPROVAL
+  ACTIVE
+  REJECTED
+  BLOCKED
+
+  @@schema("public")
+}
+
+enum AthleteSignupSource {
+  SLUG
+  INVITE
+  ADMIN
+
+  @@schema("public")
+}
+
+enum OrgPlan {
+  FREE
+  STARTER
+  PRO
+  ENTERPRISE
+
+  @@schema("public")
+}
+
+enum OrgStatus {
+  PENDING_SETUP
+  ACTIVE
+  SUSPENDED
+  TRIAL
+  CANCELLED
+
+  @@schema("public")
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  CANCELLED
+  FINISHED
+
+  @@schema("public")
+}
+
+enum RegistrationStatus {
+  INTERESTED
+  PENDING_PAYMENT
+  CONFIRMED
+  CANCELLED
+
+  @@schema("public")
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  EXPIRED
+  REFUNDED
+  CANCELLED
+
+  @@schema("public")
+}
+
+enum CollectiveStatus {
+  OPEN
+  CLOSED
+  CANCELLED
+
+  @@schema("public")
+}
+
+enum CommunityReactionType {
+  LIKE
+  FIRE
+  APPLAUSE
+
+  @@schema("public")
+}
+
+enum NoticeAudience {
+  ALL
+  ATHLETES
+  COACHES
+  ADMINS
+
+  @@schema("public")
+}
+
+enum NoticeStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+
+  @@schema("public")
+}
+
+enum NoticeChannel {
+  IN_APP
+  TELEGRAM
+
+  @@schema("public")
+}
+
+enum NoticeDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+
+  @@schema("public")
+}
+
+enum LedgerType {
+  CREDIT
+  DEBIT
+  EXPIRATION
+  ADJUSTMENT
+  REFUND
+
+  @@schema("public")
+}
+
+enum LedgerSource {
+  EVENT_PARTICIPATION
+  EARLY_SIGNUP
+  EARLY_PAYMENT
+  CAMPAIGN_BONUS
+  REFERRAL
+  RECURRENCE
+  MANUAL
+  REDEMPTION
+  EXPIRATION
+
+  @@schema("public")
+}
+
+enum RedemptionStatus {
+  REQUESTED
+  PENDING_PAYMENT
+  APPROVED
+  SEPARATED
+  DELIVERED
+  CANCELLED
+  PAYMENT_FAILED
+
+  @@schema("public")
+}
+
+enum StravaSyncTrigger {
+  WEBHOOK
+  MANUAL
+  OAUTH_CALLBACK
+  SCHEDULED
+
+  @@schema("public")
+}
+
+enum StravaSyncStatus {
+  RECEIVED
+  PROCESSING
+  SYNCED
+  SKIPPED
+  IGNORED
+  FAILED
+
+  @@schema("public")
+}
+
+enum RankingSnapshotMetric {
+  DISTANCE_M
+  MOVING_TIME_S
+  ACTIVITY_COUNT
+
+  @@schema("public")
+}
+
+model Organization {
+  id              String    @id @default(uuid())
+  name            String
+  slug            String    @unique
+  logo_url        String?
+  plan            OrgPlan   @default(FREE)
+  status          OrgStatus @default(PENDING_SETUP)
+  setup_completed_at DateTime?
+  plan_expires_at DateTime?
+  settings        Json?
+  created_at      DateTime  @default(now())
+
+  users                User[]
+  refresh_tokens       RefreshToken[]
+  athlete_profiles     AthleteProfile[]
+  events               Event[]
+  registrations        Registration[]
+  payments             Payment[]
+  collective_signups   CollectiveSignup[]
+  invites              OrganizationInvite[]
+  admin_invites        AdminActivationInvite[]
+  community_posts      CommunityPost[]
+  community_comments   CommunityComment[]
+  community_reactions  CommunityReaction[]
+  notices              Notice[]
+  notice_deliveries    NoticeDelivery[]
+  event_point_rules    EventPointRule[]
+  athlete_point_ledger AthletePointLedger[]
+  reward_items         RewardItem[]
+  reward_redemptions   RewardRedemption[]
+  strava_connections   StravaConnection[]
+  activities           Activity[]
+  strava_sync_logs     StravaSyncLog[]
+  ranking_snapshots    RankingSnapshot[]
+
+  @@index([slug])
+  @@index([status])
+  @@map("organizations")
+  @@schema("public")
+}
+
+model User {
+  id              String        @id @default(uuid())
+  organization_id String
+  organization    Organization  @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  email           String        @unique
+  password_hash   String
+  role            UserRole      @default(ATHLETE)
+  account_status  AccountStatus @default(ACTIVE)
+  name            String
+  avatar_url      String?
+  email_verified  Boolean       @default(false)
+  last_login_at   DateTime?
+  created_at      DateTime      @default(now())
+
+  refresh_tokens             RefreshToken[]
+  password_reset_tokens      PasswordResetToken[]
+  athlete_profile            AthleteProfile?
+  created_events             Event[]              @relation("EventCreator")
+  registrations              Registration[]
+  payments                   Payment[]
+  created_collective_signups CollectiveSignup[]   @relation("CollectiveSignupCreator")
+  collective_memberships     CollectiveMember[]
+  community_posts            CommunityPost[]
+  community_comments         CommunityComment[]
+  community_reactions        CommunityReaction[]
+  created_notices            Notice[]             @relation("NoticeCreator")
+  athlete_point_ledger       AthletePointLedger[]
+  reward_redemptions         RewardRedemption[]
+  strava_connection          StravaConnection?
+  activities                 Activity[]
+  strava_sync_logs           StravaSyncLog[]
+  generated_rankings         RankingSnapshot[]    @relation("RankingSnapshotGenerator")
+
+  @@index([organization_id])
+  @@index([email])
+  @@index([role])
+  @@map("users")
+  @@schema("public")
+}
+
+model PasswordResetToken {
+  id         String    @id @default(uuid())
+  user_id    String
+  user       User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  token_hash String    @unique
+  expires_at DateTime
+  used_at    DateTime?
+  created_at DateTime  @default(now())
+
+  @@index([user_id, created_at(sort: Desc)])
+  @@index([expires_at])
+  @@map("password_reset_tokens")
+  @@schema("public")
+}
+
+model RefreshToken {
+  id              String       @id @default(uuid())
+  user_id         String
+  user            User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  token_hash      String       @unique
+  expires_at      DateTime
+  revoked         Boolean      @default(false)
+  created_at      DateTime     @default(now())
+
+  @@index([user_id])
+  @@index([organization_id])
+  @@index([token_hash])
+  @@index([expires_at])
+  @@map("refresh_tokens")
+  @@schema("public")
+}
+
+model AthleteProfile {
+  id                String       @id @default(uuid())
+  user_id           String       @unique
+  user              User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  organization_id   String
+  organization      Organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  athlete_status    AthleteStatus @default(ACTIVE)
+  signup_source     AthleteSignupSource @default(SLUG)
+  onboarding_completed_at DateTime?
+  cpf               String?
+  birth_date        DateTime?
+  gender            String?
+  phone             String?
+  city              String?
+  state             String?
+  weight_kg         Decimal?     @db.Decimal(5, 2)
+  height_cm         Int?
+  shirt_size        String?
+  emergency_contact Json?
+  created_at        DateTime     @default(now())
+
+  @@index([organization_id])
+  @@index([organization_id, athlete_status])
+  @@index([organization_id, signup_source])
+  @@index([user_id])
+  @@index([cpf])
+  @@map("athlete_profiles")
+  @@schema("public")
+}
+
+model StravaConnection {
+  id                String       @id @default(uuid())
+  user_id           String       @unique
+  user              User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  organization_id   String
+  organization      Organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  strava_athlete_id String
+  access_token      String
+  refresh_token     String
+  expires_at        DateTime
+  scopes            String[]
+  last_sync_at      DateTime?
+  created_at        DateTime     @default(now())
+  updated_at        DateTime     @updatedAt
+
+  @@unique([organization_id, strava_athlete_id])
+  @@index([organization_id, updated_at(sort: Desc)])
+  @@index([organization_id, expires_at(sort: Asc)])
+  @@index([user_id])
+  @@map("strava_connections")
+  @@schema("public")
+}
+
+model Activity {
+  id                  String       @id @default(uuid())
+  external_source     String
+  external_id         String
+  user_id             String
+  user                User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  organization_id     String
+  organization        Organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  type                String
+  name                String
+  distance_m          Int?
+  moving_time_s       Int?
+  elapsed_time_s      Int?
+  average_pace_sec_km Decimal?     @db.Decimal(8, 2)
+  average_hr          Int?
+  max_hr              Int?
+  elevation_gain_m    Int?
+  activity_date       DateTime
+  raw_payload         Json?
+  created_at          DateTime     @default(now())
+  updated_at          DateTime     @updatedAt
+
+  @@unique([external_source, external_id])
+  @@index([organization_id, user_id, activity_date(sort: Desc)])
+  @@index([user_id, activity_date(sort: Desc)])
+  @@index([organization_id, activity_date(sort: Desc)])
+  @@index([organization_id, type, activity_date(sort: Desc)])
+  @@index([organization_id, activity_date, user_id])
+  @@index([organization_id, user_id, type, activity_date(sort: Desc)])
+  @@map("activities")
+  @@schema("public")
+}
+
+model StravaSyncLog {
+  id                String            @id @default(uuid())
+  organization_id   String?
+  organization      Organization?     @relation(fields: [organization_id], references: [id], onDelete: SetNull)
+  user_id           String?
+  user              User?             @relation(fields: [user_id], references: [id], onDelete: SetNull)
+  strava_athlete_id String
+  trigger           StravaSyncTrigger @default(WEBHOOK)
+  status            StravaSyncStatus  @default(RECEIVED)
+  idempotency_key   String            @unique
+  object_type       String
+  aspect_type       String
+  object_id         String
+  subscription_id   String?
+  event_time        DateTime?
+  payload           Json?
+  sync_result       Json?
+  error_message     String?
+  created_at        DateTime          @default(now())
+  processed_at      DateTime?
+  updated_at        DateTime          @updatedAt
+
+  @@index([status, created_at(sort: Desc)])
+  @@index([organization_id, created_at(sort: Desc)])
+  @@index([organization_id, status, created_at(sort: Desc)])
+  @@index([strava_athlete_id, created_at(sort: Desc)])
+  @@map("strava_sync_logs")
+  @@schema("public")
+}
+
+model RankingSnapshot {
+  id              String                @id @default(uuid())
+  organization_id String
+  organization    Organization          @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  metric          RankingSnapshotMetric
+  period_start    DateTime
+  period_end      DateTime
+  generated_at    DateTime              @default(now())
+  generated_by    String?
+  generator       User?                 @relation("RankingSnapshotGenerator", fields: [generated_by], references: [id], onDelete: SetNull)
+  payload         Json
+
+  @@index([organization_id, metric, period_end(sort: Desc)])
+  @@index([organization_id, generated_at(sort: Desc)])
+  @@index([generated_by])
+  @@map("ranking_snapshots")
+  @@schema("public")
+}
+
+model Event {
+  id                    String       @id @default(uuid())
+  organization_id       String
+  organization          Organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  created_by            String
+  creator               User         @relation("EventCreator", fields: [created_by], references: [id], onDelete: Cascade)
+  name                  String
+  city                  String?
+  state                 String?      @db.Char(2)
+  address               String?
+  event_date            DateTime
+  registration_deadline DateTime?
+  description           String?
+  image_url             String?
+  external_url          String?
+  status                EventStatus  @default(DRAFT)
+  created_at            DateTime     @default(now())
+
+  distances          EventDistance[]
+  registrations      Registration[]
+  collective_signups CollectiveSignup[]
+
+  @@index([organization_id])
+  @@index([event_date])
+  @@index([status])
+  @@map("events")
+  @@schema("public")
+}
+
+model EventDistance {
+  id               String  @id @default(uuid())
+  event_id         String
+  event            Event   @relation(fields: [event_id], references: [id], onDelete: Cascade)
+  label            String
+  distance_km      Decimal @db.Decimal(6, 3)
+  price_cents      Int
+  max_slots        Int?
+  registered_count Int     @default(0)
+
+  registrations      Registration[]
+  collective_members CollectiveMember[]
+
+  @@index([event_id])
+  @@map("event_distances")
+  @@schema("public")
+}
+
+model Registration {
+  id              String             @id @default(uuid())
+  user_id         String
+  user            User               @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  event_id        String
+  event           Event              @relation(fields: [event_id], references: [id], onDelete: Cascade)
+  distance_id     String
+  distance        EventDistance      @relation(fields: [distance_id], references: [id], onDelete: Cascade)
+  organization_id String
+  organization    Organization       @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  status          RegistrationStatus @default(INTERESTED)
+  notes           String?
+  registered_at   DateTime           @default(now())
+
+  payment Payment?
+
+  @@unique([user_id, event_id, distance_id])
+  @@index([organization_id])
+  @@index([user_id])
+  @@map("registrations")
+  @@schema("public")
+}
+
+model Payment {
+  id              String        @id @default(uuid())
+  registration_id String        @unique
+  registration    Registration  @relation(fields: [registration_id], references: [id], onDelete: Cascade)
+  user_id         String
+  user            User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  organization_id String
+  organization    Organization  @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  efi_charge_id   String?       @unique
+  efi_tx_id       String?       @unique
+  amount_cents    Int
+  fee_cents       Int           @default(0)
+  net_cents       Int
+  status          PaymentStatus @default(PENDING)
+  pix_key         String?
+  qr_code_url     String?
+  paid_at         DateTime?
+  expires_at      DateTime?
+  webhook_payload Json?
+  created_at      DateTime      @default(now())
+
+  collective_member CollectiveMember?
+
+  @@index([organization_id])
+  @@index([efi_tx_id])
+  @@index([status])
+  @@map("payments")
+  @@schema("public")
+}
+
+model CollectiveSignup {
+  id              String           @id @default(uuid())
+  event_id        String
+  event           Event            @relation(fields: [event_id], references: [id], onDelete: Cascade)
+  organization_id String
+  organization    Organization     @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  created_by      String
+  creator         User             @relation("CollectiveSignupCreator", fields: [created_by], references: [id], onDelete: Cascade)
+  name            String
+  status          CollectiveStatus @default(OPEN)
+  deadline        DateTime?
+  max_members     Int?
+  created_at      DateTime         @default(now())
+
+  members CollectiveMember[]
+
+  @@index([event_id])
+  @@index([organization_id])
+  @@index([status])
+  @@map("collective_signups")
+  @@schema("public")
+}
+
+model CollectiveMember {
+  id                   String           @id @default(uuid())
+  collective_signup_id String
+  collective_signup    CollectiveSignup @relation(fields: [collective_signup_id], references: [id], onDelete: Cascade)
+  user_id              String
+  user                 User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  distance_id          String
+  distance             EventDistance    @relation(fields: [distance_id], references: [id], onDelete: Cascade)
+  payment_id           String?          @unique
+  payment              Payment?         @relation(fields: [payment_id], references: [id], onDelete: SetNull)
+  joined_at            DateTime         @default(now())
+
+  @@unique([collective_signup_id, user_id])
+  @@index([user_id])
+  @@index([distance_id])
+  @@map("collective_members")
+  @@schema("public")
+}
+
+model OrganizationInvite {
+  id              String       @id @default(uuid())
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  token           String       @unique
+  label           String?
+  active          Boolean      @default(true)
+  expires_at      DateTime?
+  max_uses        Int?
+  used_count      Int          @default(0)
+  created_at      DateTime     @default(now())
+
+  @@index([organization_id, active])
+  @@index([token, active])
+  @@map("organization_invites")
+  @@schema("public")
+}
+
+model AdminActivationInvite {
+  id              String       @id @default(uuid())
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  email           String
+  token           String       @unique
+  role            UserRole     @default(ADMIN)
+  active          Boolean      @default(true)
+  expires_at      DateTime?
+  accepted_at     DateTime?
+  invited_by      String?
+  invitee_name    String?
+  created_at      DateTime     @default(now())
+
+  @@index([organization_id, active])
+  @@index([email])
+  @@index([token, active])
+  @@map("admin_activation_invites")
+  @@schema("public")
+}
+
+model CommunityPost {
+  id              String       @id @default(uuid())
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  user_id         String
+  user            User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  tab             String       @default("Feed")
+  content         String
+  created_at      DateTime     @default(now())
+
+  comments  CommunityComment[]
+  reactions CommunityReaction[]
+
+  @@index([organization_id, created_at(sort: Desc)])
+  @@index([user_id])
+  @@map("community_posts")
+  @@schema("public")
+}
+
+model CommunityComment {
+  id              String        @id @default(uuid())
+  post_id         String
+  post            CommunityPost @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  organization_id String
+  organization    Organization  @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  user_id         String
+  user            User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  text            String
+  created_at      DateTime      @default(now())
+
+  @@index([post_id, created_at(sort: Asc)])
+  @@index([organization_id, created_at(sort: Desc)])
+  @@index([user_id])
+  @@map("community_comments")
+  @@schema("public")
+}
+
+model CommunityReaction {
+  id              String                @id @default(uuid())
+  post_id         String
+  post            CommunityPost         @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  organization_id String
+  organization    Organization          @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  user_id         String
+  user            User                  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  type            CommunityReactionType
+  created_at      DateTime              @default(now())
+
+  @@unique([post_id, user_id, type])
+  @@index([post_id, type])
+  @@index([organization_id, created_at(sort: Desc)])
+  @@index([user_id])
+  @@map("community_reactions")
+  @@schema("public")
+}
+
+model Notice {
+  id               String         @id @default(uuid())
+  organization_id  String?
+  organization     Organization?  @relation(fields: [organization_id], references: [id], onDelete: SetNull)
+  created_by       String
+  creator          User           @relation("NoticeCreator", fields: [created_by], references: [id], onDelete: Cascade)
+  title            String
+  body             String
+  audience         NoticeAudience @default(ALL)
+  status           NoticeStatus   @default(DRAFT)
+  pinned           Boolean        @default(false)
+  publish_at       DateTime?
+  telegram_enabled Boolean        @default(false)
+  created_at       DateTime       @default(now())
+  updated_at       DateTime       @updatedAt
+
+  deliveries NoticeDelivery[]
+
+  @@index([organization_id, status, pinned, publish_at(sort: Desc)])
+  @@index([created_by, created_at(sort: Desc)])
+  @@map("notices")
+  @@schema("public")
+}
+
+model NoticeDelivery {
+  id              String               @id @default(uuid())
+  notice_id       String
+  notice          Notice               @relation(fields: [notice_id], references: [id], onDelete: Cascade)
+  organization_id String?
+  organization    Organization?        @relation(fields: [organization_id], references: [id], onDelete: SetNull)
+  channel         NoticeChannel
+  status          NoticeDeliveryStatus @default(PENDING)
+  external_id     String?
+  error_message   String?
+  attempt_count   Int                  @default(0)
+  last_attempt_at DateTime?
+  sent_at         DateTime?
+  created_at      DateTime             @default(now())
+  updated_at      DateTime             @updatedAt
+
+  @@unique([notice_id, channel])
+  @@index([organization_id, channel, status])
+  @@index([organization_id, created_at(sort: Desc)])
+  @@index([sent_at(sort: Desc)])
+  @@map("notice_deliveries")
+  @@schema("public")
+}
+
+model EventPointRule {
+  id                String       @id @default(cuid())
+  organizationId    String
+  eventId           String?
+  basePoints        Int          @default(10)
+  earlySignupBonus  Int          @default(5)
+  earlyPaymentBonus Int          @default(3)
+  campaignBonus     Int          @default(0)
+  active            Boolean      @default(true)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, eventId, active])
+  @@schema("public")
+}
+
+model AthletePointLedger {
+  id             String       @id @default(cuid())
+  organizationId String
+  userId         String
+  eventId        String?
+  registrationId String?
+  type           LedgerType
+  sourceType     LedgerSource
+  points         Int
+  balanceAfter   Int
+  description    String
+  referenceCode  String       @unique
+  createdBy      String
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, userId, createdAt(sort: Desc)])
+  @@schema("public")
+}
+
+model RewardItem {
+  id                       String             @id @default(cuid())
+  organizationId           String
+  name                     String
+  description              String?
+  category                 String
+  imageUrl                 String?
+  pointsCost               Int
+  cashPriceCents           Int                @default(0)
+  allowPoints              Boolean            @default(true)
+  allowCash                Boolean            @default(false)
+  allowMixed               Boolean            @default(false)
+  maxPointsDiscountPercent Int                @default(40)
+  minimumCashCents         Int                @default(0)
+  stockQuantity            Int                @default(0)
+  active                   Boolean            @default(true)
+  createdAt                DateTime           @default(now())
+  updatedAt                DateTime           @updatedAt
+  organization             Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  redemptions              RewardRedemption[]
+
+  @@index([organizationId, active])
+  @@schema("public")
+}
+
+model RewardRedemption {
+  id             String           @id @default(cuid())
+  organizationId String
+  userId         String
+  rewardItemId   String
+  quantity       Int              @default(1)
+  pointsUsed     Int              @default(0)
+  cashPaidCents  Int              @default(0)
+  paymentId      String?
+  idempotencyKey String           @unique
+  status         RedemptionStatus @default(REQUESTED)
+  requestedAt    DateTime         @default(now())
+  deliveredAt    DateTime?
+  cancelledAt    DateTime?
+  notes          String?
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rewardItem     RewardItem       @relation(fields: [rewardItemId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, userId, status])
+  @@schema("public")
+}

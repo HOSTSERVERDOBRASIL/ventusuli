@@ -1,0 +1,93 @@
+﻿name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ventu_suli
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d ventu_suli"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ventu_suli?schema=public
+      JWT_SECRET: ci-jwt-secret-32-chars-minimum-value-1234
+      NEXTAUTH_SECRET: ci-nextauth-secret-32-chars-min-value
+      NEXTAUTH_URL: http://127.0.0.1:3000
+      NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
+      NEXT_PUBLIC_DEMO_MODE: "false"
+      DEMO_AUTH_ENABLED: "false"
+      DEMO_SEED_ENABLED: "true"
+      RATE_LIMIT_BYPASS: "true"
+      SUPER_ADMIN_EMAIL: superadmin@ventu.demo
+      SUPER_ADMIN_PASSWORD: SuperAdmin@1234
+      TEST_BASE_URL: http://127.0.0.1:3000
+      TEST_LOGIN_EMAIL: admin@ventu.demo
+      TEST_LOGIN_PASSWORD: Demo@1234
+      TEST_SUPER_ADMIN_EMAIL: superadmin@ventu.demo
+      TEST_SUPER_ADMIN_PASSWORD: SuperAdmin@1234
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Prisma generate
+        run: npx prisma generate
+
+      - name: Prisma migrate deploy
+        run: npx prisma migrate deploy
+
+      - name: Seed database
+        run: npm run db:seed
+
+      - name: Type check
+        run: npm run type-check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Start app
+        run: |
+          npm run start -- -p 3000 > next.log 2>&1 &
+          for i in {1..40}; do
+            if curl -fsS http://127.0.0.1:3000/api/health >/dev/null; then
+              echo "App is up"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "App did not start in time"
+          cat next.log
+          exit 1
+
+      - name: Integration tests
+        run: npm test
+
+      - name: Post-deploy smoke tests
+        run: npm run test:smoke

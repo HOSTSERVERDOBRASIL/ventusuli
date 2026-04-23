@@ -1,0 +1,301 @@
+import { NextRequest, NextResponse } from "next/server";
+import { EventStatus, Prisma, RegistrationStatus, UserRole } from "@prisma/client";
+import { z } from "zod";
+import { prisma } from "@/lib/prisma";
+import { apiError } from "@/lib/api-error";
+import { isAllowedImageUrl } from "@/lib/storage/image-url";
+
+const patchEventSchema = z.object({
+  name: z.string().trim().min(3).optional(),
+  city: z.string().trim().min(1).optional(),
+  state: z
+    .string()
+    .trim()
+    .length(2)
+    .transform((v) => v.toUpperCase())
+    .optional(),
+  address: z.string().trim().max(255).nullable().optional(),
+  event_date: z.string().datetime().optional(),
+  registration_deadline: z.string().datetime().nullable().optional(),
+  description: z.string().trim().max(5000).nullable().optional(),
+  image_url: z
+    .string()
+    .trim()
+    .min(1)
+    .refine((value) => isAllowedImageUrl(value), {
+      message: "Imagem da prova invalida. Use upload oficial ou URL http/https.",
+    })
+    .nullable()
+    .optional(),
+  external_url: z.string().url().nullable().optional(),
+  status: z.nativeEnum(EventStatus).optional(),
+  distances: z
+    .array(
+      z.object({
+        label: z.string().trim().min(1).max(50),
+        distance_km: z.number().positive(),
+        price_cents: z.number().int().min(0),
+        max_slots: z.number().int().positive().nullable().optional(),
+      }),
+    )
+    .optional(),
+});
+
+function getAuthContext(req: NextRequest) {
+  const userId = req.headers.get("x-user-id");
+  const role = req.headers.get("x-user-role") as UserRole | null;
+  const organizationId = req.headers.get("x-org-id");
+
+  if (!userId || !role || !organizationId) {
+    return null;
+  }
+
+  return { userId, role, organizationId };
+}
+
+function isAdminRole(role: UserRole): boolean {
+  return role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN;
+}
+
+function prismaToApiError(error: unknown): NextResponse {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error.code === "P2002") {
+      return apiError("VALIDATION_ERROR", "Conflito de dados únicos.", 409);
+    }
+    if (error.code === "P2025") {
+      return apiError("USER_NOT_FOUND", "Registro não encontrado.", 404);
+    }
+  }
+  return apiError("INTERNAL_ERROR", "Erro interno ao processar evento.", 500);
+}
+
+interface RouteParams {
+  params: { id: string };
+}
+
+export async function GET(req: NextRequest, { params }: RouteParams) {
+  const auth = getAuthContext(req);
+  if (!auth) return apiError("UNAUTHORIZED", "Token de acesso ausente.", 401);
+
+  try {
+    const event = await prisma.event.findFirst({
+      where: {
+        id: params.id,
+        organization_id: auth.organizationId,
+      },
+      include: {
+        distances: {
+          orderBy: { distance_km: "asc" },
+        },
+        _count: {
+          select: { registrations: true },
+        },
+      },
+    });
+
+    if (!event) {
+      return apiError("USER_NOT_FOUND", "Prova não encontrada.", 404);
+    }
+
+    const confirmedCount = await prisma.registration.count({
+      where: {
+        event_id: params.id,
+        organization_id: auth.organizationId,
+        status: RegistrationStatus.CONFIRMED,
+      },
+    });
+
+    return NextResponse.json({
+      data: {
+        ...event,
+        registrations_count: event._count.registrations,
+        confirmed_registrations_count: confirmedCount,
+      },
+    });
+  } catch (error) {
+    return prismaToApiError(error);
+  }
+}
+
+export async function PATCH(req: NextRequest, { params }: RouteParams) {
+  const auth = getAuthContext(req);
+  if (!auth) return apiError("UNAUTHORIZED", "Token de acesso ausente.", 401);
+  if (!isAdminRole(auth.role)) {
+    return apiError("FORBIDDEN", "Apenas administradores podem editar provas.", 403);
+  }
+
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return apiError("VALIDATION_ERROR", "Body inválido.", 400);
+  }
+
+  const parsed = patchEventSchema.safeParse(body);
+  if (!parsed.success) {
+    return apiError("VALIDATION_ERROR", parsed.error.errors[0]?.message ?? "Dados inválidos.", 400);
+  }
+
+  const input = parsed.data;
+
+  try {
+    const current = await prisma.event.findFirst({
+      where: { id: params.id, organization_id: auth.organizationId },
+      include: {
+        distances: {
+          orderBy: { distance_km: "asc" },
+        },
+      },
+    });
+
+    if (!current) {
+      return apiError("USER_NOT_FOUND", "Prova não encontrada.", 404);
+    }
+
+    const targetDistanceLabels = input.distances?.map((d) => d.label) ?? null;
+    const finalDistancesCount = targetDistanceLabels
+      ? targetDistanceLabels.length
+      : current.distances.length;
+    const nextStatus = input.status ?? current.status;
+
+    if (nextStatus === EventStatus.PUBLISHED && finalDistancesCount < 1) {
+      return apiError("VALIDATION_ERROR", "Prova publicada deve ter ao menos uma distância.", 400);
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.event.update({
+        where: { id: params.id },
+        data: {
+          ...(input.name !== undefined ? { name: input.name } : {}),
+          ...(input.city !== undefined ? { city: input.city } : {}),
+          ...(input.state !== undefined ? { state: input.state } : {}),
+          ...(input.address !== undefined ? { address: input.address } : {}),
+          ...(input.event_date !== undefined ? { event_date: new Date(input.event_date) } : {}),
+          ...(input.registration_deadline !== undefined
+            ? {
+                registration_deadline: input.registration_deadline
+                  ? new Date(input.registration_deadline)
+                  : null,
+              }
+            : {}),
+          ...(input.description !== undefined ? { description: input.description } : {}),
+          ...(input.image_url !== undefined ? { image_url: input.image_url } : {}),
+          ...(input.external_url !== undefined ? { external_url: input.external_url } : {}),
+          ...(input.status !== undefined ? { status: input.status } : {}),
+        },
+      });
+
+      if (!input.distances) return;
+
+      const existingByLabel = new Map(current.distances.map((d) => [d.label, d]));
+      const nextLabels = input.distances.map((d) => d.label);
+      const labelsToRemove = current.distances
+        .filter((distance) => !nextLabels.includes(distance.label))
+        .map((distance) => distance.label);
+
+      if (labelsToRemove.length > 0) {
+        const idsToRemove = current.distances
+          .filter((distance) => labelsToRemove.includes(distance.label))
+          .map((distance) => distance.id);
+
+        const linkedRegistrations = await tx.registration.count({
+          where: { distance_id: { in: idsToRemove } },
+        });
+        if (linkedRegistrations > 0) {
+          throw new Error("DISTANCE_HAS_REGISTRATIONS");
+        }
+
+        await tx.eventDistance.deleteMany({
+          where: {
+            event_id: params.id,
+            label: { in: labelsToRemove },
+          },
+        });
+      }
+
+      for (const distance of input.distances) {
+        const existing = existingByLabel.get(distance.label);
+        if (existing) {
+          await tx.eventDistance.update({
+            where: { id: existing.id },
+            data: {
+              distance_km: new Prisma.Decimal(distance.distance_km),
+              price_cents: distance.price_cents,
+              max_slots: distance.max_slots ?? null,
+            },
+          });
+        } else {
+          await tx.eventDistance.create({
+            data: {
+              event_id: params.id,
+              label: distance.label,
+              distance_km: new Prisma.Decimal(distance.distance_km),
+              price_cents: distance.price_cents,
+              max_slots: distance.max_slots ?? null,
+            },
+          });
+        }
+      }
+    });
+
+    const updated = await prisma.event.findFirst({
+      where: { id: params.id, organization_id: auth.organizationId },
+      include: { distances: { orderBy: { distance_km: "asc" } } },
+    });
+
+    return NextResponse.json({ data: updated });
+  } catch (error) {
+    if (error instanceof Error && error.message === "DISTANCE_HAS_REGISTRATIONS") {
+      return apiError(
+        "FORBIDDEN",
+        "Não é possível remover distâncias que já possuem inscrições.",
+        403,
+      );
+    }
+    return prismaToApiError(error);
+  }
+}
+
+export async function DELETE(req: NextRequest, { params }: RouteParams) {
+  const auth = getAuthContext(req);
+  if (!auth) return apiError("UNAUTHORIZED", "Token de acesso ausente.", 401);
+  if (!isAdminRole(auth.role)) {
+    return apiError("FORBIDDEN", "Apenas administradores podem cancelar provas.", 403);
+  }
+
+  try {
+    const event = await prisma.event.findFirst({
+      where: { id: params.id, organization_id: auth.organizationId },
+      select: { id: true },
+    });
+    if (!event) {
+      return apiError("USER_NOT_FOUND", "Prova não encontrada.", 404);
+    }
+
+    const confirmedCount = await prisma.registration.count({
+      where: {
+        event_id: params.id,
+        organization_id: auth.organizationId,
+        status: RegistrationStatus.CONFIRMED,
+      },
+    });
+
+    if (confirmedCount > 0) {
+      return apiError(
+        "FORBIDDEN",
+        "Não é possível cancelar prova com inscrições confirmadas.",
+        403,
+      );
+    }
+
+    const cancelled = await prisma.event.update({
+      where: { id: params.id },
+      data: { status: EventStatus.CANCELLED },
+      include: { distances: { orderBy: { distance_km: "asc" } } },
+    });
+
+    return NextResponse.json({ data: cancelled });
+  } catch (error) {
+    return prismaToApiError(error);
+  }
+}

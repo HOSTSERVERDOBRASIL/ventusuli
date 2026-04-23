@@ -1,0 +1,504 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { Copy, RefreshCw, UserPlus, Users } from "lucide-react";
+import { toast } from "sonner";
+import { AthletesCrmTable } from "@/components/athletes/athletes-crm-table";
+import { AthletesSummaryCards } from "@/components/athletes/athletes-summary-cards";
+import { useAuthToken } from "@/components/auth/AuthTokenProvider";
+import { ActionButton } from "@/components/system/action-button";
+import { EmptyState } from "@/components/system/empty-state";
+import { LoadingState } from "@/components/system/loading-state";
+import { PageHeader } from "@/components/system/page-header";
+import { SectionCard } from "@/components/system/section-card";
+import { StatusBadge } from "@/components/system/status-badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import {
+  createAdminInvite,
+  getAdminAthletes,
+  listAdminInvites,
+  resendAdminInvite,
+  updateAdminAthleteStatus,
+} from "@/services/admin-athletes-service";
+import {
+  AdminAthleteInvite,
+  AdminAthletePolicy,
+  AthleteListRow,
+  AthletesListSummary,
+} from "@/services/types";
+
+const EMPTY_SUMMARY: AthletesListSummary = {
+  totalAthletes: 0,
+  active: 0,
+  pendingApproval: 0,
+  rejected: 0,
+  blocked: 0,
+  totalPendingCents: 0,
+  totalPaidCents: 0,
+};
+
+const EMPTY_POLICY: AdminAthletePolicy = {
+  slug: "",
+  allowAthleteSelfSignup: false,
+  requireAthleteApproval: true,
+};
+
+type AthleteStatusFilter = "ALL" | "PENDING_APPROVAL" | "ACTIVE" | "REJECTED" | "BLOCKED";
+
+export default function AdminAtletasPage() {
+  const { accessToken } = useAuthToken();
+
+  const [rows, setRows] = useState<AthleteListRow[]>([]);
+  const [summary, setSummary] = useState<AthletesListSummary>(EMPTY_SUMMARY);
+  const [policy, setPolicy] = useState<AdminAthletePolicy>(EMPTY_POLICY);
+  const [invites, setInvites] = useState<AdminAthleteInvite[]>([]);
+  const [loadingAthletes, setLoadingAthletes] = useState(true);
+  const [loadingInvites, setLoadingInvites] = useState(true);
+
+  const [status, setStatus] = useState<AthleteStatusFilter>("ALL");
+  const [query, setQuery] = useState("");
+
+  const [inviteLabel, setInviteLabel] = useState("");
+  const [inviteReusable, setInviteReusable] = useState(false);
+  const [inviteMaxUses, setInviteMaxUses] = useState("1");
+  const [inviteExpiresAt, setInviteExpiresAt] = useState("");
+  const [creatingInvite, setCreatingInvite] = useState(false);
+  const [statusActionId, setStatusActionId] = useState<string | null>(null);
+
+  const statusCards = useMemo(
+    () => [
+      { key: "ALL" as const, label: "Todos", value: summary.totalAthletes },
+      { key: "PENDING_APPROVAL" as const, label: "Pendentes", value: summary.pendingApproval },
+      { key: "ACTIVE" as const, label: "Ativos", value: summary.active },
+      { key: "REJECTED" as const, label: "Rejeitados", value: summary.rejected },
+      { key: "BLOCKED" as const, label: "Bloqueados", value: summary.blocked },
+    ],
+    [summary],
+  );
+
+  const refreshAthletes = async () => {
+    setLoadingAthletes(true);
+    try {
+      const payload = await getAdminAthletes({
+        q: query || undefined,
+        status,
+        page: 1,
+        pageSize: 50,
+        accessToken,
+      });
+
+      setRows(payload.data);
+      setSummary(payload.summary);
+      setPolicy(payload.organizationPolicy);
+    } catch (error) {
+      setRows([]);
+      setSummary(EMPTY_SUMMARY);
+      toast.error(error instanceof Error ? error.message : "Falha ao carregar atletas.");
+    } finally {
+      setLoadingAthletes(false);
+    }
+  };
+
+  const refreshInvites = async () => {
+    setLoadingInvites(true);
+    try {
+      const payload = await listAdminInvites(accessToken);
+      setInvites(payload.data);
+      setPolicy(payload.policy);
+    } catch (error) {
+      setInvites([]);
+      toast.error(error instanceof Error ? error.message : "Falha ao carregar convites.");
+    } finally {
+      setLoadingInvites(false);
+    }
+  };
+
+  useEffect(() => {
+    void refreshAthletes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accessToken, query, status]);
+
+  useEffect(() => {
+    void refreshInvites();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accessToken]);
+
+  const applyStatusAction = async (
+    athleteId: string,
+    action: "APPROVE" | "REJECT" | "BLOCK",
+    successMessage: string,
+  ) => {
+    try {
+      setStatusActionId(`${athleteId}:${action}`);
+      await updateAdminAthleteStatus(athleteId, action, accessToken);
+      toast.success(successMessage);
+      await refreshAthletes();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Falha ao atualizar status do atleta.");
+    } finally {
+      setStatusActionId(null);
+    }
+  };
+
+  return (
+    <div className="space-y-6 text-white">
+      <PageHeader
+        title="Gestao de atletas"
+        subtitle="Convide atletas, acompanhe pendentes e opere aprovacoes com controle por assessoria."
+        actions={
+          <div className="flex items-center gap-2">
+            <ActionButton asChild>
+              <Link href="/admin/atletas/novo">
+                <UserPlus className="mr-2 h-4 w-4" />
+                Novo atleta
+              </Link>
+            </ActionButton>
+            <ActionButton asChild intent="secondary">
+              <Link href="/admin/configuracoes">
+                <Users className="mr-2 h-4 w-4" />
+                Politicas da assessoria
+              </Link>
+            </ActionButton>
+          </div>
+        }
+      />
+
+      <SectionCard
+        title="Politica de cadastro"
+        description="Controle de entrada por slug aberto ou convite"
+      >
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="rounded-xl border border-white/10 bg-[#0F2743] p-4">
+            <p className="text-xs uppercase tracking-wide text-slate-300">Slug da assessoria</p>
+            <p className="mt-2 text-sm font-semibold text-white">/{policy.slug || "assessoria"}</p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-[#0F2743] p-4">
+            <p className="text-xs uppercase tracking-wide text-slate-300">Auto cadastro por slug</p>
+            <div className="mt-2">
+              <StatusBadge
+                tone={policy.allowAthleteSelfSignup ? "positive" : "warning"}
+                label={policy.allowAthleteSelfSignup ? "Permitido" : "Somente convite"}
+              />
+            </div>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-[#0F2743] p-4">
+            <p className="text-xs uppercase tracking-wide text-slate-300">Aprovacao manual</p>
+            <div className="mt-2">
+              <StatusBadge
+                tone={policy.requireAthleteApproval ? "warning" : "positive"}
+                label={policy.requireAthleteApproval ? "Obrigatoria" : "Nao obrigatoria"}
+              />
+            </div>
+          </div>
+        </div>
+      </SectionCard>
+
+      {loadingAthletes ? <LoadingState lines={3} /> : <AthletesSummaryCards summary={summary} />}
+
+      <SectionCard
+        title="Fila operacional"
+        description="Listagens por status com acoes de aprovacao, rejeicao e bloqueio"
+      >
+        <div className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            {statusCards.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setStatus(item.key)}
+                className={
+                  status === item.key
+                    ? "rounded-xl border border-[#F5A623]/60 bg-[#13304f] p-3 text-left"
+                    : "rounded-xl border border-white/10 bg-[#0F2743] p-3 text-left hover:border-white/20"
+                }
+              >
+                <p className="text-xs uppercase tracking-wide text-slate-300">{item.label}</p>
+                <p className="mt-2 text-2xl font-semibold text-white">{item.value}</p>
+              </button>
+            ))}
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Buscar por nome ou email"
+              className="border-white/[0.1] bg-white/[0.05] text-white placeholder:text-white/30"
+            />
+            <ActionButton intent="secondary" onClick={() => void refreshAthletes()}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Atualizar
+            </ActionButton>
+          </div>
+
+          {loadingAthletes ? (
+            <LoadingState lines={4} />
+          ) : rows.length === 0 ? (
+            <EmptyState
+              title="Nenhum atleta encontrado"
+              description="Ajuste filtros ou convide novos atletas."
+            />
+          ) : (
+            <>
+              <AthletesCrmTable rows={rows} basePath="/admin/atletas" />
+              <div className="flex flex-wrap items-center gap-2">
+                {status === "PENDING_APPROVAL"
+                  ? rows.map((athlete) => (
+                      <div
+                        key={athlete.id}
+                        className="rounded-lg border border-white/10 bg-white/[0.03] p-2 text-xs"
+                      >
+                        <p className="font-semibold text-white">{athlete.name}</p>
+                        <div className="mt-2 flex gap-2">
+                          <ActionButton
+                            size="sm"
+                            disabled={statusActionId === `${athlete.id}:APPROVE`}
+                            onClick={() =>
+                              void applyStatusAction(athlete.id, "APPROVE", "Atleta aprovado.")
+                            }
+                          >
+                            {statusActionId === `${athlete.id}:APPROVE`
+                              ? "Aprovando..."
+                              : "Aprovar"}
+                          </ActionButton>
+                          <ActionButton
+                            size="sm"
+                            intent="secondary"
+                            disabled={statusActionId === `${athlete.id}:REJECT`}
+                            onClick={() =>
+                              void applyStatusAction(athlete.id, "REJECT", "Atleta rejeitado.")
+                            }
+                          >
+                            {statusActionId === `${athlete.id}:REJECT`
+                              ? "Rejeitando..."
+                              : "Rejeitar"}
+                          </ActionButton>
+                        </div>
+                      </div>
+                    ))
+                  : status === "ACTIVE"
+                    ? rows.map((athlete) => (
+                        <div
+                          key={athlete.id}
+                          className="rounded-lg border border-white/10 bg-white/[0.03] p-2 text-xs"
+                        >
+                          <p className="font-semibold text-white">{athlete.name}</p>
+                          <div className="mt-2 flex gap-2">
+                            <ActionButton
+                              size="sm"
+                              intent="secondary"
+                              disabled={statusActionId === `${athlete.id}:BLOCK`}
+                              onClick={() =>
+                                void applyStatusAction(athlete.id, "BLOCK", "Atleta bloqueado.")
+                              }
+                            >
+                              {statusActionId === `${athlete.id}:BLOCK`
+                                ? "Bloqueando..."
+                                : "Bloquear"}
+                            </ActionButton>
+                          </div>
+                        </div>
+                      ))
+                    : null}
+              </div>
+            </>
+          )}
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="Convites para atletas"
+        description="Crie tokens reutilizaveis ou com validade limitada e reenvie quando necessario"
+      >
+        <div className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            <div className="space-y-2 xl:col-span-2">
+              <Label htmlFor="invite-label">Rotulo</Label>
+              <Input
+                id="invite-label"
+                value={inviteLabel}
+                onChange={(event) => setInviteLabel(event.target.value)}
+                placeholder="Ex: Turma iniciantes maio"
+                className="border-white/15 bg-[#0F2743] text-white"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="invite-reusable">Tipo</Label>
+              <Select
+                id="invite-reusable"
+                value={inviteReusable ? "REUSABLE" : "LIMITED"}
+                onChange={(event) => setInviteReusable(event.target.value === "REUSABLE")}
+                className="border-white/15 bg-[#0F2743] text-white"
+              >
+                <option value="LIMITED">Limitado por uso</option>
+                <option value="REUSABLE">Reutilizavel</option>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="invite-max-uses">Maximo de usos</Label>
+              <Input
+                id="invite-max-uses"
+                type="number"
+                min={1}
+                value={inviteMaxUses}
+                onChange={(event) => setInviteMaxUses(event.target.value)}
+                disabled={inviteReusable}
+                className="border-white/15 bg-[#0F2743] text-white disabled:opacity-60"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="invite-expires-at">Expira em</Label>
+              <Input
+                id="invite-expires-at"
+                type="datetime-local"
+                value={inviteExpiresAt}
+                onChange={(event) => setInviteExpiresAt(event.target.value)}
+                className="border-white/15 bg-[#0F2743] text-white"
+              />
+            </div>
+          </div>
+
+          <ActionButton
+            disabled={creatingInvite}
+            onClick={async () => {
+              if (!inviteReusable) {
+                const parsedMaxUses = Number(inviteMaxUses);
+                if (
+                  !Number.isFinite(parsedMaxUses) ||
+                  !Number.isInteger(parsedMaxUses) ||
+                  parsedMaxUses < 1
+                ) {
+                  toast.error("Informe um máximo de usos válido (inteiro maior ou igual a 1).");
+                  return;
+                }
+              }
+
+              if (inviteExpiresAt) {
+                const expiryDate = new Date(inviteExpiresAt);
+                if (Number.isNaN(expiryDate.getTime())) {
+                  toast.error("Data de expiração inválida.");
+                  return;
+                }
+                if (expiryDate.getTime() <= Date.now()) {
+                  toast.error("A data de expiração precisa ser futura.");
+                  return;
+                }
+              }
+
+              setCreatingInvite(true);
+              try {
+                await createAdminInvite(
+                  {
+                    label: inviteLabel || undefined,
+                    reusable: inviteReusable,
+                    maxUses: inviteReusable ? undefined : Number(inviteMaxUses),
+                    expiresAt: inviteExpiresAt
+                      ? new Date(inviteExpiresAt).toISOString()
+                      : undefined,
+                  },
+                  accessToken,
+                );
+                toast.success("Convite criado com sucesso.");
+                setInviteLabel("");
+                setInviteReusable(false);
+                setInviteMaxUses("1");
+                setInviteExpiresAt("");
+                await refreshInvites();
+              } catch (error) {
+                toast.error(error instanceof Error ? error.message : "Falha ao criar convite.");
+              } finally {
+                setCreatingInvite(false);
+              }
+            }}
+          >
+            Criar convite
+          </ActionButton>
+
+          {loadingInvites ? (
+            <LoadingState lines={3} />
+          ) : invites.length === 0 ? (
+            <EmptyState
+              title="Nenhum convite criado"
+              description="Crie links para convidar atletas da assessoria."
+            />
+          ) : (
+            <div className="space-y-2">
+              {invites.map((invite) => (
+                <div key={invite.id} className="rounded-xl border border-white/10 bg-[#0F2743] p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-white">
+                        {invite.label ?? "Convite sem rotulo"}
+                      </p>
+                      <p className="text-xs text-slate-300">Token: {invite.token}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <StatusBadge
+                        tone={invite.active ? "positive" : "neutral"}
+                        label={invite.active ? "Ativo" : "Inativo"}
+                      />
+                      {invite.expired ? <StatusBadge tone="danger" label="Expirado" /> : null}
+                    </div>
+                  </div>
+
+                  <div className="mt-2 grid gap-2 text-xs text-slate-300 md:grid-cols-3">
+                    <p>
+                      Usos: {invite.usedCount}/{invite.maxUses ?? "ilimitado"}
+                    </p>
+                    <p>Disponivel: {invite.availableUses ?? "ilimitado"}</p>
+                    <p>
+                      Expira:{" "}
+                      {invite.expiresAt
+                        ? new Date(invite.expiresAt).toLocaleString("pt-BR")
+                        : "sem expiracao"}
+                    </p>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <ActionButton
+                      size="sm"
+                      intent="secondary"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(invite.signupUrl);
+                          toast.success("Link de convite copiado.");
+                        } catch {
+                          toast.error("Nao foi possivel copiar o link.");
+                        }
+                      }}
+                    >
+                      <Copy className="mr-2 h-3.5 w-3.5" />
+                      Copiar link
+                    </ActionButton>
+                    <ActionButton
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          await resendAdminInvite(invite.id, accessToken);
+                          toast.success("Convite reenviado com novo token.");
+                          await refreshInvites();
+                        } catch (error) {
+                          toast.error(
+                            error instanceof Error ? error.message : "Falha ao reenviar convite.",
+                          );
+                        }
+                      }}
+                    >
+                      Reenviar convite
+                    </ActionButton>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </SectionCard>
+    </div>
+  );
+}

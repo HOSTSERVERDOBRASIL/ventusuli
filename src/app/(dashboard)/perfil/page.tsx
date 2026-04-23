@@ -1,0 +1,605 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { CircleUserRound, Mail, ShieldCheck, Pencil, X, Check, AlertTriangle } from "lucide-react";
+import { toast } from "sonner";
+import { EmptyState } from "@/components/system/empty-state";
+import { LoadingState } from "@/components/system/loading-state";
+import { PageHeader } from "@/components/system/page-header";
+import { SectionCard } from "@/components/system/section-card";
+import { useAuthToken } from "@/components/auth/AuthTokenProvider";
+import { getAthleteIdentity, updateAthleteProfile } from "@/services/registrations-service";
+import { AthleteIdentity } from "@/services/types";
+import { formatCpf, isValidCpf, normalizeCpf } from "@/lib/cpf";
+import {
+  ACCEPTED_IMAGE_FILE_INPUT_ACCEPT,
+  uploadImageFile,
+} from "@/services/upload-service";
+
+const BRAZILIAN_STATES = [
+  "AC",
+  "AL",
+  "AP",
+  "AM",
+  "BA",
+  "CE",
+  "DF",
+  "ES",
+  "GO",
+  "MA",
+  "MT",
+  "MS",
+  "MG",
+  "PA",
+  "PB",
+  "PR",
+  "PE",
+  "PI",
+  "RJ",
+  "RN",
+  "RS",
+  "RO",
+  "RR",
+  "SC",
+  "SP",
+  "SE",
+  "TO",
+];
+
+const GENDER_LABELS: Record<string, string> = { M: "Masculino", F: "Feminino", O: "Outro" };
+
+interface FormState {
+  cpf: string;
+  phone: string;
+  city: string;
+  state: string;
+  birth_date: string;
+  gender: string;
+  ec_name: string;
+  ec_phone: string;
+  ec_relation: string;
+}
+
+function toFormState(identity: AthleteIdentity): FormState {
+  return {
+    cpf: identity.cpf ? formatCpf(identity.cpf) : "",
+    phone: identity.phone ?? "",
+    city: identity.city ?? "",
+    state: identity.state ?? "",
+    birth_date: identity.birthDate ? identity.birthDate.slice(0, 10) : "",
+    gender: identity.gender ?? "",
+    ec_name: identity.emergencyContact?.name ?? "",
+    ec_phone: identity.emergencyContact?.phone ?? "",
+    ec_relation: identity.emergencyContact?.relation ?? "",
+  };
+}
+
+function inputClass(extra = "") {
+  return [
+    "w-full rounded-xl border border-[#24486f] bg-[#0f233d] px-3 py-2",
+    "text-sm text-white placeholder:text-[#4a7fa8]",
+    "focus:outline-none focus:ring-2 focus:ring-[#3a8fd4]",
+    extra,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function labelClass() {
+  return "block text-xs uppercase tracking-wide text-[#8eb0dc] mb-1";
+}
+
+export default function PerfilPage() {
+  const { accessToken, userRole, organization } = useAuthToken();
+  const [identity, setIdentity] = useState<AthleteIdentity | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [form, setForm] = useState<FormState>({
+    cpf: "",
+    phone: "",
+    city: "",
+    state: "",
+    birth_date: "",
+    gender: "",
+    ec_name: "",
+    ec_phone: "",
+    ec_relation: "",
+  });
+  const [cpfError, setCpfError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await getAthleteIdentity(accessToken);
+        if (!cancelled) {
+          setIdentity(data);
+          setForm(toFormState(data));
+        }
+      } catch {
+        if (!cancelled) setError("Não foi possível carregar os dados do perfil.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, reloadKey]);
+
+  const isAthleteRole = userRole === "ATHLETE" || !userRole;
+
+  const hasCpf = Boolean(identity?.cpf);
+
+  function handleCpfChange(raw: string) {
+    // Auto-format as user types: insert dots and dash
+    const digits = normalizeCpf(raw);
+    let formatted = digits;
+    if (digits.length > 9)
+      formatted = `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9, 11)}`;
+    else if (digits.length > 6)
+      formatted = `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
+    else if (digits.length > 3) formatted = `${digits.slice(0, 3)}.${digits.slice(3)}`;
+
+    setForm((f) => ({ ...f, cpf: formatted }));
+
+    if (digits.length === 11) {
+      setCpfError(isValidCpf(digits) ? null : "CPF inválido. Verifique os dígitos.");
+    } else {
+      setCpfError(null);
+    }
+  }
+
+  async function handleSave() {
+    if (!form.cpf && identity?.cpf) {
+      toast.error("CPF não pode ser removido após cadastro.");
+      return;
+    }
+
+    const cpfDigits = normalizeCpf(form.cpf);
+    if (cpfDigits && !isValidCpf(cpfDigits)) {
+      setCpfError("CPF inválido. Verifique os dígitos.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const hasEc = form.ec_name.trim() || form.ec_phone.trim();
+
+      await updateAthleteProfile(
+        {
+          ...(cpfDigits ? { cpf: cpfDigits } : {}),
+          phone: form.phone.trim() || null,
+          city: form.city.trim() || null,
+          state: form.state || null,
+          birth_date: form.birth_date || null,
+          gender: form.gender || null,
+          emergency_contact: hasEc
+            ? {
+                name: form.ec_name.trim(),
+                phone: form.ec_phone.trim(),
+                ...(form.ec_relation.trim() ? { relation: form.ec_relation.trim() } : {}),
+              }
+            : null,
+        },
+        accessToken,
+      );
+
+      const updated = await getAthleteIdentity(accessToken);
+      setIdentity(updated);
+      setForm(toFormState(updated));
+      setEditing(false);
+      toast.success("Perfil atualizado com sucesso!");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao salvar perfil.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleCancel() {
+    if (identity) setForm(toFormState(identity));
+    setCpfError(null);
+    setEditing(false);
+  }
+
+  async function handleAvatarUpload(file: File) {
+    setAvatarUploading(true);
+    try {
+      const uploaded = await uploadImageFile(file, "avatars", accessToken);
+      await updateAthleteProfile({ avatar_url: uploaded.url }, accessToken);
+      const updated = await getAthleteIdentity(accessToken);
+      setIdentity(updated);
+      toast.success("Foto de perfil atualizada.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Falha ao atualizar foto.");
+    } finally {
+      setAvatarUploading(false);
+    }
+  }
+
+  async function handleAvatarRemove() {
+    setAvatarUploading(true);
+    try {
+      await updateAthleteProfile({ avatar_url: null }, accessToken);
+      const updated = await getAthleteIdentity(accessToken);
+      setIdentity(updated);
+      toast.success("Foto de perfil removida.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Falha ao remover foto.");
+    } finally {
+      setAvatarUploading(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6 text-white">
+      <PageHeader title="Meu perfil" subtitle="Dados da conta e informações esportivas." />
+
+      {loading ? <LoadingState lines={4} /> : null}
+      {error ? (
+        <EmptyState
+          title="Perfil indisponível"
+          description={error}
+          action={
+            <button
+              type="button"
+              onClick={() => setReloadKey((prev) => prev + 1)}
+              className="inline-flex items-center rounded-xl border border-[#2f5d8f] bg-[#12355d] px-4 py-2 text-sm font-medium text-[#dce9ff] transition hover:bg-[#18436f]"
+            >
+              Tentar novamente
+            </button>
+          }
+        />
+      ) : null}
+
+      {!loading && !error && identity ? (
+        <>
+          {/* CPF banner when missing and athlete role */}
+          {isAthleteRole && !hasCpf ? (
+            <div className="flex items-start gap-3 rounded-xl border border-amber-400/40 bg-amber-400/10 p-4 text-amber-100">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
+              <div>
+                <p className="font-semibold text-amber-200">CPF não cadastrado</p>
+                <p className="mt-0.5 text-sm text-amber-100/80">
+                  Para se inscrever em provas e gerar pagamentos PIX, você precisa informar seu CPF.{" "}
+                  <button
+                    type="button"
+                    className="underline hover:text-amber-200"
+                    onClick={() => setEditing(true)}
+                  >
+                    Preencher agora
+                  </button>
+                </p>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Account info */}
+          <SectionCard title="Informações da conta" description="Dados de autenticação e acesso">
+            <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-[#24486f] bg-[#0a1d36] p-4">
+              <div className="h-16 w-16 overflow-hidden rounded-full border border-[#2f5d8f] bg-[#0f233d]">
+                {identity.avatarUrl ? (
+                  <img
+                    src={identity.avatarUrl}
+                    alt="Foto de perfil"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-xl font-bold text-[#8eb0dc]">
+                    {identity.name[0]?.toUpperCase() ?? "A"}
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <label className="inline-flex cursor-pointer items-center rounded-xl border border-[#2f5d8f] bg-[#12355d] px-3 py-2 text-sm font-medium text-[#dce9ff] transition hover:bg-[#18436f]">
+                  <input
+                    type="file"
+                    accept={ACCEPTED_IMAGE_FILE_INPUT_ACCEPT}
+                    className="hidden"
+                    disabled={avatarUploading}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      event.currentTarget.value = "";
+                      if (!file) return;
+                      void handleAvatarUpload(file);
+                    }}
+                  />
+                  {avatarUploading ? "Enviando..." : "Alterar foto"}
+                </label>
+                <button
+                  type="button"
+                  onClick={() => void handleAvatarRemove()}
+                  disabled={avatarUploading || !identity.avatarUrl}
+                  className="rounded-xl border border-[#2f5d8f] bg-[#0f233d] px-3 py-2 text-sm font-medium text-[#dce9ff] transition hover:bg-[#18436f] disabled:opacity-50"
+                >
+                  Remover foto
+                </button>
+              </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {[
+                { label: "Nome", value: identity.name },
+                { label: "Email", value: identity.email },
+                { label: "Perfil", value: GENDER_LABELS[userRole ?? ""] ?? userRole ?? "ATHLETE" },
+                { label: "Assessoria", value: organization?.name ?? "Não identificada" },
+              ].map(({ label, value }) => (
+                <div key={label} className="rounded-xl border border-[#24486f] bg-[#0f233d] p-4">
+                  <p className="text-xs uppercase tracking-wide text-[#8eb0dc]">{label}</p>
+                  <p className="mt-2 text-base font-semibold text-white">{value}</p>
+                </div>
+              ))}
+            </div>
+          </SectionCard>
+
+          {/* Profile data */}
+          <SectionCard
+            title="Dados esportivos"
+            description="Informações usadas em inscrições e pagamentos"
+          >
+            {!editing ? (
+              <>
+                <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <ProfileField
+                    label="CPF"
+                    value={identity.cpf ? formatCpf(identity.cpf) : null}
+                    sensitive
+                  />
+                  <ProfileField label="Telefone" value={identity.phone} />
+                  <ProfileField label="Cidade" value={identity.city} />
+                  <ProfileField label="Estado" value={identity.state} />
+                  <ProfileField
+                    label="Data de nascimento"
+                    value={
+                      identity.birthDate
+                        ? new Date(identity.birthDate).toLocaleDateString("pt-BR", {
+                            timeZone: "UTC",
+                          })
+                        : null
+                    }
+                  />
+                  <ProfileField
+                    label="Gênero"
+                    value={identity.gender ? GENDER_LABELS[identity.gender] : null}
+                  />
+                </div>
+
+                {identity.emergencyContact ? (
+                  <div className="mb-4 rounded-xl border border-[#24486f] bg-[#0a1d36] p-4">
+                    <p className="mb-2 text-xs uppercase tracking-wide text-[#8eb0dc]">
+                      Contato de emergência
+                    </p>
+                    <p className="text-sm font-semibold text-white">
+                      {identity.emergencyContact.name}
+                    </p>
+                    <p className="text-sm text-[#8eb0dc]">{identity.emergencyContact.phone}</p>
+                    {identity.emergencyContact.relation ? (
+                      <p className="text-xs text-[#6a9ac8]">{identity.emergencyContact.relation}</p>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                <button
+                  type="button"
+                  onClick={() => setEditing(true)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-[#2f5d8f] bg-[#12355d] px-4 py-2 text-sm font-medium text-[#dce9ff] transition hover:bg-[#18436f]"
+                >
+                  <Pencil className="h-4 w-4" /> Editar perfil
+                </button>
+              </>
+            ) : (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void handleSave();
+                }}
+                className="space-y-5"
+              >
+                {/* CPF */}
+                <div>
+                  <label className={labelClass()}>
+                    CPF {!hasCpf && <span className="text-amber-400">*</span>}
+                  </label>
+                  <input
+                    className={inputClass(cpfError ? "border-red-500/60" : "")}
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="000.000.000-00"
+                    maxLength={14}
+                    value={form.cpf}
+                    onChange={(e) => handleCpfChange(e.target.value)}
+                  />
+                  {cpfError ? <p className="mt-1 text-xs text-red-400">{cpfError}</p> : null}
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {/* Telefone */}
+                  <div>
+                    <label className={labelClass()}>Telefone</label>
+                    <input
+                      className={inputClass()}
+                      type="tel"
+                      placeholder="(11) 99999-9999"
+                      value={form.phone}
+                      onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                    />
+                  </div>
+
+                  {/* Gênero */}
+                  <div>
+                    <label className={labelClass()}>Gênero</label>
+                    <select
+                      className={inputClass()}
+                      value={form.gender}
+                      onChange={(e) => setForm((f) => ({ ...f, gender: e.target.value }))}
+                    >
+                      <option value="">Selecionar</option>
+                      <option value="M">Masculino</option>
+                      <option value="F">Feminino</option>
+                      <option value="O">Outro / Prefiro não informar</option>
+                    </select>
+                  </div>
+
+                  {/* Cidade */}
+                  <div>
+                    <label className={labelClass()}>Cidade</label>
+                    <input
+                      className={inputClass()}
+                      type="text"
+                      placeholder="São Paulo"
+                      value={form.city}
+                      onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
+                    />
+                  </div>
+
+                  {/* Estado */}
+                  <div>
+                    <label className={labelClass()}>Estado (UF)</label>
+                    <select
+                      className={inputClass()}
+                      value={form.state}
+                      onChange={(e) => setForm((f) => ({ ...f, state: e.target.value }))}
+                    >
+                      <option value="">Selecionar</option>
+                      {BRAZILIAN_STATES.map((uf) => (
+                        <option key={uf} value={uf}>
+                          {uf}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Data de nascimento */}
+                  <div className="sm:col-span-2">
+                    <label className={labelClass()}>Data de nascimento</label>
+                    <input
+                      className={inputClass("max-w-xs")}
+                      type="date"
+                      value={form.birth_date}
+                      onChange={(e) => setForm((f) => ({ ...f, birth_date: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                {/* Contato de emergência */}
+                <div className="rounded-xl border border-[#24486f] bg-[#0a1d36] p-4">
+                  <p className="mb-3 text-xs uppercase tracking-wide text-[#8eb0dc]">
+                    Contato de emergência
+                  </p>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div>
+                      <label className={labelClass()}>Nome</label>
+                      <input
+                        className={inputClass()}
+                        type="text"
+                        placeholder="Nome completo"
+                        value={form.ec_name}
+                        onChange={(e) => setForm((f) => ({ ...f, ec_name: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass()}>Telefone</label>
+                      <input
+                        className={inputClass()}
+                        type="tel"
+                        placeholder="(11) 99999-9999"
+                        value={form.ec_phone}
+                        onChange={(e) => setForm((f) => ({ ...f, ec_phone: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass()}>Parentesco / Relação</label>
+                      <input
+                        className={inputClass()}
+                        type="text"
+                        placeholder="Ex: Mãe, Cônjuge"
+                        value={form.ec_relation}
+                        onChange={(e) => setForm((f) => ({ ...f, ec_relation: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    type="submit"
+                    disabled={saving || Boolean(cpfError)}
+                    className="inline-flex items-center gap-2 rounded-xl bg-[#F5A623] px-5 py-2 text-sm font-semibold text-[#0A1628] transition hover:bg-[#e59a1f] disabled:opacity-50"
+                  >
+                    <Check className="h-4 w-4" />
+                    {saving ? "Salvando..." : "Salvar perfil"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancel}
+                    disabled={saving}
+                    className="inline-flex items-center gap-2 rounded-xl border border-[#2f5d8f] bg-[#12355d] px-5 py-2 text-sm font-medium text-[#dce9ff] transition hover:bg-[#18436f] disabled:opacity-50"
+                  >
+                    <X className="h-4 w-4" /> Cancelar
+                  </button>
+                </div>
+              </form>
+            )}
+          </SectionCard>
+
+          {/* Quick links */}
+          <SectionCard title="Acessos rápidos" description="Atalhos para a área do atleta">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <Link
+                href="/minhas-inscricoes"
+                className="inline-flex items-center gap-2 rounded-xl border border-[#2f5d8f] bg-[#12355d] px-4 py-3 text-sm font-medium text-[#dce9ff] transition hover:bg-[#18436f]"
+              >
+                <CircleUserRound className="h-4 w-4" /> Minhas inscrições
+              </Link>
+              <Link
+                href="/financeiro"
+                className="inline-flex items-center gap-2 rounded-xl border border-[#2f5d8f] bg-[#12355d] px-4 py-3 text-sm font-medium text-[#dce9ff] transition hover:bg-[#18436f]"
+              >
+                <Mail className="h-4 w-4" /> Financeiro
+              </Link>
+              <Link
+                href="/configuracoes/conta"
+                className="inline-flex items-center gap-2 rounded-xl border border-[#2f5d8f] bg-[#12355d] px-4 py-3 text-sm font-medium text-[#dce9ff] transition hover:bg-[#18436f]"
+              >
+                <ShieldCheck className="h-4 w-4" /> Configurações
+              </Link>
+            </div>
+          </SectionCard>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+function ProfileField({
+  label,
+  value,
+  sensitive = false,
+}: {
+  label: string;
+  value: string | null | undefined;
+  sensitive?: boolean;
+}) {
+  const display = value ?? "—";
+  const masked = sensitive && value ? `${value.slice(0, 3)}.***.***-${value.slice(-2)}` : display;
+
+  return (
+    <div className="rounded-xl border border-[#24486f] bg-[#0f233d] p-4">
+      <p className="text-xs uppercase tracking-wide text-[#8eb0dc]">{label}</p>
+      <p className={`mt-2 text-base font-semibold ${value ? "text-white" : "text-[#4a7fa8]"}`}>
+        {masked}
+      </p>
+    </div>
+  );
+}

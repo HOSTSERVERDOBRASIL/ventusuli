@@ -1,0 +1,6 @@
+{
+  "crons": [
+    { "path": "/api/admin/points/process-recurrence", "schedule": "0 2 1 * *" },
+    { "path": "/api/admin/points/process-expiration", "schedule": "0 3 * * *" }
+  ]
+}

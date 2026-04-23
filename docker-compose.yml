@@ -1,0 +1,57 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: ventusuli-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ventu_suli
+    volumes:
+      - ventusuli_postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ventu_suli"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: ventusuli-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_PUBLIC_DEMO_MODE: "false"
+      NEXT_PUBLIC_PUBLIC_ADMIN_REGISTRATION_ENABLED: "true"
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/ventu_suli?schema=public
+      JWT_SECRET: ventu-suli-local-jwt-secret-2026
+      NEXTAUTH_SECRET: ventu-suli-local-nextauth-secret-2026
+      NEXTAUTH_URL: http://localhost:3000
+      PUBLIC_ADMIN_REGISTRATION_ENABLED: "true"
+      SUPER_ADMIN_EMAIL: superadmin@ventu.demo
+      SUPER_ADMIN_PASSWORD: SuperAdmin@1234
+      DEMO_AUTH_ENABLED: "false"
+      DEMO_EMAIL: admin@ventu.demo
+      DEMO_PASSWORD: Demo@1234
+      DEMO_ATHLETE_EMAIL: atleta@ventu.demo
+      DEMO_ATHLETE_PASSWORD: Atleta@1234
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - ventusuli_node_modules:/app/node_modules
+      - ventusuli_next_cache:/app/.next
+    command: sh -c "npm ci && npx prisma generate && npm run dev -- -H 0.0.0.0 -p 3000"
+
+volumes:
+  ventusuli_postgres_data:
+  ventusuli_node_modules:
+  ventusuli_next_cache:
