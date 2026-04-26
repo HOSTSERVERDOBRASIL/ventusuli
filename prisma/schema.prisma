@@ -340,6 +340,9 @@ model AthleteProfile {
   height_cm         Int?
   shirt_size        String?
   emergency_contact Json?
+  member_sequence   Int?
+  member_number     String?
+  member_since      DateTime?
   created_at        DateTime     @default(now())
 
   @@index([organization_id])
@@ -347,6 +350,9 @@ model AthleteProfile {
   @@index([organization_id, signup_source])
   @@index([user_id])
   @@index([cpf])
+  @@index([member_number])
+  @@unique([organization_id, member_sequence])
+  @@unique([organization_id, member_number])
   @@map("athlete_profiles")
   @@schema("public")
 }
@@ -608,10 +614,19 @@ model OrganizationInvite {
   expires_at      DateTime?
   max_uses        Int?
   used_count      Int          @default(0)
+  invite_kind     String       @default("GENERAL")
+  invited_email   String?
+  invited_name    String?
+  created_by      String?
+  accepted_user_id String?
+  accepted_at     DateTime?
   created_at      DateTime     @default(now())
 
   @@index([organization_id, active])
   @@index([token, active])
+  @@index([created_by])
+  @@index([invited_email])
+  @@index([invite_kind])
   @@map("organization_invites")
   @@schema("public")
 }

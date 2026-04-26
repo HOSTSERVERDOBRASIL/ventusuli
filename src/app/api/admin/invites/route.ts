@@ -44,12 +44,28 @@ function toInviteOutput(
     expires_at: Date | null;
     max_uses: number | null;
     used_count: number;
+    invite_kind: string;
+    invited_email: string | null;
+    invited_name: string | null;
+    created_by: string | null;
+    accepted_user_id: string | null;
+    accepted_at: Date | null;
     created_at: Date;
   },
   origin: string,
+  actors?: {
+    createdByName?: string | null;
+    createdByEmail?: string | null;
+    acceptedUserName?: string | null;
+    acceptedUserEmail?: string | null;
+    acceptedUserMemberNumber?: string | null;
+  },
 ) {
   const expired = invite.expires_at ? invite.expires_at.getTime() < Date.now() : false;
   const availableUses = invite.max_uses === null ? null : Math.max(0, invite.max_uses - invite.used_count);
+  const exhausted = availableUses !== null && availableUses <= 0;
+  const status = !invite.active ? "INACTIVE" : expired ? "EXPIRED" : exhausted ? "EXHAUSTED" : "AVAILABLE";
+
   return {
     id: invite.id,
     token: invite.token,
@@ -57,10 +73,30 @@ function toInviteOutput(
     active: invite.active,
     expiresAt: invite.expires_at,
     expired,
+    status,
     maxUses: invite.max_uses,
     usedCount: invite.used_count,
     availableUses,
     reusable: invite.max_uses === null,
+    inviteKind: invite.invite_kind,
+    invitedEmail: invite.invited_email,
+    invitedName: invite.invited_name,
+    createdBy: invite.created_by
+      ? {
+          id: invite.created_by,
+          name: actors?.createdByName ?? null,
+          email: actors?.createdByEmail ?? null,
+        }
+      : null,
+    acceptedUser: invite.accepted_user_id
+      ? {
+          id: invite.accepted_user_id,
+          name: actors?.acceptedUserName ?? null,
+          email: actors?.acceptedUserEmail ?? null,
+          memberNumber: actors?.acceptedUserMemberNumber ?? null,
+        }
+      : null,
+    acceptedAt: invite.accepted_at,
     createdAt: invite.created_at,
     signupUrl: `${origin}/register/atleta?inviteToken=${invite.token}`,
   };
@@ -83,6 +119,12 @@ export async function GET(req: NextRequest) {
         expires_at: true,
         max_uses: true,
         used_count: true,
+        invite_kind: true,
+        invited_email: true,
+        invited_name: true,
+        created_by: true,
+        accepted_user_id: true,
+        accepted_at: true,
         created_at: true,
       },
     }),
@@ -95,8 +137,49 @@ export async function GET(req: NextRequest) {
     }),
   ]);
 
+  const userIds = Array.from(
+    new Set(
+      invites
+        .flatMap((invite) => [invite.created_by, invite.accepted_user_id])
+        .filter((id): id is string => Boolean(id)),
+    ),
+  );
+
+  const users = userIds.length
+    ? await prisma.user.findMany({
+        where: { id: { in: userIds }, organization_id: auth.organizationId },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          athlete_profile: { select: { member_number: true } },
+        },
+      })
+    : [];
+
+  const userById = new Map(users.map((user) => [user.id, user]));
+  const inviteOutputs = invites.map((invite) => {
+    const createdBy = invite.created_by ? userById.get(invite.created_by) : null;
+    const acceptedUser = invite.accepted_user_id ? userById.get(invite.accepted_user_id) : null;
+    return toInviteOutput(invite, req.nextUrl.origin, {
+      createdByName: createdBy?.name ?? null,
+      createdByEmail: createdBy?.email ?? null,
+      acceptedUserName: acceptedUser?.name ?? null,
+      acceptedUserEmail: acceptedUser?.email ?? null,
+      acceptedUserMemberNumber: acceptedUser?.athlete_profile?.member_number ?? null,
+    });
+  });
+
   return NextResponse.json({
-    data: invites.map((invite) => toInviteOutput(invite, req.nextUrl.origin)),
+    data: inviteOutputs,
+    summary: {
+      total: inviteOutputs.length,
+      available: inviteOutputs.filter((invite) => invite.status === "AVAILABLE").length,
+      used: inviteOutputs.filter((invite) => invite.acceptedUser).length,
+      expired: inviteOutputs.filter((invite) => invite.status === "EXPIRED").length,
+      athleteReferral: inviteOutputs.filter((invite) => invite.inviteKind === "ATHLETE_REFERRAL").length,
+      adminGeneral: inviteOutputs.filter((invite) => invite.inviteKind !== "ATHLETE_REFERRAL").length,
+    },
     policy: {
       slug: organization?.slug ?? "",
       allowAthleteSelfSignup: readBooleanSetting(organization?.settings, "allowAthleteSelfSignup", false),
@@ -130,6 +213,8 @@ export async function POST(req: NextRequest) {
       active: true,
       max_uses: parsed.data.reusable ? null : (parsed.data.maxUses ?? 1),
       expires_at: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null,
+      invite_kind: "GENERAL",
+      created_by: auth.userId,
     },
     select: {
       id: true,
@@ -139,10 +224,15 @@ export async function POST(req: NextRequest) {
       expires_at: true,
       max_uses: true,
       used_count: true,
+      invite_kind: true,
+      invited_email: true,
+      invited_name: true,
+      created_by: true,
+      accepted_user_id: true,
+      accepted_at: true,
       created_at: true,
     },
   });
 
   return NextResponse.json({ data: toInviteOutput(invite, req.nextUrl.origin) }, { status: 201 });
 }
-

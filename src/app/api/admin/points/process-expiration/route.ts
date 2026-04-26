@@ -19,14 +19,15 @@ export async function POST(req: NextRequest) {
   const auth = getAuthContext(req);
   const cronAuthorized = hasValidCronSecret(req);
 
-  if (!cronAuthorized) {
+  let organizationIds: string[];
+
+  if (cronAuthorized) {
+    organizationIds = (await prisma.organization.findMany({ select: { id: true } })).map((item) => item.id);
+  } else {
     if (!auth) return apiError("UNAUTHORIZED", "Token de acesso ausente.", 401);
     if (!isAdminRole(auth.role)) return apiError("FORBIDDEN", "Acesso restrito ao ADMIN.", 403);
+    organizationIds = [auth.organizationId];
   }
-
-  const organizationIds = cronAuthorized
-    ? (await prisma.organization.findMany({ select: { id: true } })).map((item) => item.id)
-    : [auth!.organizationId];
 
   const perOrganization: Array<{ organizationId: string; usersAffected: number; pointsExpired: number }> = [];
 

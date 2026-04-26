@@ -76,6 +76,8 @@ export async function getAthleteIdentity(accessToken?: string | null): Promise<A
         athlete_status?: "PENDING_APPROVAL" | "ACTIVE" | "REJECTED" | "BLOCKED" | null;
         signup_source?: "SLUG" | "INVITE" | "ADMIN" | null;
         onboarding_completed_at?: string | null;
+        member_number?: string | null;
+        member_since?: string | null;
         cpf?: string | null;
         phone?: string | null;
         city?: string | null;
@@ -97,6 +99,8 @@ export async function getAthleteIdentity(accessToken?: string | null): Promise<A
     name: payload.data.name,
     email: payload.data.email,
     avatarUrl: payload.data.avatar_url ?? null,
+    memberNumber: p?.member_number ?? null,
+    memberSince: p?.member_since ?? null,
     accountStatus: payload.data.account_status ?? null,
     athleteStatus: p?.athlete_status ?? null,
     signupSource: p?.signup_source ?? null,

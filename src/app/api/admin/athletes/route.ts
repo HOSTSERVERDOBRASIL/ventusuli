@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { UserRole } from "@prisma/client";
+import { Prisma, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { apiError } from "@/lib/api-error";
+import { ensureAthleteMemberNumber } from "@/lib/athletes/member-number";
 import { hashPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/request-auth";
@@ -10,11 +11,46 @@ import { createAthleteByAdminSchema } from "@/lib/validations/athletes";
 type AthleteStatus = "PENDING_APPROVAL" | "ACTIVE" | "REJECTED" | "BLOCKED";
 type FinancialSituation = "EM_DIA" | "PENDENTE" | "SEM_HISTORICO";
 
+type AthleteListUser = Prisma.UserGetPayload<{
+  include: {
+    athlete_profile: {
+      select: {
+        athlete_status: true;
+        signup_source: true;
+        member_number: true;
+        member_sequence: true;
+        member_since: true;
+        city: true;
+        state: true;
+      };
+    };
+    registrations: {
+      include: {
+        event: {
+          select: {
+            name: true;
+            event_date: true;
+          };
+        };
+        payment: {
+          select: {
+            status: true;
+            amount_cents: true;
+            paid_at: true;
+            created_at: true;
+          };
+        };
+      };
+    };
+  };
+}>;
+
 const querySchema = z.object({
   q: z.string().trim().optional(),
   status: z.enum(["ALL", "PENDING_APPROVAL", "ACTIVE", "REJECTED", "BLOCKED"]).default("ALL"),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  export: z.enum(["csv"]).optional(),
 });
 
 function canManageAthletes(role: UserRole): boolean {
@@ -63,6 +99,122 @@ function readBooleanSetting(settings: unknown, key: string, fallback: boolean): 
   return typeof value === "boolean" ? value : fallback;
 }
 
+function csvValue(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  const text = String(value);
+  return /[",\r\n;]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function toCsv(rows: ReturnType<typeof buildAthleteRow>[]): string {
+  const headers = [
+    "matricula",
+    "nome",
+    "email",
+    "status",
+    "origem",
+    "convidado_por",
+    "matricula_convidante",
+    "cidade",
+    "estado",
+    "data_associacao",
+    "inscricoes",
+    "pendente_centavos",
+    "pago_centavos",
+  ];
+
+  const lines = rows.map((row) =>
+    [
+      row.memberNumber,
+      row.name,
+      row.email,
+      row.status,
+      row.signupSource,
+      row.invitedByName,
+      row.invitedByMemberNumber,
+      row.city,
+      row.state,
+      row.memberSince,
+      row.registrationsCount,
+      row.pendingAmountCents,
+      row.paidAmountCents,
+    ]
+      .map(csvValue)
+      .join(";"),
+  );
+
+  return [headers.join(";"), ...lines].join("\n");
+}
+
+function buildAthleteRow(
+  user: AthleteListUser,
+  now: Date,
+  inviteByAcceptedUserId: Map<
+    string,
+    {
+      creatorName: string | null;
+      creatorEmail: string | null;
+      creatorMemberNumber: string | null;
+    }
+  >,
+) {
+  const payments = user.registrations.flatMap((registration) =>
+    registration.payment ? [registration.payment] : [],
+  );
+
+  const pendingAmountCents = payments
+    .filter((payment) => payment.status === "PENDING")
+    .reduce((sum, payment) => sum + payment.amount_cents, 0);
+
+  const paidAmountCents = payments
+    .filter((payment) => payment.status === "PAID")
+    .reduce((sum, payment) => sum + payment.amount_cents, 0);
+
+  const nextRegistration =
+    user.registrations
+      .filter((registration) => new Date(registration.event.event_date) >= now)
+      .sort((a, b) => new Date(a.event.event_date).getTime() - new Date(b.event.event_date).getTime())[0] ??
+    null;
+
+  const lastPayment =
+    payments
+      .filter((payment) => payment.status === "PAID")
+      .sort((a, b) => {
+        const aDate = a.paid_at ? new Date(a.paid_at) : new Date(a.created_at);
+        const bDate = b.paid_at ? new Date(b.paid_at) : new Date(b.created_at);
+        return bDate.getTime() - aDate.getTime();
+      })[0] ?? null;
+
+  const athleteStatus = resolveAthleteStatus(user.athlete_profile?.athlete_status, user.account_status);
+  const inviteSource = inviteByAcceptedUserId.get(user.id) ?? null;
+
+  return {
+    id: user.id,
+    memberNumber: user.athlete_profile?.member_number ?? null,
+    memberSequence: user.athlete_profile?.member_sequence ?? null,
+    memberSince: user.athlete_profile?.member_since
+      ? new Date(user.athlete_profile.member_since).toISOString()
+      : null,
+    name: user.name,
+    email: user.email,
+    status: athleteStatus,
+    approvalPending: athleteStatus === "PENDING_APPROVAL",
+    signupSource: user.athlete_profile?.signup_source ?? null,
+    invitedByName: inviteSource?.creatorName ?? null,
+    invitedByEmail: inviteSource?.creatorEmail ?? null,
+    invitedByMemberNumber: inviteSource?.creatorMemberNumber ?? null,
+    registrationsCount: user.registrations.length,
+    nextEventName: nextRegistration?.event.name ?? null,
+    nextEventDate: nextRegistration ? new Date(nextRegistration.event.event_date).toISOString() : null,
+    pendingAmountCents,
+    paidAmountCents,
+    financialSituation: financialFromData(payments.length, pendingAmountCents),
+    lastPaymentAt: lastPayment?.paid_at ? new Date(lastPayment.paid_at).toISOString() : null,
+    city: user.athlete_profile?.city ?? null,
+    state: user.athlete_profile?.state ?? null,
+    internalNote: null,
+  };
+}
+
 export async function GET(req: NextRequest) {
   const auth = getAuthContext(req);
   if (!auth) return apiError("UNAUTHORIZED", "Token de acesso ausente.", 401);
@@ -75,6 +227,7 @@ export async function GET(req: NextRequest) {
     status: req.nextUrl.searchParams.get("status") ?? undefined,
     page: req.nextUrl.searchParams.get("page") ?? undefined,
     pageSize: req.nextUrl.searchParams.get("pageSize") ?? undefined,
+    export: req.nextUrl.searchParams.get("export") ?? undefined,
   });
 
   if (!parsed.success) {
@@ -94,6 +247,7 @@ export async function GET(req: NextRequest) {
               OR: [
                 { name: { contains: q, mode: "insensitive" } },
                 { email: { contains: q, mode: "insensitive" } },
+                { athlete_profile: { is: { member_number: { contains: q, mode: "insensitive" } } } },
               ],
             }
           : {}),
@@ -102,6 +256,10 @@ export async function GET(req: NextRequest) {
         athlete_profile: {
           select: {
             athlete_status: true,
+            signup_source: true,
+            member_number: true,
+            member_sequence: true,
+            member_since: true,
             city: true,
             state: true,
           },
@@ -134,62 +292,65 @@ export async function GET(req: NextRequest) {
     }),
   ]);
 
-  const rows = users.map((user) => {
-    const payments = user.registrations.flatMap((registration) =>
-      registration.payment ? [registration.payment] : [],
-    );
+  const acceptedUserIds = users.map((user) => user.id);
+  const acceptedInvites = acceptedUserIds.length
+    ? await prisma.organizationInvite.findMany({
+        where: {
+          organization_id: auth.organizationId,
+          accepted_user_id: { in: acceptedUserIds },
+          created_by: { not: null },
+        },
+        select: {
+          accepted_user_id: true,
+          created_by: true,
+        },
+      })
+    : [];
 
-    const pendingAmountCents = payments
-      .filter((payment) => payment.status === "PENDING")
-      .reduce((sum, payment) => sum + payment.amount_cents, 0);
+  const creatorIds = Array.from(
+    new Set(acceptedInvites.map((invite) => invite.created_by).filter((id): id is string => Boolean(id))),
+  );
+  const creators = creatorIds.length
+    ? await prisma.user.findMany({
+        where: { id: { in: creatorIds }, organization_id: auth.organizationId },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          athlete_profile: { select: { member_number: true } },
+        },
+      })
+    : [];
+  const creatorById = new Map(creators.map((creator) => [creator.id, creator]));
+  const inviteByAcceptedUserId = new Map(
+    acceptedInvites
+      .filter((invite) => invite.accepted_user_id && invite.created_by)
+      .map((invite) => {
+        const creator = creatorById.get(invite.created_by ?? "");
+        return [
+          invite.accepted_user_id ?? "",
+          {
+            creatorName: creator?.name ?? null,
+            creatorEmail: creator?.email ?? null,
+            creatorMemberNumber: creator?.athlete_profile?.member_number ?? null,
+          },
+        ] as const;
+      }),
+  );
 
-    const paidAmountCents = payments
-      .filter((payment) => payment.status === "PAID")
-      .reduce((sum, payment) => sum + payment.amount_cents, 0);
-
-    const nextRegistration =
-      user.registrations
-        .filter((registration) => new Date(registration.event.event_date) >= now)
-        .sort(
-          (a, b) => new Date(a.event.event_date).getTime() - new Date(b.event.event_date).getTime(),
-        )[0] ?? null;
-
-    const lastPayment =
-      payments
-        .filter((payment) => payment.status === "PAID")
-        .sort((a, b) => {
-          const aDate = a.paid_at ? new Date(a.paid_at) : new Date(a.created_at);
-          const bDate = b.paid_at ? new Date(b.paid_at) : new Date(b.created_at);
-          return bDate.getTime() - aDate.getTime();
-        })[0] ?? null;
-
-    const athleteStatus = resolveAthleteStatus(
-      user.athlete_profile?.athlete_status,
-      user.account_status,
-    );
-
-    return {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      status: athleteStatus,
-      approvalPending: athleteStatus === "PENDING_APPROVAL",
-      registrationsCount: user.registrations.length,
-      nextEventName: nextRegistration?.event.name ?? null,
-      nextEventDate: nextRegistration
-        ? new Date(nextRegistration.event.event_date).toISOString()
-        : null,
-      pendingAmountCents,
-      paidAmountCents,
-      financialSituation: financialFromData(payments.length, pendingAmountCents),
-      lastPaymentAt: lastPayment?.paid_at ? new Date(lastPayment.paid_at).toISOString() : null,
-      city: user.athlete_profile?.city ?? null,
-      state: user.athlete_profile?.state ?? null,
-      internalNote: null,
-    };
-  });
+  const rows = users.map((user) => buildAthleteRow(user, now, inviteByAcceptedUserId));
 
   const filteredRows = rows.filter((row) => (status === "ALL" ? true : row.status === status));
+
+  if (parsed.data.export === "csv") {
+    return new NextResponse(toCsv(filteredRows), {
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": `attachment; filename="associados-${new Date().toISOString().slice(0, 10)}.csv"`,
+        "Cache-Control": "no-store",
+      },
+    });
+  }
 
   const total = filteredRows.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -207,6 +368,11 @@ export async function GET(req: NextRequest) {
       blocked: rows.filter((row) => row.status === "BLOCKED").length,
       totalPendingCents: rows.reduce((sum, row) => sum + row.pendingAmountCents, 0),
       totalPaidCents: rows.reduce((sum, row) => sum + row.paidAmountCents, 0),
+      withMemberNumber: rows.filter((row) => Boolean(row.memberNumber)).length,
+      missingMemberNumber: rows.filter((row) => !row.memberNumber).length,
+      invitedSignups: rows.filter((row) => row.signupSource === "INVITE").length,
+      slugSignups: rows.filter((row) => row.signupSource === "SLUG").length,
+      adminSignups: rows.filter((row) => row.signupSource === "ADMIN").length,
     },
     organizationPolicy: {
       slug: organization?.slug ?? "",
@@ -339,6 +505,11 @@ export async function POST(req: NextRequest) {
           gender: data.gender ?? null,
           emergency_contact: data.emergencyContact ? { contact: data.emergencyContact } : undefined,
         },
+      });
+
+      await ensureAthleteMemberNumber(tx, {
+        organizationId: auth.organizationId,
+        userId: user.id,
       });
 
       return user;

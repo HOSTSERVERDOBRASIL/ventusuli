@@ -1,6 +1,7 @@
 import { buildAuthHeaders } from "@/services/runtime";
 import {
   AdminAthleteInvite,
+  AdminAthleteInviteSummary,
   AdminAthletePolicy,
   AdminAthletesListResponse,
   CreateAthleteByAdminResponse,
@@ -48,6 +49,18 @@ export async function getAdminAthletes(filters: AdminAthletesFilters): Promise<A
   }
 
   return (await response.json()) as AdminAthletesListResponse;
+}
+
+export function buildAdminAthletesExportUrl(filters: AdminAthletesFilters): string {
+  const query = new URLSearchParams();
+
+  if (filters.q) query.set("q", filters.q);
+  if (filters.status) query.set("status", filters.status);
+  query.set("page", "1");
+  query.set("pageSize", "100");
+  query.set("export", "csv");
+
+  return `/api/admin/athletes?${query.toString()}`;
 }
 
 export async function updateAdminAthleteStatus(
@@ -102,6 +115,7 @@ export async function createAthleteByAdmin(
 
 export async function listAdminInvites(accessToken?: string | null): Promise<{
   data: AdminAthleteInvite[];
+  summary: AdminAthleteInviteSummary;
   policy: AdminAthletePolicy;
 }> {
   const response = await fetch("/api/admin/invites", {
@@ -114,7 +128,11 @@ export async function listAdminInvites(accessToken?: string | null): Promise<{
     throw await parseError(response, "Nao foi possivel carregar convites.");
   }
 
-  return (await response.json()) as { data: AdminAthleteInvite[]; policy: AdminAthletePolicy };
+  return (await response.json()) as {
+    data: AdminAthleteInvite[];
+    summary: AdminAthleteInviteSummary;
+    policy: AdminAthletePolicy;
+  };
 }
 
 export async function createAdminInvite(
@@ -151,4 +169,3 @@ export async function resendAdminInvite(inviteId: string, accessToken?: string |
   const payload = (await response.json()) as { data: AdminAthleteInvite };
   return payload.data;
 }
-

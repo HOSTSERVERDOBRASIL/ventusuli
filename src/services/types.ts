@@ -259,6 +259,8 @@ export interface AthleteIdentity {
   name: string;
   email: string;
   avatarUrl?: string | null;
+  memberNumber?: string | null;
+  memberSince?: string | null;
   accountStatus?: "ACTIVE" | "PENDING_INVITE" | "PENDING_APPROVAL" | "SUSPENDED" | null;
   cpf: string | null;
   phone: string | null;
@@ -377,10 +379,17 @@ export type AthleteFinancialSituation = "EM_DIA" | "PENDENTE" | "SEM_HISTORICO";
 
 export interface AthleteListRow {
   id: string;
+  memberNumber: string | null;
+  memberSequence: number | null;
+  memberSince: string | null;
   name: string;
   email: string;
   status: AthleteCrmStatus;
   approvalPending: boolean;
+  signupSource?: "SLUG" | "INVITE" | "ADMIN" | null;
+  invitedByName?: string | null;
+  invitedByMemberNumber?: string | null;
+  invitedByEmail?: string | null;
   registrationsCount: number;
   nextEventName: string | null;
   nextEventDate: string | null;
@@ -401,6 +410,11 @@ export interface AthletesListSummary {
   blocked: number;
   totalPendingCents: number;
   totalPaidCents: number;
+  withMemberNumber?: number;
+  missingMemberNumber?: number;
+  invitedSignups?: number;
+  slugSignups?: number;
+  adminSignups?: number;
 }
 
 export interface AthletesListResponse {
@@ -431,12 +445,37 @@ export interface AdminAthleteInvite {
   active: boolean;
   expiresAt: string | null;
   expired: boolean;
+  status: "AVAILABLE" | "EXPIRED" | "EXHAUSTED" | "INACTIVE";
   maxUses: number | null;
   usedCount: number;
   availableUses: number | null;
   reusable: boolean;
+  inviteKind: string;
+  invitedEmail: string | null;
+  invitedName: string | null;
+  createdBy: {
+    id: string;
+    name: string | null;
+    email: string | null;
+  } | null;
+  acceptedUser: {
+    id: string;
+    name: string | null;
+    email: string | null;
+    memberNumber: string | null;
+  } | null;
+  acceptedAt: string | null;
   createdAt: string;
   signupUrl: string;
+}
+
+export interface AdminAthleteInviteSummary {
+  total: number;
+  available: number;
+  used: number;
+  expired: number;
+  athleteReferral: number;
+  adminGeneral: number;
 }
 
 export interface CreateAthleteByAdminResponse {
@@ -491,6 +530,9 @@ export interface AthleteDetail {
     internalNote: string | null;
     athleteStatus: AthleteCrmStatus;
     approvalPending: boolean;
+    memberNumber: string | null;
+    memberSince: string | null;
+    signupSource: "SLUG" | "INVITE" | "ADMIN" | null;
   };
   summary: {
     registrationsCount: number;

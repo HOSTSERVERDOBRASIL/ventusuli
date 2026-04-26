@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { ensureAthleteMemberNumber } from "@/lib/athletes/member-number";
 import {
   hashPassword,
   generateAccessToken,
@@ -21,7 +22,22 @@ const RATE_WINDOW_MS = 15 * 60 * 1_000;
 type ResolvedEnrollment = {
   organizationId: string;
   usedInviteId: string | null;
+  invitedEmail: string | null;
 };
+
+type InviteUsageGuard = {
+  active: boolean;
+  expires_at: Date | null;
+  max_uses: number | null;
+  used_count: number;
+  invited_email: string | null;
+};
+
+class InviteUsageError extends Error {
+  constructor() {
+    super("invalid_or_exhausted_invite");
+  }
+}
 
 function hasPrismaCode(error: unknown, code: string): boolean {
   return (
@@ -47,33 +63,40 @@ function resolveSignupSource(usingInvite: boolean): "INVITE" | "SLUG" {
   return usingInvite ? "INVITE" : "SLUG";
 }
 
+function isInviteUsable(invite: InviteUsageGuard): boolean {
+  const expired = invite.expires_at ? invite.expires_at.getTime() < Date.now() : false;
+  const outOfUses = typeof invite.max_uses === "number" && invite.used_count >= invite.max_uses;
+  return invite.active && !expired && !outOfUses;
+}
+
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
 async function resolveEnrollmentTarget(input: {
   organizationSlug?: string;
   inviteToken?: string;
 }): Promise<ResolvedEnrollment | null> {
   if (input.inviteToken) {
-    const invite = await prisma.organizationInvite.findUnique({
-      where: { token: input.inviteToken },
-      select: {
-        id: true,
-        organization_id: true,
-        active: true,
-        expires_at: true,
-        max_uses: true,
-        used_count: true,
-      },
-    });
+    const inviteRows = await prisma.$queryRaw<
+      Array<InviteUsageGuard & { id: string; organization_id: string }>
+    >`
+      SELECT id, organization_id, active, expires_at, max_uses, used_count, invited_email
+      FROM public.organization_invites
+      WHERE token = ${input.inviteToken}
+      LIMIT 1
+    `;
+
+    const invite = inviteRows[0];
 
     if (!invite) return null;
 
-    const expired = invite.expires_at ? invite.expires_at.getTime() < Date.now() : false;
-    const outOfUses = typeof invite.max_uses === "number" && invite.used_count >= invite.max_uses;
-
-    if (!invite.active || expired || outOfUses) return null;
+    if (!isInviteUsable(invite)) return null;
 
     return {
       organizationId: invite.organization_id,
       usedInviteId: invite.id,
+      invitedEmail: invite.invited_email,
     };
   }
 
@@ -88,6 +111,7 @@ async function resolveEnrollmentTarget(input: {
     return {
       organizationId: organization.id,
       usedInviteId: null,
+      invitedEmail: null,
     };
   }
 
@@ -162,10 +186,11 @@ export async function POST(req: NextRequest) {
   }
 
   const { name, email, password, organizationSlug, inviteToken } = parsed.data;
+  const normalizedEmail = normalizeEmail(email);
 
   try {
     const existingUser = await prisma.user.findUnique({
-      where: { email },
+      where: { email: normalizedEmail },
       select: { id: true, organization_id: true },
     });
 
@@ -214,9 +239,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const requireAthleteApproval = readBooleanSetting(organization.settings, "requireAthleteApproval", false);
+    const requireAthleteApproval =
+      usingInvite || readBooleanSetting(organization.settings, "requireAthleteApproval", false);
     const athleteStatus = resolveAthleteStatus(requireAthleteApproval);
     const signupSource = resolveSignupSource(usingInvite);
+
+    if (enrollment.invitedEmail && normalizeEmail(enrollment.invitedEmail) !== normalizedEmail) {
+      return apiError(
+        "FORBIDDEN",
+        "Este convite foi emitido para outro e-mail. Use o e-mail convidado ou solicite novo convite.",
+        403,
+      );
+    }
 
     const password_hash = await hashPassword(password);
 
@@ -224,7 +258,7 @@ export async function POST(req: NextRequest) {
       const user = await tx.user.create({
         data: {
           name,
-          email,
+          email: normalizedEmail,
           password_hash,
           role: UserRole.ATHLETE,
           account_status: requireAthleteApproval ? "PENDING_APPROVAL" : "ACTIVE",
@@ -251,9 +285,37 @@ export async function POST(req: NextRequest) {
       });
 
       if (enrollment.usedInviteId) {
-        await tx.organizationInvite.update({
-          where: { id: enrollment.usedInviteId },
-          data: { used_count: { increment: 1 } },
+        const inviteRows = await tx.$queryRaw<InviteUsageGuard[]>`
+          SELECT active, expires_at, max_uses, used_count, invited_email
+          FROM public.organization_invites
+          WHERE id = ${enrollment.usedInviteId}
+            AND organization_id = ${organization.id}
+          LIMIT 1
+          FOR UPDATE
+        `;
+
+        const invite = inviteRows[0];
+        if (!invite || !isInviteUsable(invite)) {
+          throw new InviteUsageError();
+        }
+
+        if (invite.invited_email && normalizeEmail(invite.invited_email) !== normalizedEmail) {
+          throw new InviteUsageError();
+        }
+
+        await tx.$executeRaw`
+          UPDATE public.organization_invites
+          SET used_count = used_count + 1,
+              accepted_user_id = ${user.id},
+              accepted_at = NOW()
+          WHERE id = ${enrollment.usedInviteId}
+        `;
+      }
+
+      if (!requireAthleteApproval) {
+        await ensureAthleteMemberNumber(tx, {
+          organizationId: organization.id,
+          userId: user.id,
         });
       }
 
@@ -340,6 +402,14 @@ export async function POST(req: NextRequest) {
     );
     return response;
   } catch (error) {
+    if (error instanceof InviteUsageError) {
+      return apiError(
+        "ORG_NOT_FOUND",
+        "Assessoria nao encontrada com os dados informados. Verifique slug ou convite.",
+        404,
+      );
+    }
+
     if (hasPrismaCode(error, "P2002")) {
       logWarn("auth_register_athlete_unique_conflict", withRequestContext(req, { email }));
       return apiError(

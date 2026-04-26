@@ -1,7 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { apiError } from "@/lib/api-error";
-import { sanitizeOrganizationSettings } from "@/lib/organization-settings";
 import { getAuthContext } from "@/lib/request-auth";
 
 export async function GET(req: NextRequest) {
@@ -26,6 +25,8 @@ export async function GET(req: NextRequest) {
           athlete_status: true,
           signup_source: true,
           onboarding_completed_at: true,
+          member_number: true,
+          member_since: true,
           cpf: true,
           phone: true,
           city: true,
@@ -52,15 +53,5 @@ export async function GET(req: NextRequest) {
     return apiError("USER_NOT_FOUND", "Usuário não encontrado.", 404);
   }
 
-  return NextResponse.json({
-    data: {
-      ...user,
-      organization: user.organization
-        ? {
-            ...user.organization,
-            settings: sanitizeOrganizationSettings(user.organization.settings),
-          }
-        : null,
-    },
-  });
+  return NextResponse.json({ data: user });
 }
