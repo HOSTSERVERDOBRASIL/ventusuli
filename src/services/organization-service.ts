@@ -1,5 +1,5 @@
 import { buildAuthHeaders } from "@/services/runtime";
-
+export const ACCEPTED_IMAGE_FILE_INPUT_ACCEPT = "image/png,image/jpeg,image/jpg,image/webp";
 export interface OrganizationSettings {
   id: string;
   name: string;
@@ -48,7 +48,9 @@ async function parseJsonResponse<T>(response: Response, fallback: string): Promi
   }
 }
 
-export async function getOrganizationSettings(accessToken?: string | null): Promise<OrganizationSettings> {
+export async function getOrganizationSettings(
+  accessToken?: string | null,
+): Promise<OrganizationSettings> {
   const response = await fetch("/api/organization", {
     method: "GET",
     cache: "no-store",
@@ -63,7 +65,8 @@ export async function getOrganizationSettings(accessToken?: string | null): Prom
     response,
     "Resposta invalida ao carregar configuracoes da organizacao.",
   );
-  if (!payload.data) throw new Error("Resposta sem dados ao carregar configuracoes da organizacao.");
+  if (!payload.data)
+    throw new Error("Resposta sem dados ao carregar configuracoes da organizacao.");
   return payload.data;
 }
 
@@ -167,7 +170,9 @@ export async function createInvite(
     "Convite criado, mas a resposta do servidor veio invalida. Recarregue a lista.",
   );
   if (!payload.data) {
-    throw new Error("Convite criado, mas a resposta do servidor veio sem dados. Recarregue a lista.");
+    throw new Error(
+      "Convite criado, mas a resposta do servidor veio sem dados. Recarregue a lista.",
+    );
   }
 
   return payload.data;
