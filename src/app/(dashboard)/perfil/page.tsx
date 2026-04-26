@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CircleUserRound, Mail, ShieldCheck, Pencil, X, Check, AlertTriangle } from "lucide-react";
+import { AlertTriangle, Check, CircleUserRound, Copy, Mail, Pencil, ShieldCheck, UserPlus, X } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/system/empty-state";
 import { LoadingState } from "@/components/system/loading-state";
@@ -11,11 +11,10 @@ import { SectionCard } from "@/components/system/section-card";
 import { useAuthToken } from "@/components/auth/AuthTokenProvider";
 import { getAthleteIdentity, updateAthleteProfile } from "@/services/registrations-service";
 import { AthleteIdentity } from "@/services/types";
+import { createInvite, listInvites, OrgInvite } from "@/services/organization-service";
 import { formatCpf, isValidCpf, normalizeCpf } from "@/lib/cpf";
-import {
-  ACCEPTED_IMAGE_FILE_INPUT_ACCEPT,
-  uploadImageFile,
-} from "@/services/upload-service";
+import { uploadImageFile } from "@/services/upload-service";
+import { UserRole } from "@/types";
 
 const BRAZILIAN_STATES = [
   "AC",
@@ -48,6 +47,12 @@ const BRAZILIAN_STATES = [
 ];
 
 const GENDER_LABELS: Record<string, string> = { M: "Masculino", F: "Feminino", O: "Outro" };
+const ROLE_LABELS: Record<string, string> = {
+  [UserRole.ATHLETE]: "Atleta",
+  [UserRole.ADMIN]: "Administrador",
+  [UserRole.COACH]: "Treinador",
+  [UserRole.SUPER_ADMIN]: "Super administrador",
+};
 
 interface FormState {
   cpf: string;
@@ -91,7 +96,7 @@ function labelClass() {
 }
 
 export default function PerfilPage() {
-  const { accessToken, userRole, organization } = useAuthToken();
+  const { accessToken, userRole, organization, currentUser, refreshSession } = useAuthToken();
   const [identity, setIdentity] = useState<AthleteIdentity | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -99,6 +104,11 @@ export default function PerfilPage() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [friendInvites, setFriendInvites] = useState<OrgInvite[]>([]);
+  const [friendInviteLoading, setFriendInviteLoading] = useState(false);
+  const [friendInviteCreating, setFriendInviteCreating] = useState(false);
+  const [friendName, setFriendName] = useState("");
+  const [friendEmail, setFriendEmail] = useState("");
   const [form, setForm] = useState<FormState>({
     cpf: "",
     phone: "",
@@ -137,9 +147,40 @@ export default function PerfilPage() {
     };
   }, [accessToken, reloadKey]);
 
+  useEffect(() => {
+    if (organization?.name || !userRole) return;
+    void refreshSession();
+  }, [organization?.name, refreshSession, userRole]);
+
   const isAthleteRole = userRole === "ATHLETE" || !userRole;
+  const roleLabel = userRole ? (ROLE_LABELS[userRole] ?? userRole) : "Atleta";
+  const organizationName =
+    organization?.name ?? currentUser?.organization?.name ?? "Assessoria nao identificada";
 
   const hasCpf = Boolean(identity?.cpf);
+
+  useEffect(() => {
+    if (userRole !== "ATHLETE") return;
+
+    let cancelled = false;
+
+    const loadInvites = async () => {
+      setFriendInviteLoading(true);
+      try {
+        const data = await listInvites(accessToken);
+        if (!cancelled) setFriendInvites(data);
+      } catch {
+        if (!cancelled) setFriendInvites([]);
+      } finally {
+        if (!cancelled) setFriendInviteLoading(false);
+      }
+    };
+
+    void loadInvites();
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, userRole]);
 
   function handleCpfChange(raw: string) {
     // Auto-format as user types: insert dots and dash
@@ -242,6 +283,52 @@ export default function PerfilPage() {
     }
   }
 
+  function buildInviteUrl(invite: OrgInvite): string {
+    const path = invite.signupUrl ?? `/register/atleta?inviteToken=${invite.token}`;
+    if (typeof window === "undefined") return path;
+    return path.startsWith("http") ? path : `${window.location.origin}${path}`;
+  }
+
+  async function handleCreateFriendInvite() {
+    const email = friendEmail.trim().toLowerCase();
+    if (!email) {
+      toast.error("Informe o e-mail do amigo.");
+      return;
+    }
+
+    setFriendInviteCreating(true);
+    try {
+      const invite = await createInvite(
+        {
+          invitedEmail: email,
+          invitedName: friendName.trim() || undefined,
+          label: friendName.trim() ? `Convite para ${friendName.trim()}` : `Convite para ${email}`,
+          max_uses: 1,
+        },
+        accessToken,
+      );
+      setFriendInvites((prev) => [invite, ...prev]);
+      setFriendName("");
+      setFriendEmail("");
+
+      await navigator.clipboard.writeText(buildInviteUrl(invite));
+      toast.success("Convite individual criado e link copiado.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Nao foi possivel criar convite.");
+    } finally {
+      setFriendInviteCreating(false);
+    }
+  }
+
+  async function copyFriendInvite(invite: OrgInvite) {
+    try {
+      await navigator.clipboard.writeText(buildInviteUrl(invite));
+      toast.success("Link de convite copiado.");
+    } catch {
+      toast.error("Nao foi possivel copiar o link.");
+    }
+  }
+
   return (
     <div className="space-y-6 text-white">
       <PageHeader title="Meu perfil" subtitle="Dados da conta e informações esportivas." />
@@ -305,7 +392,7 @@ export default function PerfilPage() {
                 <label className="inline-flex cursor-pointer items-center rounded-xl border border-[#2f5d8f] bg-[#12355d] px-3 py-2 text-sm font-medium text-[#dce9ff] transition hover:bg-[#18436f]">
                   <input
                     type="file"
-                    accept={ACCEPTED_IMAGE_FILE_INPUT_ACCEPT}
+                    accept="image/png,image/jpeg,image/jpg,image/webp,image/gif,image/svg+xml"
                     className="hidden"
                     disabled={avatarUploading}
                     onChange={(event) => {
@@ -332,8 +419,9 @@ export default function PerfilPage() {
               {[
                 { label: "Nome", value: identity.name },
                 { label: "Email", value: identity.email },
-                { label: "Perfil", value: GENDER_LABELS[userRole ?? ""] ?? userRole ?? "ATHLETE" },
-                { label: "Assessoria", value: organization?.name ?? "Não identificada" },
+                { label: "Associado", value: identity.memberNumber ?? "Aguardando aprovação" },
+                { label: "Perfil", value: roleLabel },
+                { label: "Assessoria", value: organizationName },
               ].map(({ label, value }) => (
                 <div key={label} className="rounded-xl border border-[#24486f] bg-[#0f233d] p-4">
                   <p className="text-xs uppercase tracking-wide text-[#8eb0dc]">{label}</p>
@@ -342,6 +430,89 @@ export default function PerfilPage() {
               ))}
             </div>
           </SectionCard>
+
+          {userRole === "ATHLETE" ? (
+            <SectionCard
+              title="Convidar amigo"
+              description="Gere um convite individual para um amigo entrar na sua assessoria"
+            >
+              <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+                <div>
+                  <label className={labelClass()}>Nome do amigo</label>
+                  <input
+                    className={inputClass()}
+                    type="text"
+                    placeholder="Nome completo"
+                    value={friendName}
+                    onChange={(event) => setFriendName(event.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className={labelClass()}>E-mail do amigo</label>
+                  <input
+                    className={inputClass()}
+                    type="email"
+                    placeholder="amigo@email.com"
+                    value={friendEmail}
+                    onChange={(event) => setFriendEmail(event.target.value)}
+                  />
+                </div>
+                <div className="flex items-end">
+                  <button
+                    type="button"
+                    onClick={() => void handleCreateFriendInvite()}
+                    disabled={friendInviteCreating}
+                    className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#F5A623] px-4 py-2 text-sm font-semibold text-[#0A1628] transition hover:bg-[#e59a1f] disabled:opacity-50 md:w-auto"
+                  >
+                    <UserPlus className="h-4 w-4" />
+                    {friendInviteCreating ? "Criando..." : "Criar convite"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-2">
+                {friendInviteLoading ? (
+                  <p className="text-sm text-[#8eb0dc]">Carregando convites...</p>
+                ) : friendInvites.length === 0 ? (
+                  <p className="rounded-xl border border-[#24486f] bg-[#0a1d36] p-4 text-sm text-[#8eb0dc]">
+                    Nenhum convite individual criado ainda.
+                  </p>
+                ) : (
+                  friendInvites.map((invite) => {
+                    const accepted = Boolean(invite.accepted_at);
+                    const exhausted =
+                      typeof invite.max_uses === "number" && invite.used_count >= invite.max_uses;
+                    const status = accepted ? "Usado" : exhausted ? "Esgotado" : invite.active ? "Ativo" : "Inativo";
+
+                    return (
+                      <div
+                        key={invite.id}
+                        className="flex flex-col gap-3 rounded-xl border border-[#24486f] bg-[#0a1d36] p-4 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div>
+                          <p className="font-semibold text-white">
+                            {invite.invited_name ?? invite.label ?? "Convite individual"}
+                          </p>
+                          <p className="text-sm text-[#8eb0dc]">{invite.invited_email ?? "E-mail nao informado"}</p>
+                          <p className="text-xs text-[#6a9ac8]">
+                            {status} · usos {invite.used_count}/{invite.max_uses ?? "ilimitado"}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => void copyFriendInvite(invite)}
+                          className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#2f5d8f] bg-[#12355d] px-3 py-2 text-sm font-medium text-[#dce9ff] transition hover:bg-[#18436f]"
+                        >
+                          <Copy className="h-4 w-4" />
+                          Copiar link
+                        </button>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </SectionCard>
+          ) : null}
 
           {/* Profile data */}
           <SectionCard

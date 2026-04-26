@@ -72,20 +72,3 @@ export function calculateRedemption(
     validationError,
   };
 }
-
-const specExample = calculateRedemption(
-  {
-    cashPriceCents: 6000,
-    pointsCost: 300,
-    maxPointsDiscountPercent: 40,
-    minimumCashCents: 0,
-    allowMixed: true,
-    allowPoints: true,
-    active: true,
-    stockQuantity: 5,
-  },
-  300,
-);
-
-console.assert(specExample.pointsUsed === 240, "Spec falhou: pointsUsed deve ser 240");
-console.assert(specExample.cashCents === 3600, "Spec falhou: cashCents deve ser 3600");

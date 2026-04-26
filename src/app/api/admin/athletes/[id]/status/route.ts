@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { UserRole } from "@prisma/client";
 import { z } from "zod";
 import { apiError } from "@/lib/api-error";
+import { ensureAthleteMemberNumber } from "@/lib/athletes/member-number";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/request-auth";
 
@@ -80,6 +81,13 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         athlete_status: nextAthleteStatus,
       },
     });
+
+    if (action === "APPROVE") {
+      await ensureAthleteMemberNumber(tx, {
+        organizationId: auth.organizationId,
+        userId: athlete.id,
+      });
+    }
   });
 
   return NextResponse.json({

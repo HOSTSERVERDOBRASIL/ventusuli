@@ -213,12 +213,34 @@ export async function creditPoints(input: LedgerMutationInput): Promise<LedgerMu
   return prisma.$transaction((tx) => createLedgerEntryInTransaction(tx, input, "CREDIT"));
 }
 
+export async function creditPointsInTransaction(
+  tx: Prisma.TransactionClient,
+  input: LedgerMutationInput,
+): Promise<LedgerMutationResult> {
+  if (input.points <= 0) {
+    throw new Error("credit_points_must_be_positive");
+  }
+
+  return createLedgerEntryInTransaction(tx, input, "CREDIT");
+}
+
 export async function debitPoints(input: LedgerMutationInput): Promise<LedgerMutationResult> {
   if (input.points >= 0) {
     throw new Error("debit_points_must_be_negative");
   }
 
   return prisma.$transaction((tx) => createLedgerEntryInTransaction(tx, input, "DEBIT"));
+}
+
+export async function debitPointsInTransaction(
+  tx: Prisma.TransactionClient,
+  input: LedgerMutationInput,
+): Promise<LedgerMutationResult> {
+  if (input.points >= 0) {
+    throw new Error("debit_points_must_be_negative");
+  }
+
+  return createLedgerEntryInTransaction(tx, input, "DEBIT");
 }
 
 export async function creditEventPoints(p: {

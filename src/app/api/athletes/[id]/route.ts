@@ -134,6 +134,9 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
       role: athlete.role,
       profile: {
         cpf: athlete.athlete_profile?.cpf ?? null,
+        memberNumber: athlete.athlete_profile?.member_number ?? null,
+        memberSince: athlete.athlete_profile?.member_since ?? null,
+        signupSource: athlete.athlete_profile?.signup_source ?? null,
         phone: athlete.athlete_profile?.phone ?? null,
         city: athlete.athlete_profile?.city ?? null,
         state: athlete.athlete_profile?.state ?? null,

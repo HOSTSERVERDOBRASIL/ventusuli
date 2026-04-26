@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Copy, RefreshCw, UserPlus, Users } from "lucide-react";
+import { Copy, Download, RefreshCw, UserPlus, Users } from "lucide-react";
 import { toast } from "sonner";
 import { AthletesCrmTable } from "@/components/athletes/athletes-crm-table";
 import { AthletesSummaryCards } from "@/components/athletes/athletes-summary-cards";
@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import {
   createAdminInvite,
+  buildAdminAthletesExportUrl,
   getAdminAthletes,
   listAdminInvites,
   resendAdminInvite,
@@ -25,6 +26,7 @@ import {
 } from "@/services/admin-athletes-service";
 import {
   AdminAthleteInvite,
+  AdminAthleteInviteSummary,
   AdminAthletePolicy,
   AthleteListRow,
   AthletesListSummary,
@@ -38,12 +40,26 @@ const EMPTY_SUMMARY: AthletesListSummary = {
   blocked: 0,
   totalPendingCents: 0,
   totalPaidCents: 0,
+  withMemberNumber: 0,
+  missingMemberNumber: 0,
+  invitedSignups: 0,
+  slugSignups: 0,
+  adminSignups: 0,
 };
 
 const EMPTY_POLICY: AdminAthletePolicy = {
   slug: "",
   allowAthleteSelfSignup: false,
   requireAthleteApproval: true,
+};
+
+const EMPTY_INVITE_SUMMARY: AdminAthleteInviteSummary = {
+  total: 0,
+  available: 0,
+  used: 0,
+  expired: 0,
+  athleteReferral: 0,
+  adminGeneral: 0,
 };
 
 type AthleteStatusFilter = "ALL" | "PENDING_APPROVAL" | "ACTIVE" | "REJECTED" | "BLOCKED";
@@ -55,6 +71,7 @@ export default function AdminAtletasPage() {
   const [summary, setSummary] = useState<AthletesListSummary>(EMPTY_SUMMARY);
   const [policy, setPolicy] = useState<AdminAthletePolicy>(EMPTY_POLICY);
   const [invites, setInvites] = useState<AdminAthleteInvite[]>([]);
+  const [inviteSummary, setInviteSummary] = useState<AdminAthleteInviteSummary>(EMPTY_INVITE_SUMMARY);
   const [loadingAthletes, setLoadingAthletes] = useState(true);
   const [loadingInvites, setLoadingInvites] = useState(true);
 
@@ -107,9 +124,11 @@ export default function AdminAtletasPage() {
     try {
       const payload = await listAdminInvites(accessToken);
       setInvites(payload.data);
+      setInviteSummary(payload.summary);
       setPolicy(payload.policy);
     } catch (error) {
       setInvites([]);
+      setInviteSummary(EMPTY_INVITE_SUMMARY);
       toast.error(error instanceof Error ? error.message : "Falha ao carregar convites.");
     } finally {
       setLoadingInvites(false);
@@ -140,6 +159,37 @@ export default function AdminAtletasPage() {
       toast.error(error instanceof Error ? error.message : "Falha ao atualizar status do atleta.");
     } finally {
       setStatusActionId(null);
+    }
+  };
+
+  const exportAssociates = async () => {
+    try {
+      const response = await fetch(
+        buildAdminAthletesExportUrl({
+          q: query || undefined,
+          status,
+          accessToken,
+        }),
+        {
+          cache: "no-store",
+          headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+        },
+      );
+
+      if (!response.ok) throw new Error("Nao foi possivel exportar associados.");
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `associados-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      toast.success("Relatorio de associados exportado.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Falha ao exportar associados.");
     }
   };
 
@@ -197,6 +247,40 @@ export default function AdminAtletasPage() {
       </SectionCard>
 
       {loadingAthletes ? <LoadingState lines={3} /> : <AthletesSummaryCards summary={summary} />}
+
+      <SectionCard
+        title="Relatorio de associados"
+        description="Controle de matriculas e origem de entrada dos atletas"
+      >
+        <div className="mb-3 flex justify-end">
+          <ActionButton intent="secondary" onClick={() => void exportAssociates()}>
+            <Download className="mr-2 h-4 w-4" />
+            Exportar CSV
+          </ActionButton>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <div className="rounded-xl border border-white/10 bg-[#0F2743] p-4">
+            <p className="text-xs uppercase tracking-wide text-slate-300">Com matricula</p>
+            <p className="mt-2 text-2xl font-semibold text-white">{summary.withMemberNumber ?? 0}</p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-[#0F2743] p-4">
+            <p className="text-xs uppercase tracking-wide text-slate-300">Sem matricula</p>
+            <p className="mt-2 text-2xl font-semibold text-white">{summary.missingMemberNumber ?? 0}</p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-[#0F2743] p-4">
+            <p className="text-xs uppercase tracking-wide text-slate-300">Por convite</p>
+            <p className="mt-2 text-2xl font-semibold text-white">{summary.invitedSignups ?? 0}</p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-[#0F2743] p-4">
+            <p className="text-xs uppercase tracking-wide text-slate-300">Por slug</p>
+            <p className="mt-2 text-2xl font-semibold text-white">{summary.slugSignups ?? 0}</p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-[#0F2743] p-4">
+            <p className="text-xs uppercase tracking-wide text-slate-300">Cadastro admin</p>
+            <p className="mt-2 text-2xl font-semibold text-white">{summary.adminSignups ?? 0}</p>
+          </div>
+        </div>
+      </SectionCard>
 
       <SectionCard
         title="Fila operacional"
@@ -311,9 +395,36 @@ export default function AdminAtletasPage() {
 
       <SectionCard
         title="Convites para atletas"
-        description="Crie tokens reutilizaveis ou com validade limitada e reenvie quando necessario"
+        description="Controle convites gerais, individuais e convites gerados por associados"
       >
         <div className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+            <div className="rounded-xl border border-white/10 bg-[#0F2743] p-3">
+              <p className="text-xs uppercase tracking-wide text-slate-300">Convites</p>
+              <p className="mt-2 text-xl font-semibold text-white">{inviteSummary.total}</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-[#0F2743] p-3">
+              <p className="text-xs uppercase tracking-wide text-slate-300">Disponiveis</p>
+              <p className="mt-2 text-xl font-semibold text-white">{inviteSummary.available}</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-[#0F2743] p-3">
+              <p className="text-xs uppercase tracking-wide text-slate-300">Usados</p>
+              <p className="mt-2 text-xl font-semibold text-white">{inviteSummary.used}</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-[#0F2743] p-3">
+              <p className="text-xs uppercase tracking-wide text-slate-300">Expirados</p>
+              <p className="mt-2 text-xl font-semibold text-white">{inviteSummary.expired}</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-[#0F2743] p-3">
+              <p className="text-xs uppercase tracking-wide text-slate-300">De associados</p>
+              <p className="mt-2 text-xl font-semibold text-white">{inviteSummary.athleteReferral}</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-[#0F2743] p-3">
+              <p className="text-xs uppercase tracking-wide text-slate-300">Gerais</p>
+              <p className="mt-2 text-xl font-semibold text-white">{inviteSummary.adminGeneral}</p>
+            </div>
+          </div>
+
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
             <div className="space-y-2 xl:col-span-2">
               <Label htmlFor="invite-label">Rotulo</Label>
@@ -437,6 +548,16 @@ export default function AdminAtletasPage() {
                         {invite.label ?? "Convite sem rotulo"}
                       </p>
                       <p className="text-xs text-slate-300">Token: {invite.token}</p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        {invite.inviteKind === "ATHLETE_REFERRAL" ? "Convite de associado" : "Convite geral"}
+                        {invite.createdBy?.name ? ` por ${invite.createdBy.name}` : ""}
+                      </p>
+                      {invite.invitedEmail ? (
+                        <p className="text-xs text-slate-400">
+                          Para: {invite.invitedName ? `${invite.invitedName} - ` : ""}
+                          {invite.invitedEmail}
+                        </p>
+                      ) : null}
                     </div>
                     <div className="flex items-center gap-2">
                       <StatusBadge
@@ -444,6 +565,7 @@ export default function AdminAtletasPage() {
                         label={invite.active ? "Ativo" : "Inativo"}
                       />
                       {invite.expired ? <StatusBadge tone="danger" label="Expirado" /> : null}
+                      {invite.acceptedUser ? <StatusBadge tone="positive" label="Usado" /> : null}
                     </div>
                   </div>
 
@@ -457,6 +579,16 @@ export default function AdminAtletasPage() {
                       {invite.expiresAt
                         ? new Date(invite.expiresAt).toLocaleString("pt-BR")
                         : "sem expiracao"}
+                    </p>
+                    <p>
+                      Aceito por:{" "}
+                      {invite.acceptedUser
+                        ? `${invite.acceptedUser.name ?? invite.acceptedUser.email ?? "atleta"}${
+                            invite.acceptedUser.memberNumber
+                              ? ` (${invite.acceptedUser.memberNumber})`
+                              : ""
+                          }`
+                        : "pendente"}
                     </p>
                   </div>
 

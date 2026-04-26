@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { calculateRedemption } from "@/lib/points/redemptionCalculator";
-import { creditPoints, debitPoints } from "@/lib/points/pointsService";
+import { creditPointsInTransaction, debitPointsInTransaction } from "@/lib/points/pointsService";
 import { prisma } from "@/lib/prisma";
 
 interface RewardItemRow {
@@ -117,6 +117,7 @@ export async function createRedemption(params: {
         AND active = true
         AND "stockQuantity" > 0
       LIMIT 1
+      FOR UPDATE
     `;
 
     const rewardItem = rewardRows[0];
@@ -230,7 +231,7 @@ export async function createRedemption(params: {
       RETURNING *
     `;
 
-    await debitPoints({
+    await debitPointsInTransaction(tx, {
       orgId: params.orgId,
       userId: params.userId,
       points: -Math.abs(calculation.pointsUsed),
@@ -240,13 +241,18 @@ export async function createRedemption(params: {
       createdBy: params.createdBy,
     });
 
-    await tx.$executeRaw`
+    const stockUpdated = await tx.$executeRaw`
       UPDATE public."RewardItem"
       SET "stockQuantity" = "stockQuantity" - 1,
           "updatedAt" = NOW()
       WHERE id = ${rewardItem.id}
         AND "organizationId" = ${params.orgId}
+        AND "stockQuantity" > 0
     `;
+
+    if (stockUpdated !== 1) {
+      throw new RedemptionServiceError("Item sem estoque para aprovacao do resgate.", 409);
+    }
 
     return {
       redemption: approvedRows[0],
@@ -260,26 +266,28 @@ export async function approveRedemptionAfterPayment(
   redemptionId: string,
   paymentId: string,
 ): Promise<RewardRedemptionRow> {
-  const redemptionRows = await prisma.$queryRaw<RewardRedemptionRow[]>`
-    SELECT *
-    FROM public."RewardRedemption"
-    WHERE id = ${redemptionId}
-      AND status = 'PENDING_PAYMENT'
-    LIMIT 1
-  `;
-
-  const redemption = redemptionRows[0];
-  if (!redemption) {
-    throw new RedemptionServiceError("Resgate pendente de pagamento nao encontrado.", 404);
-  }
-
   return prisma.$transaction(async (tx) => {
+    const redemptionRows = await tx.$queryRaw<RewardRedemptionRow[]>`
+      SELECT *
+      FROM public."RewardRedemption"
+      WHERE id = ${redemptionId}
+        AND status = 'PENDING_PAYMENT'
+      LIMIT 1
+      FOR UPDATE
+    `;
+
+    const redemption = redemptionRows[0];
+    if (!redemption) {
+      throw new RedemptionServiceError("Resgate pendente de pagamento nao encontrado.", 404);
+    }
+
     const rewardRows = await tx.$queryRaw<RewardItemRow[]>`
       SELECT *
       FROM public."RewardItem"
       WHERE id = ${redemption.rewardItemId}
         AND "organizationId" = ${redemption.organizationId}
       LIMIT 1
+      FOR UPDATE
     `;
 
     const rewardItem = rewardRows[0];
@@ -287,7 +295,7 @@ export async function approveRedemptionAfterPayment(
       throw new RedemptionServiceError("Item sem estoque para aprovacao do resgate.", 409);
     }
 
-    await debitPoints({
+    await debitPointsInTransaction(tx, {
       orgId: redemption.organizationId,
       userId: redemption.userId,
       points: -Math.abs(redemption.pointsUsed),
@@ -297,13 +305,18 @@ export async function approveRedemptionAfterPayment(
       createdBy: redemption.userId,
     });
 
-    await tx.$executeRaw`
+    const stockUpdated = await tx.$executeRaw`
       UPDATE public."RewardItem"
       SET "stockQuantity" = "stockQuantity" - 1,
           "updatedAt" = NOW()
       WHERE id = ${redemption.rewardItemId}
         AND "organizationId" = ${redemption.organizationId}
+        AND "stockQuantity" > 0
     `;
+
+    if (stockUpdated !== 1) {
+      throw new RedemptionServiceError("Item sem estoque para aprovacao do resgate.", 409);
+    }
 
     const updatedRows = await tx.$queryRaw<RewardRedemptionRow[]>`
       UPDATE public."RewardRedemption"
@@ -345,7 +358,7 @@ export async function cancelRedemption(
 
   return prisma.$transaction(async (tx) => {
     if (redemption.status === "APPROVED" || redemption.status === "SEPARATED") {
-      await creditPoints({
+      await creditPointsInTransaction(tx, {
         orgId: redemption.organizationId,
         userId: redemption.userId,
         points: Math.abs(redemption.pointsUsed),

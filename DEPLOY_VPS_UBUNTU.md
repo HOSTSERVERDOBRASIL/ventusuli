@@ -64,6 +64,8 @@ Ajuste obrigatoriamente:
 docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
 ```
 
+O container `app` executa automaticamente `./node_modules/.bin/prisma migrate deploy` antes de iniciar o Next.js. Isso aplica no PostgreSQL todas as migrations versionadas em `prisma/migrations`, incluindo convites individuais e numero de associado.
+
 ## 6. Validar banco e app
 
 ```bash
@@ -87,6 +89,8 @@ Após alguns segundos/minutos (primeira emissão do certificado), acesse:
 Caddy emitirá/renovará SSL automaticamente via Let's Encrypt.
 
 ## 8. Atualizações de deploy
+
+Antes de atualizar um ambiente com dados reais, gere um backup do PostgreSQL.
 
 ```bash
 cd ~/ventusuli

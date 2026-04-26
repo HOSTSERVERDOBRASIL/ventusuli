@@ -84,6 +84,15 @@ export function AthletesCrmTable({
             )}
           </div>
           <p className="mt-0.5 text-[11px] text-white/40">{row.email}</p>
+          <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#8eb0dc]">
+            {row.memberNumber ?? "Sem matricula"}
+          </p>
+          {row.invitedByName ? (
+            <p className="mt-0.5 text-[10px] text-white/35">
+              Convite: {row.invitedByName}
+              {row.invitedByMemberNumber ? ` (${row.invitedByMemberNumber})` : ""}
+            </p>
+          ) : null}
         </div>
       ),
     },
