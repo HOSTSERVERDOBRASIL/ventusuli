@@ -213,4 +213,7 @@ export async function deleteInvite(inviteId: string, accessToken?: string | null
   if (!response.ok) {
     throw await parseApiError(response, "Nao foi possivel excluir convite.");
   }
+
+  // DELETE pode responder sem corpo. Nao chame response.json() aqui,
+  // pois isso gera: Unexpected end of JSON input.
 }
