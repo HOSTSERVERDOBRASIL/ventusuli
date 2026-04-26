@@ -2,7 +2,17 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, Check, CircleUserRound, Copy, Mail, Pencil, ShieldCheck, UserPlus, X } from "lucide-react";
+import {
+  AlertTriangle,
+  Check,
+  CircleUserRound,
+  Copy,
+  Mail,
+  Pencil,
+  ShieldCheck,
+  UserPlus,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/system/empty-state";
 import { LoadingState } from "@/components/system/loading-state";
@@ -284,7 +294,7 @@ export default function PerfilPage() {
   }
 
   function buildInviteUrl(invite: OrgInvite): string {
-    const path = invite.signupUrl ?? `/register/atleta?inviteToken=${invite.token}`;
+    const path = invite.signupUrl ?? `/register/atleta?token=${invite.token}`;
     if (typeof window === "undefined") return path;
     return path.startsWith("http") ? path : `${window.location.origin}${path}`;
   }
@@ -482,7 +492,13 @@ export default function PerfilPage() {
                     const accepted = Boolean(invite.accepted_at);
                     const exhausted =
                       typeof invite.max_uses === "number" && invite.used_count >= invite.max_uses;
-                    const status = accepted ? "Usado" : exhausted ? "Esgotado" : invite.active ? "Ativo" : "Inativo";
+                    const status = accepted
+                      ? "Usado"
+                      : exhausted
+                        ? "Esgotado"
+                        : invite.active
+                          ? "Ativo"
+                          : "Inativo";
 
                     return (
                       <div
@@ -493,7 +509,9 @@ export default function PerfilPage() {
                           <p className="font-semibold text-white">
                             {invite.invited_name ?? invite.label ?? "Convite individual"}
                           </p>
-                          <p className="text-sm text-[#8eb0dc]">{invite.invited_email ?? "E-mail nao informado"}</p>
+                          <p className="text-sm text-[#8eb0dc]">
+                            {invite.invited_email ?? "E-mail nao informado"}
+                          </p>
                           <p className="text-xs text-[#6a9ac8]">
                             {status} · usos {invite.used_count}/{invite.max_uses ?? "ilimitado"}
                           </p>

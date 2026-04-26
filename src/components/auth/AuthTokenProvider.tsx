@@ -84,7 +84,10 @@ async function fetchSession(): Promise<SessionUser | null> {
   });
 
   if (!response.ok) return null;
-  const payload = (await response.json()) as { user?: SessionUser };
+  const text = await response.text();
+  if (!text.trim()) return null;
+
+  const payload = JSON.parse(text) as { user?: SessionUser };
   return payload.user ?? null;
 }
 

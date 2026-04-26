@@ -65,7 +65,7 @@ function toInviteOutput(invite: InviteRow) {
     accepted_user_id: invite.accepted_user_id,
     accepted_at: invite.accepted_at,
     created_at: invite.created_at,
-    signupUrl: `/register/atleta?inviteToken=${invite.token}`,
+    signupUrl: `/register/atleta?token=${invite.token}`,
   };
 }
 
@@ -144,7 +144,11 @@ export async function POST(req: NextRequest) {
 
     const parsed = createInviteSchema.safeParse(body);
     if (!parsed.success) {
-      return apiError("VALIDATION_ERROR", parsed.error.errors[0]?.message ?? "Dados invalidos.", 400);
+      return apiError(
+        "VALIDATION_ERROR",
+        parsed.error.errors[0]?.message ?? "Dados invalidos.",
+        400,
+      );
     }
 
     const { label, invitedEmail, invitedName, max_uses, expires_at } = parsed.data;
@@ -154,7 +158,11 @@ export async function POST(req: NextRequest) {
       return apiError("VALIDATION_ERROR", "Informe o e-mail do amigo convidado.", 400);
     }
 
-    const inviteKind = isAthleteInvite ? "ATHLETE_REFERRAL" : invitedEmail ? "INDIVIDUAL" : "GENERAL";
+    const inviteKind = isAthleteInvite
+      ? "ATHLETE_REFERRAL"
+      : invitedEmail
+        ? "INDIVIDUAL"
+        : "GENERAL";
     const maxUses = isAthleteInvite || invitedEmail ? 1 : (max_uses ?? null);
     const normalizedEmail = invitedEmail ? normalizeEmail(invitedEmail) : null;
     const inviteLabel =

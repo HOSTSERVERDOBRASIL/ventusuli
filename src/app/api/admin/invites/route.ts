@@ -12,7 +12,9 @@ const createInviteSchema = z
     maxUses: z.number().int().min(1).max(10000).optional(),
     expiresAt: z
       .string()
-      .refine((value) => !Number.isNaN(new Date(value).getTime()), { message: "Data de expiracao invalida." })
+      .refine((value) => !Number.isNaN(new Date(value).getTime()), {
+        message: "Data de expiracao invalida.",
+      })
       .optional(),
   })
   .superRefine((value, ctx) => {
@@ -62,9 +64,16 @@ function toInviteOutput(
   },
 ) {
   const expired = invite.expires_at ? invite.expires_at.getTime() < Date.now() : false;
-  const availableUses = invite.max_uses === null ? null : Math.max(0, invite.max_uses - invite.used_count);
+  const availableUses =
+    invite.max_uses === null ? null : Math.max(0, invite.max_uses - invite.used_count);
   const exhausted = availableUses !== null && availableUses <= 0;
-  const status = !invite.active ? "INACTIVE" : expired ? "EXPIRED" : exhausted ? "EXHAUSTED" : "AVAILABLE";
+  const status = !invite.active
+    ? "INACTIVE"
+    : expired
+      ? "EXPIRED"
+      : exhausted
+        ? "EXHAUSTED"
+        : "AVAILABLE";
 
   return {
     id: invite.id,
@@ -98,14 +107,15 @@ function toInviteOutput(
       : null,
     acceptedAt: invite.accepted_at,
     createdAt: invite.created_at,
-    signupUrl: `${origin}/register/atleta?inviteToken=${invite.token}`,
+    signupUrl: `${origin}/register/atleta?token=${invite.token}`,
   };
 }
 
 export async function GET(req: NextRequest) {
   const auth = getAuthContext(req);
   if (!auth) return apiError("UNAUTHORIZED", "Token de acesso ausente.", 401);
-  if (!isStaffRole(auth.role)) return apiError("FORBIDDEN", "Acesso restrito ao time administrativo.", 403);
+  if (!isStaffRole(auth.role))
+    return apiError("FORBIDDEN", "Acesso restrito ao time administrativo.", 403);
 
   const [invites, organization] = await Promise.all([
     prisma.organizationInvite.findMany({
@@ -177,13 +187,23 @@ export async function GET(req: NextRequest) {
       available: inviteOutputs.filter((invite) => invite.status === "AVAILABLE").length,
       used: inviteOutputs.filter((invite) => invite.acceptedUser).length,
       expired: inviteOutputs.filter((invite) => invite.status === "EXPIRED").length,
-      athleteReferral: inviteOutputs.filter((invite) => invite.inviteKind === "ATHLETE_REFERRAL").length,
-      adminGeneral: inviteOutputs.filter((invite) => invite.inviteKind !== "ATHLETE_REFERRAL").length,
+      athleteReferral: inviteOutputs.filter((invite) => invite.inviteKind === "ATHLETE_REFERRAL")
+        .length,
+      adminGeneral: inviteOutputs.filter((invite) => invite.inviteKind !== "ATHLETE_REFERRAL")
+        .length,
     },
     policy: {
       slug: organization?.slug ?? "",
-      allowAthleteSelfSignup: readBooleanSetting(organization?.settings, "allowAthleteSelfSignup", false),
-      requireAthleteApproval: readBooleanSetting(organization?.settings, "requireAthleteApproval", true),
+      allowAthleteSelfSignup: readBooleanSetting(
+        organization?.settings,
+        "allowAthleteSelfSignup",
+        false,
+      ),
+      requireAthleteApproval: readBooleanSetting(
+        organization?.settings,
+        "requireAthleteApproval",
+        true,
+      ),
     },
   });
 }
@@ -191,7 +211,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const auth = getAuthContext(req);
   if (!auth) return apiError("UNAUTHORIZED", "Token de acesso ausente.", 401);
-  if (!isStaffRole(auth.role)) return apiError("FORBIDDEN", "Acesso restrito ao time administrativo.", 403);
+  if (!isStaffRole(auth.role))
+    return apiError("FORBIDDEN", "Acesso restrito ao time administrativo.", 403);
 
   let body: unknown;
   try {
