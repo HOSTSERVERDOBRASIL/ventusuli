@@ -1,108 +1,152 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-log(){ printf '\n[%s] %s\n' "$(date +%H:%M:%S)" "$*"; }
+log() { printf '\n[%s] %s\n' "$(date +%H:%M:%S)" "$*"; }
 
-log "Validando projeto"
-test -d .git || { echo "ERRO: rode este script dentro da pasta do projeto VentuSuli"; exit 1; }
-test -d src || { echo "ERRO: pasta src nao encontrada"; exit 1; }
-BRANCH="$(git rev-parse --abbrev-ref HEAD)"
-BACKUP="backup-convites-json-v2-$(date +%Y%m%d-%H%M%S)"
+if [ ! -f package.json ] || [ ! -d src ]; then
+  echo "ERRO: rode este script na raiz do projeto VentuSuli, onde existe package.json e pasta src."
+  exit 1
+fi
+
+BACKUP="backup-token-todos-perfis-$(date +%Y%m%d-%H%M%S)"
+log "Criando backup em $BACKUP"
 mkdir -p "$BACKUP"
+cp -a src "$BACKUP/src"
+[ -f package.json ] && cp package.json "$BACKUP/package.json"
+[ -f package-lock.json ] && cp package-lock.json "$BACKUP/package-lock.json"
 
-log "Backup dos arquivos principais"
-for f in \
-  src/services/organization-service.ts \
-  'src/app/api/invites/[id]/route.ts' \
-  'src/app/api/super-admin/organization-invites/[id]/route.ts' \
-  package-lock.json package.json; do
-  [ -f "$f" ] && cp --parents "$f" "$BACKUP"/ || true
+log "Padronizando parametros de convite para token"
+# Links/query params antigos para o padrao unico token.
+grep -RIl --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.git "inviteToken" src 2>/dev/null | xargs -r sed -i 's/inviteToken/token/g'
+grep -RIl --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.git "adminInviteToken" src 2>/dev/null | xargs -r sed -i 's/adminInviteToken/token/g'
+grep -RIl --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.git "organizationInviteToken" src 2>/dev/null | xargs -r sed -i 's/organizationInviteToken/token/g'
+grep -RIl --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.git "athleteInviteToken" src 2>/dev/null | xargs -r sed -i 's/athleteInviteToken/token/g'
+
+# Corrige URLs montadas com parametros antigos.
+grep -RIl --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.git "inviteToken=" src 2>/dev/null | xargs -r sed -i 's/inviteToken=/token=/g'
+grep -RIl --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.git "adminInviteToken=" src 2>/dev/null | xargs -r sed -i 's/adminInviteToken=/token=/g'
+grep -RIl --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.git "organizationInviteToken=" src 2>/dev/null | xargs -r sed -i 's/organizationInviteToken=/token=/g'
+grep -RIl --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.git "athleteInviteToken=" src 2>/dev/null | xargs -r sed -i 's/athleteInviteToken=/token=/g'
+
+log "Criando helper para ler token com compatibilidade"
+mkdir -p src/lib
+cat > src/lib/invite-token.ts <<'TS'
+export function getInviteTokenFromSearchParams(searchParams: URLSearchParams): string {
+  return (
+    searchParams.get("token") ||
+    searchParams.get("inviteToken") ||
+    searchParams.get("adminInviteToken") ||
+    searchParams.get("organizationInviteToken") ||
+    searchParams.get("athleteInviteToken") ||
+    ""
+  ).trim();
+}
+
+export function getInviteTokenFromObject(input: unknown): string {
+  if (!input || typeof input !== "object") return "";
+  const data = input as Record<string, unknown>;
+  const value =
+    data.token ??
+    data.inviteToken ??
+    data.adminInviteToken ??
+    data.organizationInviteToken ??
+    data.athleteInviteToken ??
+    "";
+  return typeof value === "string" ? value.trim() : "";
+}
+
+export function appendInviteToken(url: string, token: string): string {
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}token=${encodeURIComponent(token)}`;
+}
+TS
+
+log "Corrigindo leituras comuns em paginas de cadastro/ativacao"
+# Injeta compatibilidade sem quebrar se ja usa searchParams.get("token").
+# Em arquivos de register/activate/onboarding, troca leituras diretas remanescentes por token com fallback.
+find src/app -type f \( -name 'page.tsx' -o -name 'route.ts' -o -name '*.ts' -o -name '*.tsx' \) \
+  | grep -E 'register|activate|invite|convite|onboarding|admin|athlete|atleta|organization|assessoria' \
+  | while read -r f; do
+      perl -0pi -e 's/searchParams\.get\("inviteToken"\)/searchParams.get("token") || searchParams.get("inviteToken")/g' "$f"
+      perl -0pi -e 's/searchParams\.get\("adminInviteToken"\)/searchParams.get("token") || searchParams.get("adminInviteToken")/g' "$f"
+      perl -0pi -e 's/searchParams\.get\("organizationInviteToken"\)/searchParams.get("token") || searchParams.get("organizationInviteToken")/g' "$f"
+      perl -0pi -e 's/searchParams\.get\("athleteInviteToken"\)/searchParams.get("token") || searchParams.get("athleteInviteToken")/g' "$f"
+    done
+
+log "Corrigindo APIs para aceitarem token e aliases antigos"
+# Se algum route.ts faz const { token } = await request.json(), isso ja funciona com token.
+# Aqui adicionamos compatibilidade onde ainda existe desestruturacao de nomes antigos apos sed.
+find src/app/api -type f -name 'route.ts' | while read -r f; do
+  perl -0pi -e 's/const\s*\{\s*token\s*\}\s*=\s*await request\.json\(\);/const body = await request.json();\n  const token = (body.token || body.inviteToken || body.adminInviteToken || body.organizationInviteToken || body.athleteInviteToken || "").trim();/g' "$f"
 done
 
-log "Aplicando patch de JSON vazio e token"
-# Corrige links antigos inviteToken= para token=
-if grep -RIl 'inviteToken=' src >/tmp/ventusuli_invitetoken_files 2>/dev/null; then
-  xargs -r sed -i 's/inviteToken=/token=/g' </tmp/ventusuli_invitetoken_files
-fi
+log "Garantindo que endpoints DELETE nao respondam vazio"
+find src/app/api -type f -name 'route.ts' | while read -r f; do
+  perl -0pi -e 's/return\s+new\s+NextResponse\(null,\s*\{\s*status:\s*204\s*\}\s*\);/return NextResponse.json({ success: true });/g' "$f"
+  perl -0pi -e 's/return\s+new\s+Response\(null,\s*\{\s*status:\s*204\s*\}\s*\);/return Response.json({ success: true });/g' "$f"
+done
 
-python3 - <<'PY'
-from pathlib import Path
-import re
+log "Criando helper safe-json"
+cat > src/lib/safe-json.ts <<'TS'
+export async function safeJson<T = unknown>(response: Response): Promise<T | null> {
+  const text = await response.text().catch(() => "");
+  if (!text || !text.trim()) return null;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return null;
+  }
+}
+TS
 
-# 1) Corrige o service: DELETE nao pode chamar response.json()
-p = Path('src/services/organization-service.ts')
-if p.exists():
-    s = p.read_text()
-    # garante helpers seguros se ainda existir response.json direto em respostas vazias
-    if 'async function parseJsonResponse' not in s:
-        marker = 'async function parseApiError'
-        idx = s.find(marker)
-        if idx != -1:
-            helper = '''\nasync function parseJsonResponse<T>(response: Response, fallback: string): Promise<T> {\n  const text = await response.text();\n\n  if (!text.trim()) {\n    throw new Error(fallback);\n  }\n\n  try {\n    return JSON.parse(text) as T;\n  } catch {\n    throw new Error(fallback);\n  }\n}\n\n'''
-            # insere depois da parseApiError inteira se conseguir
-            m = re.search(r'async function parseApiError[\s\S]*?\n}\n', s)
-            if m:
-                s = s[:m.end()] + helper + s[m.end():]
-    # troca chamadas simples response.json por parseJsonResponse nos principais metodos de convite/organizacao
-    replacements = {
-        'const payload = (await response.json()) as OrganizationResponse;': 'const payload = await parseJsonResponse<OrganizationResponse>(response, "Resposta invalida ao carregar configuracoes da organizacao.");',
-        'const payload = (await response.json()) as { data: OrganizationSettings };': 'const payload = await parseJsonResponse<{ data: OrganizationSettings }>(response, "Resposta invalida ao salvar configuracoes da organizacao.");',
-        'const payload = (await response.json()) as InviteListResponse;': 'const payload = await parseJsonResponse<InviteListResponse>(response, "Resposta invalida ao carregar convites.");',
-        'const payload = (await response.json()) as InviteResponse;': 'const payload = await parseJsonResponse<InviteResponse>(response, "Resposta invalida ao processar convite.");',
-    }
-    for a,b in replacements.items():
-        s = s.replace(a,b)
+log "Aplicando safe-json nos services principais"
+# Evita quebrar por JSON vazio em services. Mantem cast existente quando possivel.
+find src/services -type f -name '*.ts' | while read -r f; do
+  if grep -q 'response.json()' "$f"; then
+    if ! grep -q 'safeJson' "$f"; then
+      perl -0pi -e 's/^(import .+?;\n)/$1import { safeJson } from "@\/lib\/safe-json";\n/s' "$f"
+    fi
+    perl -0pi -e 's/await response\.json\(\)/await safeJson(response)/g' "$f"
+    perl -0pi -e 's/response\.json\(\)\.catch\(\(\) => null\)/safeJson(response)/g' "$f"
+  fi
+done
 
-    # substitui qualquer implementacao da funcao deleteInvite por uma versao que nao le JSON
-    new_func = '''export async function deleteInvite(inviteId: string, accessToken?: string | null): Promise<void> {\n  const response = await fetch(`/api/invites/${inviteId}`, {\n    method: "DELETE",\n    headers: buildAuthHeaders(accessToken),\n  });\n\n  if (!response.ok) {\n    throw await parseApiError(response, "Nao foi possivel excluir convite.");\n  }\n\n  // DELETE pode responder sem corpo. Nao chame response.json() aqui,\n  // pois isso gera: Unexpected end of JSON input.\n}\n'''
-    s2, n = re.subn(r'export async function deleteInvite\([\s\S]*?\n}\n(?=\n|$)', new_func, s, count=1)
-    if n:
-        s = s2
-    p.write_text(s)
-
-# 2) Corrige rotas DELETE para sempre retornarem JSON, nao 204 vazio
-for fname in ['src/app/api/invites/[id]/route.ts', 'src/app/api/super-admin/organization-invites/[id]/route.ts']:
-    q = Path(fname)
-    if not q.exists():
-        continue
-    t = q.read_text()
-    t = t.replace('return new NextResponse(null, { status: 204 });', 'return NextResponse.json({ success: true });')
-    t = t.replace('return new Response(null, { status: 204 });', 'return NextResponse.json({ success: true });')
-    # se alguem colocou status 204 com json, normaliza para 200 json
-    t = t.replace('return NextResponse.json(null, { status: 204 });', 'return NextResponse.json({ success: true });')
-    q.write_text(t)
-PY
-
-log "Procurando response.json perigoso perto de DELETE"
-if grep -RIn "response\.json()" src/services src/app 2>/dev/null; then
-  echo "AVISO: revise os response.json acima. Se aparecer dentro de deleteInvite/excluir convite, ainda precisa corrigir."
+log "Relatorio de tokens antigos restantes"
+OLD=$(grep -RIn --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.git -E 'inviteToken|adminInviteToken|organizationInviteToken|athleteInviteToken' src || true)
+if [ -n "$OLD" ]; then
+  echo "$OLD"
+  echo "AVISO: sobraram referencias antigas acima. Algumas podem estar apenas no helper de compatibilidade."
 else
-  echo "OK: nenhum response.json direto encontrado em src/services/src/app."
+  echo "OK: nenhum alias antigo fora do helper."
 fi
 
-log "Instalando dependencias e gerando build"
+log "Limpando build anterior e gerando novo build"
+rm -rf .next
 npm install
 npm run build
 
 log "Commitando alteracoes"
-git add src package.json package-lock.json 2>/dev/null || git add src package.json
-if git diff --cached --quiet; then
-  echo "Nada novo para commitar."
-else
-  git commit -m "fix convites json vazio"
-fi
+git add -A
+git commit -m "fix token convites todos perfis" || true
 
-log "Atualizando branch e enviando para GitHub"
-git pull --rebase origin "$BRANCH"
-git push origin "$BRANCH"
+log "Atualizando e enviando para GitHub"
+git pull --rebase origin main || {
+  echo "Rebase falhou. Salvando alteracoes pendentes e tentando de novo."
+  git stash push -u -m "auto-token-todos-perfis" || true
+  git pull --rebase origin main
+  git stash pop || true
+  git add -A
+  git commit -m "fix token convites todos perfis" || true
+}
+git push origin main
 
 log "Reiniciando aplicacao"
 if command -v pm2 >/dev/null 2>&1; then
   pm2 restart all
-elif command -v docker >/dev/null 2>&1 && [ -f docker-compose.yml -o -f compose.yml ]; then
+elif command -v docker >/dev/null 2>&1 && [ -f docker-compose.yml ]; then
   docker compose up -d --build
 else
-  echo "Nao encontrei pm2 nem docker compose. Reinicie sua aplicacao manualmente."
+  echo "AVISO: nao encontrei pm2 nem docker compose. Reinicie a aplicacao manualmente."
 fi
 
-log "Finalizado. Backup em: $BACKUP"
+log "Concluido. Teste convites novos para super admin, admin/assessoria, atleta e qualquer perfil adicional."

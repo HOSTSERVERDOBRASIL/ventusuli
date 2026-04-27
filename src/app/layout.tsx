@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { Sora } from "next/font/google";
+// import { Sora } from "next/font/google";
 import { Toaster } from "sonner";
 import { AuthTokenProvider } from "@/components/auth/AuthTokenProvider";
 import "./globals.css";
 
-const sora = Sora({ subsets: ["latin"], weight: ["400", "600", "700", "800"] });
+const sora = { className: "font-sans" };
 
 export const metadata: Metadata = {
   title: {
