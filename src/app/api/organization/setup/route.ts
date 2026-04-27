@@ -1,8 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { OrgPlan, OrgStatus, Prisma, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { apiError } from "@/lib/api-error";
-import { sanitizeOrganizationSettings } from "@/lib/organization-settings";
 import { isAllowedImageUrl } from "@/lib/storage/image-url";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/request-auth";
@@ -170,7 +169,7 @@ export async function POST(req: NextRequest) {
       status: updated.status,
       setupCompletedAt: updated.setup_completed_at,
       logoUrl: updated.logo_url,
-      settings: sanitizeOrganizationSettings(updated.settings),
+      settings: updated.settings,
     },
   });
 }

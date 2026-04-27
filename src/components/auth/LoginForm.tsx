@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -38,7 +38,7 @@ type LoginErrorResponse = {
   };
 };
 
-type PlatformOrTenantAdminRole = "SUPER_ADMIN" | "ADMIN";
+type PlatformOrTenantAdminRole = "SUPER_ADMIN" | "ADMIN" | "FINANCE";
 
 function resolvePostLoginPath(
   role: string,
@@ -48,7 +48,7 @@ function resolvePostLoginPath(
   setupCompletedAt?: string | null,
 ): string {
   const isPlatformOrTenantAdmin = (
-    ["SUPER_ADMIN", "ADMIN"] as PlatformOrTenantAdminRole[]
+    ["SUPER_ADMIN", "ADMIN", "FINANCE"] as PlatformOrTenantAdminRole[]
   ).includes(role as PlatformOrTenantAdminRole);
 
   if (role === "COACH") {
@@ -64,6 +64,10 @@ function resolvePostLoginPath(
 
     if (role === "ADMIN" && (organizationStatus === "PENDING_SETUP" || !setupCompletedAt)) {
       return "/onboarding/assessoria";
+    }
+    if (role === "FINANCE") {
+      if (nextParam && nextParam.startsWith("/admin/financeiro")) return nextParam;
+      return "/admin/financeiro";
     }
     if (nextParam && nextParam.startsWith("/admin")) return nextParam;
     return "/admin";

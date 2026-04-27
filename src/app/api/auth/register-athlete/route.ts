@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ensureAthleteMemberNumber } from "@/lib/athletes/member-number";
 import {
@@ -75,15 +75,15 @@ function normalizeEmail(email: string): string {
 
 async function resolveEnrollmentTarget(input: {
   organizationSlug?: string;
-  token?: string;
+  inviteToken?: string;
 }): Promise<ResolvedEnrollment | null> {
-  if (input.token) {
+  if (input.inviteToken) {
     const inviteRows = await prisma.$queryRaw<
       Array<InviteUsageGuard & { id: string; organization_id: string }>
     >`
       SELECT id, organization_id, active, expires_at, max_uses, used_count, invited_email
       FROM public.organization_invites
-      WHERE token = ${input.token}
+      WHERE token = ${input.inviteToken}
       LIMIT 1
     `;
 
@@ -130,23 +130,13 @@ export async function POST(req: NextRequest) {
   let remaining = 0;
   let resetAt = Date.now() + RATE_WINDOW_MS;
   try {
-    ({ allowed, remaining, resetAt } = await checkRateLimit(
-      `auth:register-athlete:${ip}`,
-      RATE_LIMIT,
-      RATE_WINDOW_MS,
-    ));
+    ({ allowed, remaining, resetAt } = await checkRateLimit(`auth:register-athlete:${ip}`, RATE_LIMIT, RATE_WINDOW_MS));
   } catch (error) {
     if (isRateLimiterUnavailableError(error)) {
-      logError(
-        "auth_register_athlete_rate_limiter_unavailable",
-        withRequestContext(req, toErrorContext(error)),
-      );
+      logError("auth_register_athlete_rate_limiter_unavailable", withRequestContext(req, toErrorContext(error)));
       return apiError("INTERNAL_ERROR", "Rate limiter indisponivel no momento.", 503);
     }
-    logError(
-      "auth_register_athlete_rate_limiter_failed",
-      withRequestContext(req, toErrorContext(error)),
-    );
+    logError("auth_register_athlete_rate_limiter_failed", withRequestContext(req, toErrorContext(error)));
     throw error;
   }
 
@@ -195,7 +185,7 @@ export async function POST(req: NextRequest) {
     return apiError("VALIDATION_ERROR", parsed.error.errors[0]?.message ?? "Dados invalidos.", 400);
   }
 
-  const { name, email, password, organizationSlug, token } = parsed.data;
+  const { name, email, password, organizationSlug, inviteToken } = parsed.data;
   const normalizedEmail = normalizeEmail(email);
 
   try {
@@ -209,20 +199,16 @@ export async function POST(req: NextRequest) {
       // Give a clear message: each user belongs to exactly one org and cannot join another.
       return apiError(
         "EMAIL_ALREADY_EXISTS",
-        "Este e-mail já está cadastrado em uma assessoria. Cada atleta só pode pertencer a uma assessoria por vez. Caso precise trocar, entre em contato com o suporte.",
+        "Este e-mail jÃ¡ estÃ¡ cadastrado em uma assessoria. Cada atleta sÃ³ pode pertencer a uma assessoria por vez. Caso precise trocar, entre em contato com o suporte.",
         409,
       );
     }
 
-    const enrollment = await resolveEnrollmentTarget({ organizationSlug, token });
+    const enrollment = await resolveEnrollmentTarget({ organizationSlug, inviteToken });
     if (!enrollment) {
       logWarn(
         "auth_register_athlete_org_not_found",
-        withRequestContext(req, {
-          email,
-          hasInviteToken: Boolean(token),
-          organizationSlug: organizationSlug ?? null,
-        }),
+        withRequestContext(req, { email, hasInviteToken: Boolean(inviteToken), organizationSlug: organizationSlug ?? null }),
       );
       return apiError(
         "ORG_NOT_FOUND",
@@ -240,20 +226,17 @@ export async function POST(req: NextRequest) {
       return apiError("ORG_NOT_FOUND", "Assessoria nao encontrada com os dados informados.", 404);
     }
 
-    const allowAthleteSelfSignup = readBooleanSetting(
-      organization.settings,
-      "allowAthleteSelfSignup",
-      false,
-    );
+    const allowAthleteSelfSignup = readBooleanSetting(organization.settings, "allowAthleteSelfSignup", false);
     const usingInvite = Boolean(enrollment.usedInviteId);
     const usingSlug = !usingInvite;
 
     if (usingSlug && !allowAthleteSelfSignup) {
-      logWarn(
-        "auth_register_athlete_slug_blocked",
-        withRequestContext(req, { email, organizationId: organization.id }),
+      logWarn("auth_register_athlete_slug_blocked", withRequestContext(req, { email, organizationId: organization.id }));
+      return apiError(
+        "FORBIDDEN",
+        "Esta assessoria nao permite auto cadastro no momento.",
+        403,
       );
-      return apiError("FORBIDDEN", "Esta assessoria nao permite auto cadastro no momento.", 403);
     }
 
     const requireAthleteApproval =
@@ -382,12 +365,7 @@ export async function POST(req: NextRequest) {
     const expires_at = new Date(Date.now() + REFRESH_TTL_DAYS * 24 * 60 * 60 * 1_000);
 
     await prisma.refreshToken.create({
-      data: {
-        user_id: createdUser.id,
-        organization_id: createdUser.organization_id,
-        token_hash,
-        expires_at,
-      },
+      data: { user_id: createdUser.id, organization_id: createdUser.organization_id, token_hash, expires_at },
     });
 
     const response = NextResponse.json(
@@ -436,7 +414,7 @@ export async function POST(req: NextRequest) {
       logWarn("auth_register_athlete_unique_conflict", withRequestContext(req, { email }));
       return apiError(
         "EMAIL_ALREADY_EXISTS",
-        "Este e-mail já está cadastrado. Cada atleta só pode pertencer a uma assessoria por vez.",
+        "Este e-mail jÃ¡ estÃ¡ cadastrado. Cada atleta sÃ³ pode pertencer a uma assessoria por vez.",
         409,
       );
     }

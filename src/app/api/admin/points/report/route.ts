@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { apiError } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
@@ -7,6 +8,21 @@ import { getAuthContext, isAdminRole } from "@/lib/request-auth";
 const querySchema = z.object({
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional(),
+  eventId: z.string().min(1).optional(),
+  sourceType: z
+    .enum([
+      "EVENT_PARTICIPATION",
+      "EARLY_SIGNUP",
+      "EARLY_PAYMENT",
+      "CAMPAIGN_BONUS",
+      "REFERRAL",
+      "RECURRENCE",
+      "MANUAL",
+      "REDEMPTION",
+      "REFUND",
+      "EXPIRATION",
+    ])
+    .optional(),
 });
 
 interface TotalsRow {
@@ -41,6 +57,26 @@ interface RedemptionsByStatusRow {
   count: number | bigint;
 }
 
+interface PointsBySourceRow {
+  sourceType: string;
+  type: string;
+  points: number | bigint | null;
+  count: number | bigint;
+}
+
+interface LedgerMovementRow {
+  id: string;
+  sourceType: string;
+  type: string;
+  points: number | bigint;
+  balanceAfter: number | bigint;
+  description: string;
+  createdAt: Date;
+  userName: string | null;
+  userEmail: string | null;
+  eventName: string | null;
+}
+
 function toNumber(value: number | bigint | null | undefined): number {
   if (value === null || value === undefined) return 0;
   if (typeof value === "bigint") return Number(value);
@@ -72,6 +108,8 @@ export async function GET(req: NextRequest) {
   const parsed = querySchema.safeParse({
     startDate: req.nextUrl.searchParams.get("startDate") ?? undefined,
     endDate: req.nextUrl.searchParams.get("endDate") ?? undefined,
+    eventId: req.nextUrl.searchParams.get("eventId") ?? undefined,
+    sourceType: req.nextUrl.searchParams.get("sourceType") ?? undefined,
   });
 
   if (!parsed.success) {
@@ -85,6 +123,15 @@ export async function GET(req: NextRequest) {
     return apiError("VALIDATION_ERROR", "Periodo invalido: startDate deve ser menor ou igual a endDate.", 400);
   }
 
+  const ledgerFilters: Prisma.Sql[] = [
+    Prisma.sql`l."organizationId" = ${auth.organizationId}`,
+    Prisma.sql`l."createdAt" >= ${period.start}`,
+    Prisma.sql`l."createdAt" <= ${period.end}`,
+  ];
+  if (parsed.data.eventId) ledgerFilters.push(Prisma.sql`l."eventId" = ${parsed.data.eventId}`);
+  if (parsed.data.sourceType) ledgerFilters.push(Prisma.sql`l."sourceType" = ${parsed.data.sourceType}`);
+  const ledgerWhere = Prisma.sql`WHERE ${Prisma.join(ledgerFilters, " AND ")}`;
+
   const [
     totalsRows,
     activeUsersRows,
@@ -92,17 +139,17 @@ export async function GET(req: NextRequest) {
     byCategoryRows,
     topItemsRows,
     byStatusRows,
+    bySourceRows,
+    movementRows,
   ] = await Promise.all([
-    prisma.$queryRaw<TotalsRow[]>`
+    prisma.$queryRaw<TotalsRow[]>(Prisma.sql`
       SELECT
         COALESCE(SUM(CASE WHEN type = 'CREDIT' THEN points ELSE 0 END), 0) AS "totalPointsIssued",
         COALESCE(SUM(CASE WHEN "sourceType" = 'REDEMPTION' THEN ABS(points) ELSE 0 END), 0) AS "totalPointsRedeemed",
         COALESCE(SUM(CASE WHEN type = 'EXPIRATION' THEN ABS(points) ELSE 0 END), 0) AS "totalPointsExpired"
-      FROM public."AthletePointLedger"
-      WHERE "organizationId" = ${auth.organizationId}
-        AND "createdAt" >= ${period.start}
-        AND "createdAt" <= ${period.end}
-    `,
+      FROM public."AthletePointLedger" l
+      ${ledgerWhere}
+    `),
     prisma.$queryRaw<CountRow[]>`
       WITH latest AS (
         SELECT
@@ -172,6 +219,36 @@ export async function GET(req: NextRequest) {
       GROUP BY status
       ORDER BY count DESC, status ASC
     `,
+    prisma.$queryRaw<PointsBySourceRow[]>(Prisma.sql`
+      SELECT
+        l."sourceType" AS "sourceType",
+        l.type,
+        COALESCE(SUM(ABS(l.points)), 0) AS points,
+        COUNT(*)::bigint AS count
+      FROM public."AthletePointLedger" l
+      ${ledgerWhere}
+      GROUP BY l."sourceType", l.type
+      ORDER BY points DESC, l."sourceType" ASC
+    `),
+    prisma.$queryRaw<LedgerMovementRow[]>(Prisma.sql`
+      SELECT
+        l.id,
+        l."sourceType",
+        l.type,
+        l.points,
+        l."balanceAfter",
+        l.description,
+        l."createdAt",
+        u.name AS "userName",
+        u.email AS "userEmail",
+        e.name AS "eventName"
+      FROM public."AthletePointLedger" l
+      LEFT JOIN public.users u ON u.id = l."userId"
+      LEFT JOIN public.events e ON e.id = l."eventId"
+      ${ledgerWhere}
+      ORDER BY l."createdAt" DESC, l.id DESC
+      LIMIT 25
+    `),
   ]);
 
   const totals = totalsRows[0] ?? {
@@ -204,6 +281,24 @@ export async function GET(req: NextRequest) {
     redemptionsByStatus: byStatusRows.map((row) => ({
       status: row.status,
       count: toNumber(row.count),
+    })),
+    pointsBySource: bySourceRows.map((row) => ({
+      sourceType: row.sourceType,
+      type: row.type,
+      points: toNumber(row.points),
+      count: toNumber(row.count),
+    })),
+    recentMovements: movementRows.map((row) => ({
+      id: row.id,
+      sourceType: row.sourceType,
+      type: row.type,
+      points: toNumber(row.points),
+      balanceAfter: toNumber(row.balanceAfter),
+      description: row.description,
+      createdAt: row.createdAt.toISOString(),
+      athleteName: row.userName,
+      athleteEmail: row.userEmail,
+      eventName: row.eventName,
     })),
   });
 }

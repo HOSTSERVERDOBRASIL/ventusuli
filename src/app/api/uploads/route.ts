@@ -1,13 +1,13 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import type { UserRole } from "@prisma/client";
 import { z } from "zod";
 import { apiError } from "@/lib/api-error";
 import { isAdminRole, getAuthContext } from "@/lib/request-auth";
 import {
-  validateImageFile,
   getAllowedImageMimeTypes,
   getMaxUploadSizeBytes,
   uploadImage,
+  validateImageFile,
   type UploadScope,
 } from "@/lib/storage/image-upload";
 
@@ -53,13 +53,9 @@ export async function POST(req: NextRequest) {
     return apiError("VALIDATION_ERROR", "Arquivo de imagem nao enviado.", 400);
   }
 
-  const maxSize = getMaxUploadSizeBytes();
-  if (file.size > maxSize) {
-    return apiError(
-      "VALIDATION_ERROR",
-      `Arquivo excede o limite de ${Math.floor(maxSize / (1024 * 1024))}MB.`,
-      400,
-    );
+  const allowedMimeTypes = getAllowedImageMimeTypes();
+  if (!allowedMimeTypes.includes(file.type)) {
+    return apiError("VALIDATION_ERROR", "Tipo de arquivo nao permitido.", 400);
   }
 
   const arrayBuffer = await file.arrayBuffer();
@@ -67,21 +63,18 @@ export async function POST(req: NextRequest) {
   const validation = validateImageFile({
     mimeType: file.type,
     bytes,
+    maxBytes: getMaxUploadSizeBytes(),
   });
 
   if (!validation.ok) {
-    const message =
-      validation.reason === "signature_mismatch"
-        ? "O conteudo do arquivo nao corresponde ao tipo de imagem enviado."
-        : `Tipo de arquivo nao permitido. Use ${getAllowedImageMimeTypes().join(", ")}.`;
-    return apiError("VALIDATION_ERROR", message, 400);
+    return apiError("VALIDATION_ERROR", validation.message, 400);
   }
 
   const uploaded = await uploadImage({
     organizationId: auth.organizationId,
     userId: auth.userId,
     scope,
-    mimeType: validation.mimeType,
+    mimeType: file.type,
     bytes,
   });
 

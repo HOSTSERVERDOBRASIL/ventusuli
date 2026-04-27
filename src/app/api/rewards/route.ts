@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { getUserPointsBalance } from "@/lib/points/pointsService";
+import { getOrganizationPointPolicy, normalizePointPolicy } from "@/lib/points/policy";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/request-auth";
 
@@ -72,10 +73,15 @@ export async function GET(req: NextRequest) {
   ]);
 
   let currentBalance: number | null = null;
+  let pointsPolicy = normalizePointPolicy(null);
   if (auth) {
     try {
-      const balance = await getUserPointsBalance(auth.userId, auth.organizationId);
+      const [balance, policy] = await Promise.all([
+        getUserPointsBalance(auth.userId, auth.organizationId),
+        getOrganizationPointPolicy(auth.organizationId),
+      ]);
       currentBalance = balance.balance;
+      pointsPolicy = policy;
     } catch {
       currentBalance = null;
     }
@@ -84,5 +90,5 @@ export async function GET(req: NextRequest) {
   const total = Number(countRows[0]?.total ?? 0);
   const totalPages = total === 0 ? 1 : Math.ceil(total / limit);
 
-  return NextResponse.json({ data: rows, total, page, totalPages, currentBalance });
+  return NextResponse.json({ data: rows, total, page, totalPages, currentBalance, pointsPolicy });
 }

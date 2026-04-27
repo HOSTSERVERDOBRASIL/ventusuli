@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { apiError, handleApiException } from "@/lib/api-error";
@@ -43,8 +43,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
   try {
     const auth = getAuthContext(req);
     if (!auth) return apiError("UNAUTHORIZED", "Token de acesso ausente.", 401);
-    if (!isAdminRole(auth.role))
-      return apiError("FORBIDDEN", "Acesso restrito ao administrador.", 403);
+    if (!isAdminRole(auth.role)) return apiError("FORBIDDEN", "Acesso restrito ao administrador.", 403);
 
     const existing = await findOwnInvite(params.id, auth.organizationId);
     if (!existing) return apiError("USER_NOT_FOUND", "Convite nao encontrado.", 404);
@@ -58,11 +57,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
 
     const parsed = patchInviteSchema.safeParse(body);
     if (!parsed.success) {
-      return apiError(
-        "VALIDATION_ERROR",
-        parsed.error.errors[0]?.message ?? "Dados invalidos.",
-        400,
-      );
+      return apiError("VALIDATION_ERROR", parsed.error.errors[0]?.message ?? "Dados invalidos.", 400);
     }
 
     const data = parsed.data;
@@ -90,15 +85,14 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
   try {
     const auth = getAuthContext(req);
     if (!auth) return apiError("UNAUTHORIZED", "Token de acesso ausente.", 401);
-    if (!isAdminRole(auth.role))
-      return apiError("FORBIDDEN", "Acesso restrito ao administrador.", 403);
+    if (!isAdminRole(auth.role)) return apiError("FORBIDDEN", "Acesso restrito ao administrador.", 403);
 
     const existing = await findOwnInvite(params.id, auth.organizationId);
     if (!existing) return apiError("USER_NOT_FOUND", "Convite nao encontrado.", 404);
 
     await prisma.organizationInvite.delete({ where: { id: params.id } });
 
-    return NextResponse.json({ success: true });
+    return new NextResponse(null, { status: 204 });
   } catch (error) {
     return handleApiException(error, "Nao foi possivel excluir convite.");
   }

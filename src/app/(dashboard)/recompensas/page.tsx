@@ -1,6 +1,6 @@
-"use client";
+﻿"use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { ActionButton } from "@/components/system/action-button";
@@ -32,6 +32,7 @@ interface RewardItem {
 interface RewardsResponse {
   data: RewardItem[];
   currentBalance: number | null;
+  pointsPolicy?: PointPolicy;
 }
 
 interface CalculationResult {
@@ -44,6 +45,30 @@ interface CalculationResult {
   validationError?: string;
   item: RewardItem;
   currentBalance: number;
+  pointValueCents?: number;
+}
+
+interface PointPolicy {
+  pointValueCents: number;
+  expirationMonths: number;
+  athletePolicyText: string;
+}
+
+interface LedgerEntry {
+  id: string;
+  type: string;
+  typeLabel?: string;
+  sourceType: string;
+  sourceLabel?: string;
+  points: number;
+  balanceAfter: number;
+  description: string;
+  createdAt: string;
+  event: { id: string; name: string | null } | null;
+}
+
+interface PointSummary {
+  pointsExpiringIn30Days: number;
 }
 
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -58,6 +83,9 @@ export default function RecompensasPage() {
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<RewardItem[]>([]);
   const [balance, setBalance] = useState<number>(0);
+  const [policy, setPolicy] = useState<PointPolicy | null>(null);
+  const [ledger, setLedger] = useState<LedgerEntry[]>([]);
+  const [pointSummary, setPointSummary] = useState<PointSummary>({ pointsExpiringIn30Days: 0 });
   const [pointsInput, setPointsInput] = useState<Record<string, string>>({});
   const [calculations, setCalculations] = useState<Record<string, CalculationResult>>({});
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -66,16 +94,33 @@ export default function RecompensasPage() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/rewards", {
-        cache: "no-store",
-        headers: buildAuthHeaders(accessToken),
-      });
+      const [response, ledgerResponse, summaryResponse] = await Promise.all([
+        fetch("/api/rewards", {
+          cache: "no-store",
+          headers: buildAuthHeaders(accessToken),
+        }),
+        fetch("/api/points/me/ledger?page=1&limit=8", {
+          cache: "no-store",
+          headers: buildAuthHeaders(accessToken),
+        }),
+        fetch("/api/points/me", {
+          cache: "no-store",
+          headers: buildAuthHeaders(accessToken),
+        }),
+      ]);
       const payload = (await response.json()) as RewardsResponse;
       if (!response.ok) throw new Error("rewards_unavailable");
+      const ledgerPayload = (await ledgerResponse.json()) as { data?: LedgerEntry[] };
+      const summaryPayload = (await summaryResponse.json()) as { data?: PointSummary };
       setItems(payload.data ?? []);
       setBalance(payload.currentBalance ?? 0);
+      setPolicy(payload.pointsPolicy ?? null);
+      setLedger(ledgerResponse.ok ? ledgerPayload.data ?? [] : []);
+      setPointSummary(summaryResponse.ok ? summaryPayload.data ?? { pointsExpiringIn30Days: 0 } : { pointsExpiringIn30Days: 0 });
     } catch (error) {
       setItems([]);
+      setLedger([]);
+      setPointSummary({ pointsExpiringIn30Days: 0 });
       setError(
         error instanceof Error
           ? error.message
@@ -90,11 +135,6 @@ export default function RecompensasPage() {
     if (!hydrated) return;
     void loadRewards();
   }, [accessToken, hydrated]);
-
-  const totalStock = useMemo(
-    () => items.reduce((sum, item) => sum + item.stockQuantity, 0),
-    [items],
-  );
 
   const handleCalculate = async (item: RewardItem) => {
     setProcessingId(item.id);
@@ -185,15 +225,24 @@ export default function RecompensasPage() {
       <div className="grid gap-3 sm:grid-cols-3">
         <MetricCard label="Saldo atual" value={`${balance} pts`} tone="highlight" />
         <MetricCard label="Itens disponiveis" value={String(items.length)} />
-        <MetricCard label="Estoque total" value={String(totalStock)} />
+        <MetricCard label="A expirar" value={`${pointSummary.pointsExpiringIn30Days} pts`} />
       </div>
+
+      {policy ? (
+        <SectionCard
+          title="Politica de pontos"
+          description={`Cada ponto vale ${BRL.format(policy.pointValueCents / 100)} em descontos. Validade: ${policy.expirationMonths} meses.`}
+        >
+          <p className="text-sm leading-6 text-slate-200">{policy.athletePolicyText}</p>
+        </SectionCard>
+      ) : null}
 
       <SectionCard title="Catalogo" description="Selecione um item, simule e finalize o resgate">
         {loading ? (
           <LoadingState lines={5} />
         ) : error ? (
           <EmptyState
-            title="Catálogo indisponível"
+            title="CatÃ¡logo indisponÃ­vel"
             description={error}
             action={
               <ActionButton intent="secondary" onClick={() => void loadRewards()}>
@@ -249,6 +298,15 @@ export default function RecompensasPage() {
 
                   <div className="mt-3 rounded-lg border border-white/10 bg-[#0c1d33] p-2 text-sm text-slate-200">
                     Estoque: <span className="font-semibold">{item.stockQuantity}</span>
+                    <span className="ml-2 text-xs text-slate-400">
+                      {item.allowMixed
+                        ? "pontos + PIX"
+                        : item.allowPoints && item.cashPriceCents === 0
+                          ? "somente pontos"
+                          : item.allowCash
+                            ? "PIX"
+                            : "pontos"}
+                    </span>
                   </div>
 
                   <div className="mt-3 space-y-2">
@@ -294,6 +352,36 @@ export default function RecompensasPage() {
                 </article>
               );
             })}
+          </div>
+        )}
+      </SectionCard>
+
+      <SectionCard title="Extrato de pontos" description="Origem dos creditos, debitos, resgates e expiracoes">
+        {ledger.length === 0 ? (
+          <EmptyState title="Sem movimentacoes" description="Seus pontos aparecerao aqui quando forem lancados." />
+        ) : (
+          <div className="space-y-2">
+            {ledger.map((entry) => (
+              <div
+                key={entry.id}
+                className="grid gap-2 rounded-xl border border-white/10 bg-[#102640] p-3 text-sm text-slate-200 md:grid-cols-[1fr_auto]"
+              >
+                <div>
+                  <p className="font-semibold text-white">{entry.sourceLabel ?? entry.sourceType}</p>
+                  <p className="text-xs text-slate-400">
+                    {entry.description}
+                    {entry.event?.name ? ` | ${entry.event.name}` : ""}
+                  </p>
+                </div>
+                <div className="text-left md:text-right">
+                  <p className={entry.points >= 0 ? "font-semibold text-emerald-300" : "font-semibold text-rose-300"}>
+                    {entry.points >= 0 ? "+" : ""}
+                    {entry.points} pts
+                  </p>
+                  <p className="text-xs text-slate-400">Saldo: {entry.balanceAfter} pts</p>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </SectionCard>

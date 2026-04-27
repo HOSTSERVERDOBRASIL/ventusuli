@@ -1,4 +1,4 @@
-interface WindowEntry {
+﻿interface WindowEntry {
   count: number;
   resetAt: number;
 }
@@ -210,23 +210,7 @@ function getAdapter(): RateLimiterAdapter {
 const upstashUrl = process.env.UPSTASH_REDIS_REST_URL ?? "";
 const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN ?? "";
 
-function getConfiguredRateLimiterBackend():
-  | "auto"
-  | "memory"
-  | "redis"
-  | "upstash" {
-  const raw = process.env.RATE_LIMIT_BACKEND?.trim().toLowerCase();
-  if (raw === "memory" || raw === "redis" || raw === "upstash") return raw;
-  return "auto";
-}
-
 export function getRateLimiterBackend(): RateLimiterBackend {
-  const configured = getConfiguredRateLimiterBackend();
-
-  if (configured === "memory") return "memory";
-  if (configured === "redis") return process.env.REDIS_URL ? "redis" : "unconfigured";
-  if (configured === "upstash") return upstashUrl && upstashToken ? "upstash" : "unconfigured";
-
   if (process.env.REDIS_URL) return "redis";
   if (upstashUrl && upstashToken) return "upstash";
   if (process.env.NODE_ENV !== "production") return "memory";

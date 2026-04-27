@@ -1,4 +1,4 @@
-export const POINT_VALUE_BRL = 0.1;
+﻿import { DEFAULT_POINT_VALUE_CENTS } from "@/lib/points/policy";
 
 export interface RewardItem {
   cashPriceCents: number;
@@ -30,9 +30,11 @@ export function calculateRedemption(
   item: RewardItem,
   userBalance: number,
   requestedPoints?: number,
+  pointValueCents = DEFAULT_POINT_VALUE_CENTS,
 ): RedemptionCalculation {
   const maxAbatementCents = (item.cashPriceCents * item.maxPointsDiscountPercent) / 100;
-  const maxPointsFromPercent = Math.floor(maxAbatementCents / (POINT_VALUE_BRL * 100));
+  const safePointValueCents = Math.max(1, pointValueCents);
+  const maxPointsFromPercent = Math.floor(maxAbatementCents / safePointValueCents);
   const maxPointsAllowed = Math.min(userBalance, item.pointsCost, maxPointsFromPercent);
 
   const pointsUsed =
@@ -40,7 +42,7 @@ export function calculateRedemption(
       ? Math.min(Math.max(requestedPoints, 0), maxPointsAllowed)
       : maxPointsAllowed;
 
-  const abatementCents = Math.floor(pointsUsed * POINT_VALUE_BRL * 100);
+  const abatementCents = Math.floor(pointsUsed * safePointValueCents);
   const cashCents = Math.max(item.cashPriceCents - abatementCents, item.minimumCashCents);
 
   let isValid = true;

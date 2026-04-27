@@ -1,9 +1,10 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { DoorOpen, UserCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { roleLabel } from "@/lib/role-labels";
 import { useAuthToken } from "@/components/auth/AuthTokenProvider";
 import { isNavItemActive, splitNavBySection, type NavItem } from "@/components/layout/nav-items";
 import { UserRole } from "@/types";
@@ -67,6 +68,17 @@ export function Sidebar() {
   const router = useRouter();
   const { userRole, clearAccessToken, currentUser, organization } = useAuthToken();
   const groups = splitNavBySection(userRole);
+  const navGroups = [
+    { title: "Inicio", items: groups.home },
+    { title: "Provas e agenda", items: groups.events },
+    { title: "Financeiro", items: groups.finance },
+    { title: "Pontos e beneficios", items: groups.points },
+    { title: "Comunicacao", items: groups.communication },
+    { title: "Tecnico", items: groups.coaching },
+    { title: "Administracao", items: groups.admin },
+    { title: "Plataforma", items: groups.platform },
+    { title: "Conta", items: groups.account },
+  ];
 
   const organizationLogo = resolveOrganizationLogo(organization?.logo_url);
   const profileHref = userRole === UserRole.SUPER_ADMIN ? "/super-admin" : "/perfil";
@@ -105,16 +117,15 @@ export function Sidebar() {
         </div>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
-        <NavGroup pathname={pathname} title="Minha jornada" items={groups.journey} />
-        {groups.operation.length > 0 && <div className="mb-2 h-px bg-white/[0.06]" />}
-        <NavGroup pathname={pathname} title="Operacao" items={groups.operation} />
-        {groups.coaching.length > 0 && <div className="mb-2 h-px bg-white/[0.06]" />}
-        <NavGroup pathname={pathname} title="Coaching" items={groups.coaching} />
-        {groups.platform.length > 0 && <div className="mb-2 h-px bg-white/[0.06]" />}
-        <NavGroup pathname={pathname} title="Plataforma" items={groups.platform} />
-        {groups.account.length > 0 && <div className="mb-2 h-px bg-white/[0.06]" />}
-        <NavGroup pathname={pathname} title="Conta" items={groups.account} />
+      <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4">
+        {navGroups.map((group, index) =>
+          group.items.length > 0 ? (
+            <div key={group.title}>
+              {index > 0 ? <div className="mb-2 h-px bg-white/[0.06]" /> : null}
+              <NavGroup pathname={pathname} title={group.title} items={group.items} />
+            </div>
+          ) : null,
+        )}
       </nav>
 
       <div className="border-t border-white/[0.06] p-3">
@@ -134,7 +145,7 @@ export function Sidebar() {
             <p className="truncate text-[12px] font-semibold text-white">
               {currentUser?.name ?? "Usuario"}
             </p>
-            <p className="text-[10px] text-white/35">{userRole ?? "ATHLETE"}</p>
+            <p className="text-[10px] text-white/35">{roleLabel(userRole)}</p>
           </div>
         </div>
         <div className="mt-2 flex gap-2 px-1">

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getOptionalIntegrationEnv, getRequiredRuntimeEnv } from "@/lib/env";
 import { logWarn, toErrorContext, withRequestContext } from "@/lib/logger";
@@ -124,7 +124,7 @@ export async function GET(req: NextRequest) {
     const rateLimiterOk = rateLimiterBackend !== "unconfigured";
     const rateLimiterError = rateLimiterOk
       ? null
-      : "Rate limiter backend nao configurado. Defina RATE_LIMIT_BACKEND=memory para cPanel single-instance, ou configure Redis/Upstash.";
+      : "Rate limiter backend nao configurado. Defina REDIS_URL ou UPSTASH_REDIS_REST_URL/UPSTASH_REDIS_REST_TOKEN.";
 
     if (!rateLimiterOk) {
       logWarn(

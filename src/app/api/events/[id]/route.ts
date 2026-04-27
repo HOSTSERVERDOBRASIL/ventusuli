@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { EventStatus, Prisma, RegistrationStatus, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { apiError } from "@/lib/api-error";
+import { getAuthContext } from "@/lib/request-auth";
 import { isAllowedImageUrl } from "@/lib/storage/image-url";
 
 const patchEventSchema = z.object({
@@ -41,18 +42,6 @@ const patchEventSchema = z.object({
     .optional(),
 });
 
-function getAuthContext(req: NextRequest) {
-  const userId = req.headers.get("x-user-id");
-  const role = req.headers.get("x-user-role") as UserRole | null;
-  const organizationId = req.headers.get("x-org-id");
-
-  if (!userId || !role || !organizationId) {
-    return null;
-  }
-
-  return { userId, role, organizationId };
-}
-
 function isAdminRole(role: UserRole): boolean {
   return role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN;
 }
@@ -60,10 +49,10 @@ function isAdminRole(role: UserRole): boolean {
 function prismaToApiError(error: unknown): NextResponse {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === "P2002") {
-      return apiError("VALIDATION_ERROR", "Conflito de dados únicos.", 409);
+      return apiError("VALIDATION_ERROR", "Conflito de dados Ãºnicos.", 409);
     }
     if (error.code === "P2025") {
-      return apiError("USER_NOT_FOUND", "Registro não encontrado.", 404);
+      return apiError("USER_NOT_FOUND", "Registro nÃ£o encontrado.", 404);
     }
   }
   return apiError("INTERNAL_ERROR", "Erro interno ao processar evento.", 500);
@@ -94,7 +83,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
     });
 
     if (!event) {
-      return apiError("USER_NOT_FOUND", "Prova não encontrada.", 404);
+      return apiError("USER_NOT_FOUND", "Prova nÃ£o encontrada.", 404);
     }
 
     const confirmedCount = await prisma.registration.count({
@@ -128,12 +117,12 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
   try {
     body = await req.json();
   } catch {
-    return apiError("VALIDATION_ERROR", "Body inválido.", 400);
+    return apiError("VALIDATION_ERROR", "Body invÃ¡lido.", 400);
   }
 
   const parsed = patchEventSchema.safeParse(body);
   if (!parsed.success) {
-    return apiError("VALIDATION_ERROR", parsed.error.errors[0]?.message ?? "Dados inválidos.", 400);
+    return apiError("VALIDATION_ERROR", parsed.error.errors[0]?.message ?? "Dados invÃ¡lidos.", 400);
   }
 
   const input = parsed.data;
@@ -149,7 +138,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
     });
 
     if (!current) {
-      return apiError("USER_NOT_FOUND", "Prova não encontrada.", 404);
+      return apiError("USER_NOT_FOUND", "Prova nÃ£o encontrada.", 404);
     }
 
     const targetDistanceLabels = input.distances?.map((d) => d.label) ?? null;
@@ -159,7 +148,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
     const nextStatus = input.status ?? current.status;
 
     if (nextStatus === EventStatus.PUBLISHED && finalDistancesCount < 1) {
-      return apiError("VALIDATION_ERROR", "Prova publicada deve ter ao menos uma distância.", 400);
+      return apiError("VALIDATION_ERROR", "Prova publicada deve ter ao menos uma distÃ¢ncia.", 400);
     }
 
     await prisma.$transaction(async (tx) => {
@@ -248,7 +237,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
     if (error instanceof Error && error.message === "DISTANCE_HAS_REGISTRATIONS") {
       return apiError(
         "FORBIDDEN",
-        "Não é possível remover distâncias que já possuem inscrições.",
+        "NÃ£o Ã© possÃ­vel remover distÃ¢ncias que jÃ¡ possuem inscriÃ§Ãµes.",
         403,
       );
     }
@@ -269,7 +258,7 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
       select: { id: true },
     });
     if (!event) {
-      return apiError("USER_NOT_FOUND", "Prova não encontrada.", 404);
+      return apiError("USER_NOT_FOUND", "Prova nÃ£o encontrada.", 404);
     }
 
     const confirmedCount = await prisma.registration.count({
@@ -283,7 +272,7 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
     if (confirmedCount > 0) {
       return apiError(
         "FORBIDDEN",
-        "Não é possível cancelar prova com inscrições confirmadas.",
+        "NÃ£o Ã© possÃ­vel cancelar prova com inscriÃ§Ãµes confirmadas.",
         403,
       );
     }

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -16,27 +16,24 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { EventCard } from "@/components/events/event-card";
 import type { EventStatus, EventView } from "@/components/events/types";
-import {
-  ACCEPTED_IMAGE_FILE_INPUT_ACCEPT,
-  uploadImageFile,
-} from "@/services/upload-service";
+import { uploadImageFile } from "@/services/upload-service";
 
 const distanceSchema = z.object({
   label: z.string().trim().min(1, "Informe o label"),
-  distance_km: z.coerce.number().positive("Informe a distância"),
-  price_brl: z.coerce.number().min(0, "Valor inválido"),
+  distance_km: z.coerce.number().positive("Informe a distÃ¢ncia"),
+  price_brl: z.coerce.number().min(0, "Valor invÃ¡lido"),
   max_slots: z.union([z.coerce.number().int().positive(), z.nan()]).optional(),
 });
 
 const eventFormSchema = z.object({
   name: z.string().trim().min(3, "Nome deve ter ao menos 3 caracteres"),
-  city: z.string().trim().min(2, "Cidade obrigatória"),
-  state: z.string().trim().length(2, "UF inválida"),
-  event_date: z.string().min(1, "Data obrigatória"),
+  city: z.string().trim().min(2, "Cidade obrigatÃ³ria"),
+  state: z.string().trim().length(2, "UF invÃ¡lida"),
+  event_date: z.string().min(1, "Data obrigatÃ³ria"),
   registration_deadline: z.string().optional(),
   description: z.string().optional(),
   image_url: z.string().trim().optional(),
-  distances: z.array(distanceSchema).min(1, "Adicione ao menos uma distância"),
+  distances: z.array(distanceSchema).min(1, "Adicione ao menos uma distÃ¢ncia"),
 });
 
 type EventFormValues = z.infer<typeof eventFormSchema>;
@@ -158,7 +155,7 @@ export function EventForm({
       status: submitMode === "PUBLISHED" ? "PUBLISHED" : (initialEvent?.status ?? "DRAFT"),
       registrations_count: initialEvent?.registrations_count ?? 0,
       distances: (values.distances ?? []).map((distance) => ({
-        label: distance.label || "Distância",
+        label: distance.label || "DistÃ¢ncia",
         distance_km: Number(distance.distance_km) || 0,
         price_cents: Math.round((Number(distance.price_brl) || 0) * 100),
         max_slots: Number.isFinite(distance.max_slots as number)
@@ -245,7 +242,7 @@ export function EventForm({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="registration_deadline">Prazo de inscrição</Label>
+              <Label htmlFor="registration_deadline">Prazo de inscriÃ§Ã£o</Label>
               <Input
                 id="registration_deadline"
                 type="date"
@@ -255,7 +252,7 @@ export function EventForm({
             </div>
 
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="description">Descrição</Label>
+              <Label htmlFor="description">DescriÃ§Ã£o</Label>
               <textarea
                 id="description"
                 className="min-h-24 w-full rounded-xl border border-white/15 bg-[#0F2743] px-3 py-2 text-sm"
@@ -275,7 +272,7 @@ export function EventForm({
                 <label className="inline-flex cursor-pointer items-center rounded-lg border border-white/15 bg-white/10 px-3 py-1.5 text-xs text-white transition hover:bg-white/20">
                   <input
                     type="file"
-                    accept={ACCEPTED_IMAGE_FILE_INPUT_ACCEPT}
+                    accept="image/png,image/jpeg,image/jpg,image/webp,image/gif,image/svg+xml"
                     className="hidden"
                     onChange={async (event) => {
                       const file = event.target.files?.[0];
@@ -323,7 +320,7 @@ export function EventForm({
 
           <div className="space-y-3 rounded-2xl border border-white/10 bg-[#102D4B] p-4">
             <div className="flex items-center justify-between">
-              <h3 className="font-semibold">Distâncias</h3>
+              <h3 className="font-semibold">DistÃ¢ncias</h3>
               <Button
                 type="button"
                 variant="secondary"
@@ -333,7 +330,7 @@ export function EventForm({
                 }
               >
                 <Plus className="h-4 w-4" />
-                Adicionar distância
+                Adicionar distÃ¢ncia
               </Button>
             </div>
 
@@ -353,7 +350,7 @@ export function EventForm({
                   </div>
 
                   <div className="space-y-1">
-                    <Label>Distância (km)</Label>
+                    <Label>DistÃ¢ncia (km)</Label>
                     <Input
                       type="number"
                       step="0.001"

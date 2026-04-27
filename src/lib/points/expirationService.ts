@@ -1,10 +1,12 @@
 import { randomUUID } from "crypto";
+import { getOrganizationPointPolicy } from "@/lib/points/policy";
 import { prisma } from "@/lib/prisma";
 
-interface CreditRow {
+export interface LedgerRow {
   id: string;
   userId: string;
   points: number | bigint;
+  type: string;
   createdAt: Date;
 }
 
@@ -20,10 +22,62 @@ interface ExpirationResult {
   pointsExpired: number;
 }
 
+interface CreditBucket {
+  id: string;
+  userId: string;
+  points: number;
+  remaining: number;
+  createdAt: Date;
+}
+
 function toNumber(value: number | bigint | null | undefined): number {
   if (value === null || value === undefined) return 0;
   if (typeof value === "bigint") return Number(value);
   return value;
+}
+
+function subtractMonths(date: Date, months: number): Date {
+  const next = new Date(date);
+  next.setUTCMonth(next.getUTCMonth() - months);
+  return next;
+}
+
+function addMonths(date: Date, months: number): Date {
+  const next = new Date(date);
+  next.setUTCMonth(next.getUTCMonth() + months);
+  return next;
+}
+
+export function buildAvailableCreditBuckets(rows: LedgerRow[]): CreditBucket[] {
+  const buckets: CreditBucket[] = [];
+
+  for (const row of rows) {
+    const points = toNumber(row.points);
+
+    if (row.type === "CREDIT" && points > 0) {
+      buckets.push({
+        id: row.id,
+        userId: row.userId,
+        points,
+        remaining: points,
+        createdAt: row.createdAt,
+      });
+      continue;
+    }
+
+    if (points >= 0) continue;
+
+    let debitRemaining = Math.abs(points);
+    for (const bucket of buckets) {
+      if (bucket.remaining <= 0) continue;
+      const consumed = Math.min(bucket.remaining, debitRemaining);
+      bucket.remaining -= consumed;
+      debitRemaining -= consumed;
+      if (debitRemaining <= 0) break;
+    }
+  }
+
+  return buckets.filter((bucket) => bucket.remaining > 0);
 }
 
 async function insertExpirationLedger(params: {
@@ -32,7 +86,7 @@ async function insertExpirationLedger(params: {
   points: number;
   referenceCode: string;
   description: string;
-}): Promise<boolean> {
+}): Promise<number> {
   const existing = await prisma.$queryRaw<Array<{ id: string }>>`
     SELECT id
     FROM public."AthletePointLedger"
@@ -40,7 +94,7 @@ async function insertExpirationLedger(params: {
     LIMIT 1
   `;
 
-  if (existing[0]) return false;
+  if (existing[0]) return 0;
 
   const latest = await prisma.$queryRaw<Array<{ balanceAfter: number | bigint | null }>>`
     SELECT "balanceAfter"
@@ -52,7 +106,11 @@ async function insertExpirationLedger(params: {
   `;
 
   const previousBalance = toNumber(latest[0]?.balanceAfter);
-  const balanceAfter = previousBalance + params.points;
+  const pointsToExpire = Math.min(Math.abs(params.points), previousBalance);
+  if (pointsToExpire <= 0) return 0;
+
+  const points = -pointsToExpire;
+  const balanceAfter = previousBalance + points;
 
   await prisma.$executeRaw`
     INSERT INTO public."AthletePointLedger" (
@@ -78,7 +136,7 @@ async function insertExpirationLedger(params: {
       NULL,
       'EXPIRATION',
       'EXPIRATION',
-      ${params.points},
+      ${points},
       ${balanceAfter},
       ${params.description},
       ${params.referenceCode},
@@ -87,37 +145,27 @@ async function insertExpirationLedger(params: {
     )
   `;
 
-  return true;
+  return pointsToExpire;
 }
 
 export async function expirePoints(orgId: string): Promise<ExpirationResult> {
-  const cutoffDate = new Date();
-  cutoffDate.setUTCMonth(cutoffDate.getUTCMonth() - 12);
+  const policy = await getOrganizationPointPolicy(orgId);
+  const cutoffDate = subtractMonths(new Date(), policy.expirationMonths);
 
-  const credits = await prisma.$queryRaw<CreditRow[]>`
+  const ledgerRows = await prisma.$queryRaw<LedgerRow[]>`
     SELECT
-      c.id,
-      c."userId",
-      c.points,
-      c."createdAt"
-    FROM public."AthletePointLedger" c
-    WHERE c."organizationId" = ${orgId}
-      AND c.type = 'CREDIT'
-      AND c.points > 0
-      AND c."createdAt" < ${cutoffDate}
-      AND NOT EXISTS (
-        SELECT 1
-        FROM public."AthletePointLedger" e
-        WHERE e."organizationId" = c."organizationId"
-          AND e."userId" = c."userId"
-          AND e.type = 'EXPIRATION'
-          AND e."referenceCode" = ('EXP-' || c.id)
-      )
-    ORDER BY c."userId" ASC, c."createdAt" ASC, c.id ASC
+      id,
+      "userId",
+      points,
+      type,
+      "createdAt"
+    FROM public."AthletePointLedger"
+    WHERE "organizationId" = ${orgId}
+    ORDER BY "userId" ASC, "createdAt" ASC, id ASC
   `;
 
-  const byUser = new Map<string, CreditRow[]>();
-  for (const row of credits) {
+  const byUser = new Map<string, LedgerRow[]>();
+  for (const row of ledgerRows) {
     const key = row.userId;
     const list = byUser.get(key) ?? [];
     list.push(row);
@@ -130,13 +178,17 @@ export async function expirePoints(orgId: string): Promise<ExpirationResult> {
   for (const [userId, rows] of byUser.entries()) {
     let userExpired = 0;
 
-    for (const row of rows) {
-      const pointsToExpire = -Math.abs(toNumber(row.points));
-      const referenceCode = `EXP-${row.id}`;
-      const createdAtLabel = new Date(row.createdAt).toLocaleDateString("pt-BR");
+    const expirableBuckets = buildAvailableCreditBuckets(rows).filter(
+      (bucket) => bucket.createdAt < cutoffDate,
+    );
+
+    for (const bucket of expirableBuckets) {
+      const pointsToExpire = -Math.abs(bucket.remaining);
+      const referenceCode = `EXP-${bucket.id}`;
+      const createdAtLabel = new Date(bucket.createdAt).toLocaleDateString("pt-BR");
       const description = `Expiracao de pontos creditados em ${createdAtLabel}`;
 
-      const created = await insertExpirationLedger({
+      const expiredPoints = await insertExpirationLedger({
         orgId,
         userId,
         points: pointsToExpire,
@@ -144,8 +196,8 @@ export async function expirePoints(orgId: string): Promise<ExpirationResult> {
         description,
       });
 
-      if (created) {
-        userExpired += Math.abs(pointsToExpire);
+      if (expiredPoints > 0) {
+        userExpired += expiredPoints;
       }
     }
 
@@ -162,43 +214,69 @@ export async function getExpiringWarnings(
   orgId: string,
   daysAhead: number,
 ): Promise<Array<{ userId: string; userName: string; userEmail: string; pointsExpiring: number }>> {
+  const policy = await getOrganizationPointPolicy(orgId);
   const now = new Date();
-  const windowStart = new Date(now);
-  windowStart.setUTCMonth(windowStart.getUTCMonth() - 12);
+  const windowStart = subtractMonths(now, policy.expirationMonths);
 
   const windowEnd = new Date(windowStart);
   windowEnd.setUTCDate(windowEnd.getUTCDate() + daysAhead);
 
-  const rows = await prisma.$queryRaw<ExpiringWarningRow[]>`
+  const ledgerRows = await prisma.$queryRaw<LedgerRow[]>`
     SELECT
-      c."userId" AS "userId",
-      u.name AS "userName",
-      u.email AS "userEmail",
-      COALESCE(SUM(c.points), 0) AS "pointsExpiring"
-    FROM public."AthletePointLedger" c
-    INNER JOIN public.users u ON u.id = c."userId"
-    WHERE c."organizationId" = ${orgId}
-      AND c.type = 'CREDIT'
-      AND c.points > 0
-      AND c."createdAt" >= ${windowStart}
-      AND c."createdAt" < ${windowEnd}
-      AND NOT EXISTS (
-        SELECT 1
-        FROM public."AthletePointLedger" e
-        WHERE e."organizationId" = c."organizationId"
-          AND e."userId" = c."userId"
-          AND e.type = 'EXPIRATION'
-          AND e."referenceCode" = ('EXP-' || c.id)
-      )
-    GROUP BY c."userId", u.name, u.email
-    HAVING COALESCE(SUM(c.points), 0) > 0
-    ORDER BY "pointsExpiring" DESC, u.name ASC
+      id,
+      "userId",
+      points,
+      type,
+      "createdAt"
+    FROM public."AthletePointLedger"
+    WHERE "organizationId" = ${orgId}
+    ORDER BY "userId" ASC, "createdAt" ASC, id ASC
   `;
 
-  return rows.map((row) => ({
-    userId: row.userId,
-    userName: row.userName ?? "",
-    userEmail: row.userEmail ?? "",
-    pointsExpiring: toNumber(row.pointsExpiring),
-  }));
+  const userIds = Array.from(new Set(ledgerRows.map((row) => row.userId)));
+  const users = await prisma.user.findMany({
+    where: { id: { in: userIds }, organization_id: orgId },
+    select: { id: true, name: true, email: true },
+  });
+  const usersById = new Map(users.map((user) => [user.id, user]));
+
+  const byUser = new Map<string, LedgerRow[]>();
+  for (const row of ledgerRows) {
+    const list = byUser.get(row.userId) ?? [];
+    list.push(row);
+    byUser.set(row.userId, list);
+  }
+
+  const warnings: ExpiringWarningRow[] = [];
+  for (const [userId, rows] of byUser.entries()) {
+    const pointsExpiring = buildAvailableCreditBuckets(rows)
+      .filter((bucket) => bucket.createdAt >= windowStart && bucket.createdAt < windowEnd)
+      .reduce((total, bucket) => total + bucket.remaining, 0);
+
+    if (pointsExpiring <= 0) continue;
+    const user = usersById.get(userId);
+    warnings.push({
+      userId,
+      userName: user?.name ?? "",
+      userEmail: user?.email ?? "",
+      pointsExpiring,
+    });
+  }
+
+  return warnings
+    .sort(
+      (a, b) =>
+        toNumber(b.pointsExpiring) - toNumber(a.pointsExpiring) ||
+        (a.userName ?? "").localeCompare(b.userName ?? ""),
+    )
+    .map((row) => ({
+      userId: row.userId,
+      userName: row.userName ?? "",
+      userEmail: row.userEmail ?? "",
+      pointsExpiring: toNumber(row.pointsExpiring),
+    }));
+}
+
+export function getCreditExpirationDate(createdAt: Date, expirationMonths: number): Date {
+  return addMonths(createdAt, expirationMonths);
 }

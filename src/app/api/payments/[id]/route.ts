@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { PaymentStatus, Prisma, RegistrationStatus } from "@prisma/client";
 import { z } from "zod";
 import { apiError } from "@/lib/api-error";
 import { approveRedemptionAfterPayment, RedemptionServiceError } from "@/lib/points/redemptionService";
 import { prisma } from "@/lib/prisma";
-import { getAuthContext, isAdminRole } from "@/lib/request-auth";
+import { getAuthContext, isFinanceRole } from "@/lib/request-auth";
 
 const patchPaymentSchema = z.object({
   action: z.enum(["MARK_PAID", "CANCEL", "MARK_EXPIRED", "REOPEN_PENDING"]),
@@ -158,7 +158,7 @@ function toDetail(payment: {
 export async function GET(req: NextRequest, { params }: RouteParams) {
   const auth = getAuthContext(req);
   if (!auth) return apiError("UNAUTHORIZED", "Token de acesso ausente.", 401);
-  if (!isAdminRole(auth.role)) return apiError("FORBIDDEN", "Acesso restrito ao ADMIN.", 403);
+  if (!isFinanceRole(auth.role)) return apiError("FORBIDDEN", "Acesso restrito ao Financeiro.", 403);
 
   const payment = await prisma.payment.findFirst({
     where: {
@@ -197,7 +197,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 export async function PATCH(req: NextRequest, { params }: RouteParams) {
   const auth = getAuthContext(req);
   if (!auth) return apiError("UNAUTHORIZED", "Token de acesso ausente.", 401);
-  if (!isAdminRole(auth.role)) return apiError("FORBIDDEN", "Acesso restrito ao ADMIN.", 403);
+  if (!isFinanceRole(auth.role)) return apiError("FORBIDDEN", "Acesso restrito ao Financeiro.", 403);
 
   let body: unknown;
   try {

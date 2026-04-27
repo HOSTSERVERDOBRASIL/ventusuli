@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { PaymentStatus } from "@prisma/client";
 import { z } from "zod";
 import { apiError } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
-import { getAuthContext, isAdminRole } from "@/lib/request-auth";
+import { getAuthContext, isFinanceRole } from "@/lib/request-auth";
 
 const dueFilterValues = ["ALL", "OVERDUE", "TODAY", "NEXT_7_DAYS", "NO_DUE_DATE"] as const;
 const sortByValues = ["createdAt", "expiresAt", "amount"] as const;
@@ -67,7 +67,7 @@ function getReconciliation(status: PaymentStatus) {
 export async function GET(req: NextRequest) {
   const auth = getAuthContext(req);
   if (!auth) return apiError("UNAUTHORIZED", "Token de acesso ausente.", 401);
-  if (!isAdminRole(auth.role)) return apiError("FORBIDDEN", "Acesso restrito ao ADMIN.", 403);
+  if (!isFinanceRole(auth.role)) return apiError("FORBIDDEN", "Acesso restrito ao Financeiro.", 403);
 
   const parsed = querySchema.safeParse({
     startDate: req.nextUrl.searchParams.get("startDate") ?? undefined,
@@ -244,5 +244,5 @@ export async function GET(req: NextRequest) {
     ),
   };
 
-  return NextResponse.json({ rows, summary, queue, filters });
+  return NextResponse.json({ data: rows, rows, summary, queue, filters });
 }

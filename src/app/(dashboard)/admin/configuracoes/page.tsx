@@ -12,7 +12,6 @@ import { SectionCard } from "@/components/system/section-card";
 import { StatusBadge } from "@/components/system/status-badge";
 import { Input } from "@/components/ui/input";
 import {
-  ACCEPTED_IMAGE_FILE_INPUT_ACCEPT,
   createInvite,
   deleteInvite,
   getOrganizationSettings,
@@ -30,7 +29,7 @@ const DEFAULT_ORG_LOGO = "/branding/ventu-suli-logo.png";
 const MAX_LOGO_FILE_SIZE = 2 * 1024 * 1024;
 
 function inviteLink(token: string): string {
-  return `${window.location.origin}/register/atleta?token=${token}`;
+  return `${window.location.origin}/register/atleta?inviteToken=${token}`;
 }
 
 function formatExpiry(expiresAt: string | null): string {
@@ -327,7 +326,7 @@ export default function AdminConfiguracoesPage() {
                       <label className="inline-flex cursor-pointer items-center rounded-lg border border-[#2f5d8f] bg-[#0a1d36] px-3 py-2 text-xs font-medium text-[#c8dbf8] transition hover:border-[#4f7fb4]">
                         <input
                           type="file"
-                          accept={ACCEPTED_IMAGE_FILE_INPUT_ACCEPT}
+                          accept="image/png,image/jpeg,image/jpg,image/webp,image/gif,image/svg+xml"
                           className="hidden"
                           onChange={(event) => void onLogoFileChange(event)}
                           disabled={!canEdit || uploadingLogo}
@@ -346,7 +345,7 @@ export default function AdminConfiguracoesPage() {
                   ) : null}
 
                   <p className="text-[11px] text-slate-400">
-                    PNG, JPG, WEBP ou GIF com ate 2MB.
+                    PNG, JPG, WEBP, GIF ou SVG com ate 2MB.
                   </p>
                 </div>
               </div>
@@ -536,7 +535,7 @@ export default function AdminConfiguracoesPage() {
                   O link de convite tem formato:{" "}
                   <span className="font-mono text-white">
                     {typeof window !== "undefined" ? window.location.origin : ""}
-                    /register/atleta?token=TOKEN
+                    /register/atleta?inviteToken=TOKEN
                   </span>
                 </p>
               </div>

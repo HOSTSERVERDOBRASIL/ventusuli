@@ -1,4 +1,4 @@
-import crypto from "crypto";
+﻿import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { UserRole } from "@prisma/client";
 import { z } from "zod";
@@ -10,7 +10,7 @@ import { getRequiredRuntimeEnv } from "@/lib/env";
 const createInviteSchema = z.object({
   organizationId: z.string().uuid("organizationId invalido"),
   email: z.string().trim().email("Email invalido").toLowerCase(),
-  role: z.enum(["ADMIN", "COACH"]).default("ADMIN"),
+  role: z.enum(["ADMIN", "FINANCE", "COACH"]).default("ADMIN"),
   expiresInDays: z.number().int().min(1).max(90).optional(),
 });
 

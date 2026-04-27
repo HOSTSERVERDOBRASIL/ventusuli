@@ -1,14 +1,7 @@
-import { buildAuthHeaders } from "@/services/runtime";
+﻿import { buildAuthHeaders } from "@/services/runtime";
 
 export type FrontendUploadScope = "events" | "avatars" | "rewards" | "branding";
-export const ACCEPTED_IMAGE_FILE_TYPES = [
-  "image/jpeg",
-  "image/jpg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-] as const;
-export const ACCEPTED_IMAGE_FILE_INPUT_ACCEPT = ACCEPTED_IMAGE_FILE_TYPES.join(",");
+export const ACCEPTED_IMAGE_FILE_INPUT_ACCEPT = "image/jpeg,image/jpg,image/png,image/webp,image/gif";
 
 interface UploadResponse {
   data: {
@@ -17,7 +10,7 @@ interface UploadResponse {
     bytes: number;
     mimeType: string;
     scope: FrontendUploadScope;
-    driver: "local";
+    driver: "local" | "s3";
   };
 }
 
@@ -26,10 +19,6 @@ export async function uploadImageFile(
   scope: FrontendUploadScope,
   accessToken?: string | null,
 ): Promise<UploadResponse["data"]> {
-  if (!ACCEPTED_IMAGE_FILE_TYPES.includes(file.type as (typeof ACCEPTED_IMAGE_FILE_TYPES)[number])) {
-    throw new Error("Tipo de arquivo nao permitido. Use PNG, JPG, WEBP ou GIF.");
-  }
-
   const formData = new FormData();
   formData.append("scope", scope);
   formData.append("file", file);

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { OrgPlan, OrgStatus, UserRole } from "@/types";
@@ -31,7 +31,7 @@ interface AuthTokenContextValue {
   userRole: UserRole | null;
   currentUser: SessionUser | null;
   organization: SessionUser["organization"] | null;
-  /** null = não determinado ainda; true/false = resultado da sessão */
+  /** null = nÃ£o determinado ainda; true/false = resultado da sessÃ£o */
   hasCpf: boolean | null;
   hydrated: boolean;
   setAccessToken: (token: string | null) => void;
@@ -84,10 +84,7 @@ async function fetchSession(): Promise<SessionUser | null> {
   });
 
   if (!response.ok) return null;
-  const text = await response.text();
-  if (!text.trim()) return null;
-
-  const payload = JSON.parse(text) as { user?: SessionUser };
+  const payload = (await response.json()) as { user?: SessionUser };
   return payload.user ?? null;
 }
 
@@ -145,7 +142,7 @@ export function AuthTokenProvider({ children }: { children: React.ReactNode }) {
             setHasCpf(user.profile?.hasCpf ?? true);
           }
 
-          // Guard: ATHLETE sem CPF → redirecionar para onboarding se necessário.
+          // Guard: ATHLETE sem CPF â†’ redirecionar para onboarding se necessÃ¡rio.
           if (
             !cancelled &&
             user.role === UserRole.ATHLETE &&
@@ -168,7 +165,7 @@ export function AuthTokenProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        // Primeira tentativa falhou — tentar renovar refresh token.
+        // Primeira tentativa falhou â€” tentar renovar refresh token.
         const refreshed = await refreshAccessToken();
         if (!refreshed) {
           if (!cancelled) {

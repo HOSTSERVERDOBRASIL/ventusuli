@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { apiError } from "@/lib/api-error";
 import { creditPoints, debitPoints } from "@/lib/points/pointsService";
@@ -67,7 +67,10 @@ export async function POST(req: NextRequest) {
           });
 
     return NextResponse.json({ data: result.entry, created: result.created });
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.message === "points_balance_cannot_be_negative") {
+      return apiError("VALIDATION_ERROR", "Ajuste nao permitido: o saldo do atleta nao pode ficar negativo.", 400);
+    }
     return apiError("INTERNAL_ERROR", "Nao foi possivel processar ajuste manual.", 500);
   }
 }

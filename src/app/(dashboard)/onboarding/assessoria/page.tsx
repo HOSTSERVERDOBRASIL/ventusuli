@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
@@ -8,10 +8,7 @@ import { useAuthToken } from "@/components/auth/AuthTokenProvider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  ACCEPTED_IMAGE_FILE_INPUT_ACCEPT,
-  uploadImageFile,
-} from "@/services/upload-service";
+import { uploadImageFile } from "@/services/upload-service";
 import { UserRole } from "@/types";
 
 type PlanOption = "FREE" | "STARTER" | "PRO" | "ENTERPRISE";
@@ -313,7 +310,7 @@ export default function OrganizationSetupOnboardingPage() {
                     <label className="inline-flex cursor-pointer items-center rounded-lg border border-[#2f5d8f] bg-[#0a1d36] px-3 py-2 text-xs font-medium text-[#c8dbf8] transition hover:border-[#4f7fb4]">
                       <input
                         type="file"
-                        accept={ACCEPTED_IMAGE_FILE_INPUT_ACCEPT}
+                        accept="image/png,image/jpeg,image/jpg,image/webp,image/gif,image/svg+xml"
                         className="hidden"
                         onChange={(event) => void handleLogoUpload(event)}
                         disabled={uploadingLogo}
@@ -330,7 +327,7 @@ export default function OrganizationSetupOnboardingPage() {
                     </button>
                   </div>
                   <p className="text-[11px] text-slate-400">
-                    PNG, JPG, WEBP ou GIF com ate 2MB.
+                    PNG, JPG, WEBP, GIF ou SVG com ate 2MB.
                   </p>
                 </div>
               </div>

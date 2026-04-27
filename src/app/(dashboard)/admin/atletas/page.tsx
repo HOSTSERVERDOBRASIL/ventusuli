@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -196,8 +196,8 @@ export default function AdminAtletasPage() {
   return (
     <div className="space-y-6 text-white">
       <PageHeader
-        title="Gestao de atletas"
-        subtitle="Convide atletas, acompanhe pendentes e opere aprovacoes com controle por assessoria."
+        title="Gestao de atletas associados"
+        subtitle="Convide atletas associados, acompanhe pendentes e opere aprovacoes com controle por assessoria."
         actions={
           <div className="flex items-center gap-2">
             <ActionButton asChild>
@@ -322,8 +322,8 @@ export default function AdminAtletasPage() {
             <LoadingState lines={4} />
           ) : rows.length === 0 ? (
             <EmptyState
-              title="Nenhum atleta encontrado"
-              description="Ajuste filtros ou convide novos atletas."
+              title="Nenhum atleta associado encontrado"
+              description="Ajuste filtros ou convide novos atletas associados."
             />
           ) : (
             <>
@@ -485,7 +485,7 @@ export default function AdminAtletasPage() {
                   !Number.isInteger(parsedMaxUses) ||
                   parsedMaxUses < 1
                 ) {
-                  toast.error("Informe um máximo de usos válido (inteiro maior ou igual a 1).");
+                  toast.error("Informe um mÃ¡ximo de usos vÃ¡lido (inteiro maior ou igual a 1).");
                   return;
                 }
               }
@@ -493,11 +493,11 @@ export default function AdminAtletasPage() {
               if (inviteExpiresAt) {
                 const expiryDate = new Date(inviteExpiresAt);
                 if (Number.isNaN(expiryDate.getTime())) {
-                  toast.error("Data de expiração inválida.");
+                  toast.error("Data de expiraÃ§Ã£o invÃ¡lida.");
                   return;
                 }
                 if (expiryDate.getTime() <= Date.now()) {
-                  toast.error("A data de expiração precisa ser futura.");
+                  toast.error("A data de expiraÃ§Ã£o precisa ser futura.");
                   return;
                 }
               }

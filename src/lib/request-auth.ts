@@ -2,12 +2,13 @@
 import type { UserRole } from "@prisma/client";
 import { ACCESS_TOKEN_COOKIE } from "@/lib/cookies";
 
-const ROLE_VALUES: readonly UserRole[] = ["SUPER_ADMIN", "ADMIN", "COACH", "ATHLETE"];
+const ROLE_VALUES: readonly UserRole[] = ["SUPER_ADMIN", "ADMIN", "FINANCE", "COACH", "ATHLETE"];
 
 export interface AuthContext {
   userId: string;
   role: UserRole;
   organizationId: string;
+  orgId: string;
 }
 
 export type AccessTokenPrecedence = "bearer-first" | "cookie-first";
@@ -42,6 +43,7 @@ export function getAuthContext(req: NextRequest): AuthContext | null {
     userId,
     role,
     organizationId,
+    orgId: organizationId,
   };
 }
 
@@ -49,8 +51,12 @@ export function isAdminRole(role: UserRole): boolean {
   return role === "ADMIN";
 }
 
+export function isFinanceRole(role: UserRole): boolean {
+  return role === "ADMIN" || role === "FINANCE";
+}
+
 export function isStaffRole(role: UserRole): boolean {
-  return role === "ADMIN" || role === "COACH";
+  return role === "ADMIN" || role === "FINANCE" || role === "COACH";
 }
 
 export function isSuperAdminRole(role: UserRole): boolean {

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -11,12 +11,13 @@ import { UserRole } from "@/types";
  * then performs a client-side redirect.
  *
  * Routes:
- *   SUPER_ADMIN                   →  /super-admin
- *   ADMIN                        →  /admin
- *   COACH                        →  /coach
- *   ATHLETE with CPF             →  /  (main athlete dashboard)
- *   ATHLETE without CPF          →  /onboarding/atleta
- *   Unauthenticated              →  /login
+ *   SUPER_ADMIN                   â†’  /super-admin
+ *   ADMIN                        â†’  /admin
+ *   FINANCE                      â†’  /admin/financeiro
+ *   COACH                        â†’  /coach
+ *   ATHLETE with CPF             â†’  /  (main athlete dashboard)
+ *   ATHLETE without CPF          â†’  /onboarding/atleta
+ *   Unauthenticated              â†’  /login
  */
 export default function DashboardDispatcher() {
   const router = useRouter();
@@ -37,6 +38,11 @@ export default function DashboardDispatcher() {
 
     if (userRole === UserRole.ADMIN) {
       router.replace("/admin");
+      return;
+    }
+
+    if (userRole === UserRole.FINANCE) {
+      router.replace("/admin/financeiro");
       return;
     }
 

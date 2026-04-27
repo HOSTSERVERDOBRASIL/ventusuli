@@ -53,6 +53,17 @@ export function MobileNav({ isOpen, onClose }: MobileNavProps) {
   const pathname = usePathname();
   const { userRole, organization } = useAuthToken();
   const groups = splitNavBySection(userRole);
+  const navGroups = [
+    { title: "Inicio", items: groups.home },
+    { title: "Provas e agenda", items: groups.events },
+    { title: "Financeiro", items: groups.finance },
+    { title: "Pontos e beneficios", items: groups.points },
+    { title: "Comunicacao", items: groups.communication },
+    { title: "Tecnico", items: groups.coaching },
+    { title: "Administracao", items: groups.admin },
+    { title: "Plataforma", items: groups.platform },
+    { title: "Conta", items: groups.account },
+  ];
 
   const organizationLogo = (() => {
     const logoUrl = organization?.logo_url?.trim();
@@ -117,31 +128,15 @@ export function MobileNav({ isOpen, onClose }: MobileNavProps) {
         </div>
 
         <nav className="space-y-3 overflow-y-auto pb-8">
-          <MobileGroup
-            pathname={pathname}
-            title="Minha jornada"
-            items={groups.journey}
-            onClose={onClose}
-          />
-          <MobileGroup
-            pathname={pathname}
-            title="Operacao"
-            items={groups.operation}
-            onClose={onClose}
-          />
-          <MobileGroup
-            pathname={pathname}
-            title="Coaching"
-            items={groups.coaching}
-            onClose={onClose}
-          />
-          <MobileGroup
-            pathname={pathname}
-            title="Plataforma"
-            items={groups.platform}
-            onClose={onClose}
-          />
-          <MobileGroup pathname={pathname} title="Conta" items={groups.account} onClose={onClose} />
+          {navGroups.map((group) => (
+            <MobileGroup
+              key={group.title}
+              pathname={pathname}
+              title={group.title}
+              items={group.items}
+              onClose={onClose}
+            />
+          ))}
         </nav>
       </aside>
     </div>

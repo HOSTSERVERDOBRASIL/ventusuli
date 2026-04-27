@@ -1,5 +1,4 @@
-import crypto from "crypto";
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { apiError } from "@/lib/api-error";
 import { approveRedemptionAfterPayment, RedemptionServiceError } from "@/lib/points/redemptionService";
@@ -17,88 +16,24 @@ function isPaidStatus(status: string): boolean {
   return normalized === "PAID" || normalized === "CONFIRMED" || normalized === "COMPLETED";
 }
 
-function readWebhookSecret(): string | null {
-  const secret = process.env.PAYMENT_WEBHOOK_SECRET?.trim();
-  return secret && secret.length >= 16 ? secret : null;
-}
-
-function safeCompare(left: string, right: string): boolean {
-  const leftBuffer = Buffer.from(left);
-  const rightBuffer = Buffer.from(right);
-
-  if (leftBuffer.length !== rightBuffer.length) return false;
-  return crypto.timingSafeEqual(leftBuffer, rightBuffer);
-}
-
-function hasValidSharedSecret(req: NextRequest, secret: string): boolean {
-  const headerSecret =
-    req.headers.get("x-webhook-secret")?.trim() ??
-    req.headers.get("x-payment-webhook-secret")?.trim() ??
-    null;
-
-  if (headerSecret && safeCompare(headerSecret, secret)) {
-    return true;
-  }
-
-  const authorization = req.headers.get("authorization");
-  if (!authorization?.startsWith("Bearer ")) return false;
-
-  const bearer = authorization.slice("Bearer ".length).trim();
-  return bearer.length > 0 && safeCompare(bearer, secret);
-}
-
-function hasValidHmacSignature(req: NextRequest, rawBody: string, secret: string): boolean {
-  const signatureHeader =
-    req.headers.get("x-webhook-signature")?.trim() ??
-    req.headers.get("x-signature")?.trim() ??
-    null;
-  const timestampHeader = req.headers.get("x-webhook-timestamp")?.trim() ?? null;
-
-  if (!signatureHeader || !timestampHeader) return false;
-
-  const timestamp = Number(timestampHeader);
-  if (!Number.isFinite(timestamp)) return false;
-
-  const ageMs = Math.abs(Date.now() - timestamp * 1000);
-  if (ageMs > 5 * 60 * 1000) return false;
-
-  const expected = crypto
-    .createHmac("sha256", secret)
-    .update(`${timestampHeader}.${rawBody}`)
-    .digest("hex");
-  const received = signatureHeader.replace(/^sha256=/i, "");
-
-  return safeCompare(received, expected);
-}
-
-function isAuthorizedWebhookRequest(req: NextRequest, rawBody: string, secret: string): boolean {
-  return hasValidSharedSecret(req, secret) || hasValidHmacSignature(req, rawBody, secret);
-}
-
 export async function POST(req: NextRequest) {
-  const webhookSecret = readWebhookSecret();
+  const webhookSecret = process.env.PAYMENT_WEBHOOK_SECRET?.trim();
   if (!webhookSecret) {
-    return apiError(
-      "INTERNAL_ERROR",
-      "Webhook de pagamento indisponivel. Configure PAYMENT_WEBHOOK_SECRET.",
-      503,
-    );
+    return apiError("INTERNAL_ERROR", "Webhook de pagamento nao configurado.", 503);
   }
 
-  let rawBody = "";
-  try {
-    rawBody = await req.text();
-  } catch {
-    return apiError("VALIDATION_ERROR", "Body invalido.", 400);
-  }
+  const authorization = req.headers.get("authorization") ?? "";
+  const providedSecret = authorization.startsWith("Bearer ")
+    ? authorization.slice("Bearer ".length).trim()
+    : "";
 
-  if (!isAuthorizedWebhookRequest(req, rawBody, webhookSecret)) {
+  if (providedSecret !== webhookSecret) {
     return apiError("FORBIDDEN", "Webhook de pagamento nao autorizado.", 401);
   }
 
   let body: unknown;
   try {
-    body = JSON.parse(rawBody);
+    body = await req.json();
   } catch {
     return apiError("VALIDATION_ERROR", "Body invalido.", 400);
   }

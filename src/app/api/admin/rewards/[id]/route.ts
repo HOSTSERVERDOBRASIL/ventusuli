@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { apiError } from "@/lib/api-error";
@@ -52,6 +52,25 @@ const patchSchema = z
   })
   .refine((value) => Object.keys(value).length > 0, "Nenhum campo enviado para atualizacao.");
 
+function validateRewardPolicy(value: {
+  allowPoints: boolean;
+  allowCash: boolean;
+  allowMixed: boolean;
+  minimumCashCents: number;
+  cashPriceCents: number;
+}): string | null {
+  if (!value.allowPoints && !value.allowCash) {
+    return "Informe pelo menos uma forma de resgate: pontos ou PIX.";
+  }
+  if (value.allowMixed && (!value.allowPoints || !value.allowCash)) {
+    return "Resgate misto exige pontos e PIX habilitados.";
+  }
+  if (value.minimumCashCents > value.cashPriceCents) {
+    return "Valor minimo em PIX nao pode superar o preco do produto.";
+  }
+  return null;
+}
+
 interface RouteParams {
   params: { id: string };
 }
@@ -87,6 +106,17 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
 
   const current = existing[0];
   const patch = parsed.data;
+  const policyError = validateRewardPolicy({
+    allowPoints: patch.allowPoints ?? current.allowPoints,
+    allowCash: patch.allowCash ?? current.allowCash,
+    allowMixed: patch.allowMixed ?? current.allowMixed,
+    minimumCashCents: patch.minimumCashCents ?? current.minimumCashCents,
+    cashPriceCents: patch.cashPriceCents ?? current.cashPriceCents,
+  });
+
+  if (policyError) {
+    return apiError("VALIDATION_ERROR", policyError, 400);
+  }
 
   const updatedRows = await prisma.$queryRaw<RewardItemRow[]>(Prisma.sql`
     UPDATE public."RewardItem"

@@ -1,4 +1,4 @@
-import { z } from "zod";
+﻿import { z } from "zod";
 
 export const loginSchema = z.object({
   email: z
@@ -51,18 +51,19 @@ export const registerAthleteSchemaBase = z.object({
     .regex(/[A-Z]/, "Senha deve conter ao menos uma letra maiuscula")
     .regex(/[0-9]/, "Senha deve conter ao menos um numero"),
   organizationSlug: z.string().trim().optional(),
-  token: z.string().trim().optional(),
+  inviteToken: z.string().trim().optional(),
 });
 
-export const registerAthleteSchema = registerAthleteSchemaBase.superRefine((data, ctx) => {
-  if (!data.organizationSlug && !data.token) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Informe o slug da assessoria ou um token de convite",
-      path: ["organizationSlug"],
-    });
-  }
-});
+export const registerAthleteSchema = registerAthleteSchemaBase
+  .superRefine((data, ctx) => {
+    if (!data.organizationSlug && !data.inviteToken) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Informe o slug da assessoria ou um token de convite",
+        path: ["organizationSlug"],
+      });
+    }
+  });
 
 export const activateAdminSchema = z.object({
   token: z.string({ required_error: "Token e obrigatorio" }).trim().min(12, "Token invalido"),
@@ -87,7 +88,10 @@ export const forgotPasswordSchema = z.object({
 });
 
 export const resetPasswordSchema = z.object({
-  token: z.string({ required_error: "Token e obrigatorio" }).trim().min(20, "Token invalido"),
+  token: z
+    .string({ required_error: "Token e obrigatorio" })
+    .trim()
+    .min(20, "Token invalido"),
   password: z
     .string({ required_error: "Senha e obrigatoria" })
     .min(8, "Senha deve ter pelo menos 8 caracteres")
@@ -129,9 +133,5 @@ export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type RegisterAdminInput = z.infer<typeof registerAdminSchema>;
 export type RegisterAthleteInput = z.infer<typeof registerAthleteSchema>;
 export type ActivateAdminInput = z.infer<typeof activateAdminSchema>;
-export type CreateOrganizationBySuperAdminInput = z.infer<
-  typeof createOrganizationBySuperAdminSchema
->;
-export type UpdateOrganizationBySuperAdminInput = z.infer<
-  typeof updateOrganizationBySuperAdminSchema
->;
+export type CreateOrganizationBySuperAdminInput = z.infer<typeof createOrganizationBySuperAdminSchema>;
+export type UpdateOrganizationBySuperAdminInput = z.infer<typeof updateOrganizationBySuperAdminSchema>;

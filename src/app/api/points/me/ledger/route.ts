@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { apiError } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
@@ -30,6 +30,33 @@ interface CountRow {
 
 function toNumber(value: number | bigint): number {
   return typeof value === "bigint" ? Number(value) : value;
+}
+
+function labelSource(sourceType: string): string {
+  const labels: Record<string, string> = {
+    EVENT_PARTICIPATION: "Participacao em prova",
+    EARLY_SIGNUP: "Bonus por inscricao antecipada",
+    EARLY_PAYMENT: "Bonus por pagamento antecipado",
+    CAMPAIGN_BONUS: "Bonus de campanha",
+    REFERRAL: "Indicacao",
+    RECURRENCE: "Recorrencia",
+    MANUAL: "Ajuste manual",
+    REDEMPTION: "Resgate de brinde",
+    REFUND: "Estorno",
+    EXPIRATION: "Expiracao",
+  };
+  return labels[sourceType] ?? sourceType;
+}
+
+function labelType(type: string): string {
+  const labels: Record<string, string> = {
+    CREDIT: "Credito",
+    DEBIT: "Debito",
+    EXPIRATION: "Expiracao",
+    ADJUSTMENT: "Ajuste",
+    REFUND: "Estorno",
+  };
+  return labels[type] ?? type;
 }
 
 export async function GET(req: NextRequest) {
@@ -88,6 +115,8 @@ export async function GET(req: NextRequest) {
     registrationId: row.registrationId,
     type: row.type,
     sourceType: row.sourceType,
+    sourceLabel: labelSource(row.sourceType),
+    typeLabel: labelType(row.type),
     points: toNumber(row.points),
     balanceAfter: toNumber(row.balanceAfter),
     description: row.description,

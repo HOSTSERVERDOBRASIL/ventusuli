@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { Prisma, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { apiError } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
+import { getAuthContext } from "@/lib/request-auth";
 
 const querySchema = z.object({
   startDate: z.string().datetime().optional(),
@@ -28,13 +29,6 @@ export interface FinancialReportResponse {
     totalPago: number;
     totalPendente: number;
   };
-}
-
-function getAuthContext(req: NextRequest) {
-  const role = req.headers.get("x-user-role") as UserRole | null;
-  const orgId = req.headers.get("x-org-id");
-  if (!role || !orgId) return null;
-  return { role, orgId };
 }
 
 function isAdmin(role: UserRole): boolean {

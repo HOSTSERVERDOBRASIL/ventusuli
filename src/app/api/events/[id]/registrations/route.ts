@@ -2,14 +2,7 @@
 import { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { apiError } from "@/lib/api-error";
-
-function getAuthContext(req: NextRequest) {
-  const role = req.headers.get("x-user-role") as UserRole | null;
-  const organizationId = req.headers.get("x-org-id");
-
-  if (!role || !organizationId) return null;
-  return { role, organizationId };
-}
+import { getAuthContext } from "@/lib/request-auth";
 
 function isAdminRole(role: UserRole): boolean {
   return role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN;

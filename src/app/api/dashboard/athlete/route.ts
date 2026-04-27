@@ -16,8 +16,9 @@ import {
   formatDistanceKm,
   monthlyDeltaLabel,
 } from "@/lib/dashboard/calculations";
+import { getAuthContext } from "@/lib/request-auth";
 import type { DashboardData } from "@/services/types";
-import { UserRole } from "@/types";
+import { UserRole } from "@prisma/client";
 
 export const revalidate = 60;
 
@@ -83,15 +84,6 @@ export interface DashboardAthleteResponse {
 type PaymentStatus = "PENDING" | "PAID" | "EXPIRED" | "REFUNDED" | "CANCELLED";
 type NumericLike = number | bigint | { toString(): string };
 type RegistrationApiStatus = "INTERESTED" | "PENDING_PAYMENT" | "CONFIRMED" | "CANCELLED";
-
-function getAuthContext(req: NextRequest) {
-  const userId = req.headers.get("x-user-id");
-  const role = req.headers.get("x-user-role") as UserRole | null;
-  const orgId = req.headers.get("x-org-id");
-
-  if (!userId || !role || !orgId) return null;
-  return { userId, role, orgId };
-}
 
 function getYearBounds(now: Date) {
   const year = now.getUTCFullYear();
@@ -560,12 +552,18 @@ export async function GET(req: NextRequest) {
       ...(warnings.length ? { dataWarnings: warnings } : {}),
     };
 
-    return NextResponse.json(payload, {
+    return NextResponse.json(
+      {
+        data: payload,
+        ...payload,
+      },
+      {
       status: 200,
       headers: {
         "Cache-Control": "private, max-age=60, stale-while-revalidate=60",
       },
-    });
+      },
+    );
   } catch {
     return apiError("INTERNAL_ERROR", "Nao foi possivel carregar o dashboard no momento.", 503);
   }

@@ -1,8 +1,9 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { Copy, Loader2, RefreshCw, Search } from "lucide-react";
 import { useAuthToken } from "@/components/auth/AuthTokenProvider";
+import { roleLabel } from "@/lib/role-labels";
 
 interface OrganizationOption {
   id: string;
@@ -14,7 +15,7 @@ interface AdminInvite {
   id: string;
   organizationId: string;
   email: string;
-  role: "ADMIN" | "COACH" | "ATHLETE" | "SUPER_ADMIN";
+  role: "ADMIN" | "FINANCE" | "COACH" | "ATHLETE" | "SUPER_ADMIN";
   active: boolean;
   expiresAt: string | null;
   acceptedAt: string | null;
@@ -82,7 +83,7 @@ export default function SuperAdminAdminInvitesPage() {
   const [form, setForm] = useState({
     organizationId: "",
     email: "",
-    role: "ADMIN" as "ADMIN" | "COACH",
+    role: "ADMIN" as "ADMIN" | "FINANCE" | "COACH",
     expiresInDays: 14,
   });
 
@@ -319,12 +320,13 @@ export default function SuperAdminAdminInvitesPage() {
           <select
             value={form.role}
             onChange={(event) =>
-              setForm((current) => ({ ...current, role: event.target.value as "ADMIN" | "COACH" }))
+              setForm((current) => ({ ...current, role: event.target.value as "ADMIN" | "FINANCE" | "COACH" }))
             }
             className="rounded-lg border border-white/15 bg-[#0F2743] px-3 py-2 text-sm text-white outline-none"
           >
-            <option value="ADMIN">ADMIN</option>
-            <option value="COACH">COACH</option>
+            <option value="ADMIN">Gestor da assessoria</option>
+            <option value="FINANCE">Financeiro</option>
+            <option value="COACH">Treinador</option>
           </select>
           <input
             type="number"
@@ -422,7 +424,7 @@ export default function SuperAdminAdminInvitesPage() {
                         <p>{invite.organization.name}</p>
                         <p className="text-xs text-slate-400">{invite.organization.slug}</p>
                       </td>
-                      <td className="px-4 py-3 text-slate-300">{invite.role}</td>
+                      <td className="px-4 py-3 text-slate-300">{roleLabel(invite.role)}</td>
                       <td className="px-4 py-3">
                         <span
                           className={`inline-flex rounded-full border px-2 py-1 text-xs ${state.tone}`}

@@ -1,12 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { UserRole } from "@prisma/client";
 import { z } from "zod";
 import { apiError } from "@/lib/api-error";
 import { isAllowedImageUrl } from "@/lib/storage/image-url";
-import {
-  hasOrganizationTelegramBotToken,
-  sanitizeOrganizationSettings,
-} from "@/lib/organization-settings";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/request-auth";
 
@@ -63,6 +59,7 @@ function getBrandingSettings(settings: unknown): { supportEmail?: string; primar
 function getTelegramSettings(settings: unknown): {
   telegramEnabled: boolean;
   telegramChatId: string;
+  telegramBotToken: string;
 } {
   const enabled =
     getSettingsValue<boolean>(settings, "integrations", "telegram", "telegram_enabled") ??
@@ -72,9 +69,15 @@ function getTelegramSettings(settings: unknown): {
     getSettingsValue<string>(settings, "integrations", "telegram", "telegram_chat_id") ??
     getSettingsValue<string>(settings, "telegram_chat_id") ??
     "";
+  const botToken =
+    getSettingsValue<string>(settings, "integrations", "telegram", "telegram_bot_token") ??
+    getSettingsValue<string>(settings, "telegram_bot_token") ??
+    "";
+
   return {
     telegramEnabled: enabled,
     telegramChatId: chatId,
+    telegramBotToken: botToken,
   };
 }
 
@@ -105,7 +108,6 @@ export async function GET(req: NextRequest) {
   const requireAthleteApproval =
     getSettingsValue<boolean>(organization.settings, "requireAthleteApproval") ?? false;
   const telegram = getTelegramSettings(organization.settings);
-  const sanitizedSettings = sanitizeOrganizationSettings(organization.settings);
 
   return NextResponse.json({
     data: {
@@ -120,8 +122,7 @@ export async function GET(req: NextRequest) {
       requireAthleteApproval,
       telegramEnabled: telegram.telegramEnabled,
       telegramChatId: telegram.telegramChatId,
-      telegramConfigured: hasOrganizationTelegramBotToken(organization.settings),
-      settings: sanitizedSettings,
+      telegramBotToken: telegram.telegramBotToken,
       createdAt: organization.created_at,
     },
   });
@@ -233,7 +234,6 @@ export async function PATCH(req: NextRequest) {
   const updatedRequireApproval =
     getSettingsValue<boolean>(updated.settings, "requireAthleteApproval") ?? false;
   const updatedTelegram = getTelegramSettings(updated.settings);
-  const sanitizedSettings = sanitizeOrganizationSettings(updated.settings);
 
   return NextResponse.json({
     data: {
@@ -248,8 +248,8 @@ export async function PATCH(req: NextRequest) {
       requireAthleteApproval: updatedRequireApproval,
       telegramEnabled: updatedTelegram.telegramEnabled,
       telegramChatId: updatedTelegram.telegramChatId,
-      telegramConfigured: hasOrganizationTelegramBotToken(updated.settings),
-      settings: sanitizedSettings,
+      telegramBotToken: updatedTelegram.telegramBotToken,
+      settings: updated.settings,
     },
   });
 }

@@ -1,9 +1,10 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { BellRing, FileText, ShieldCheck, UserRoundPen } from "lucide-react";
 import { type DataTableColumn, DataTable } from "@/components/system/data-table";
 import { StatusBadge } from "@/components/system/status-badge";
+import { managedAthleteLabel } from "@/lib/role-labels";
 import { AthleteListRow } from "@/services/types";
 
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -71,7 +72,7 @@ export function AthletesCrmTable({
   const baseColumns: DataTableColumn<AthleteListRow>[] = [
     {
       key: "athlete",
-      header: "Atleta",
+      header: managedAthleteLabel(),
       className: "min-w-[210px]",
       cell: (row) => (
         <div>
@@ -114,7 +115,7 @@ export function AthletesCrmTable({
             </p>
             <p className="mt-0.5 text-[10px] text-white/40">
               {format(new Date(row.nextEventDate), "dd/MM/yyyy", { locale: ptBR })}
-              {" · "}
+              {" Â· "}
               {row.registrationsCount} inscr.
             </p>
           </div>

@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { apiError } from "@/lib/api-error";
 import { calculateRedemption, RewardItem } from "@/lib/points/redemptionCalculator";
 import { getUserPointsBalance } from "@/lib/points/pointsService";
+import { getOrganizationPointPolicy } from "@/lib/points/policy";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/request-auth";
 
@@ -73,14 +74,23 @@ export async function POST(req: NextRequest) {
     return apiError("USER_NOT_FOUND", "Item de recompensa nao encontrado.", 404);
   }
 
-  const balance = await getUserPointsBalance(auth.userId, auth.organizationId);
-  const calculation = calculateRedemption(toCalculatorInput(item), balance.balance, parsed.data.pointsToUse);
+  const [balance, policy] = await Promise.all([
+    getUserPointsBalance(auth.userId, auth.organizationId),
+    getOrganizationPointPolicy(auth.organizationId),
+  ]);
+  const calculation = calculateRedemption(
+    toCalculatorInput(item),
+    balance.balance,
+    parsed.data.pointsToUse,
+    policy.pointValueCents,
+  );
 
   return NextResponse.json({
     data: {
       ...calculation,
       item,
       currentBalance: balance.balance,
+      pointValueCents: policy.pointValueCents,
     },
   });
 }

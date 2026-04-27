@@ -1,10 +1,11 @@
-import { UserRole } from "@/types";
+﻿import { UserRole } from "@/types";
 
 export const ROLE_GROUPS = {
   platform: [UserRole.SUPER_ADMIN] as const,
   platformAdmin: [UserRole.SUPER_ADMIN] as const,
-  tenant: [UserRole.ADMIN, UserRole.COACH, UserRole.ATHLETE] as const,
+  tenant: [UserRole.ADMIN, UserRole.FINANCE, UserRole.COACH, UserRole.ATHLETE] as const,
   tenantAdmin: [UserRole.ADMIN] as const,
+  tenantFinance: [UserRole.ADMIN, UserRole.FINANCE] as const,
   tenantStaff: [UserRole.ADMIN, UserRole.COACH] as const,
   coach: [UserRole.COACH] as const,
   athlete: [UserRole.ATHLETE] as const,
@@ -16,6 +17,7 @@ export type AccessPolicy =
   | "TENANT_AUTHENTICATED"
   | "SUPER_ADMIN_ONLY"
   | "ADMIN_ONLY"
+  | "FINANCE_AREA"
   | "TENANT_STAFF"
   | "COACH_AREA"
   | "ATHLETE_AREA"
@@ -26,6 +28,7 @@ const POLICY_ROLES: Record<AccessPolicy, readonly UserRole[]> = {
   TENANT_AUTHENTICATED: ROLE_GROUPS.tenant,
   SUPER_ADMIN_ONLY: ROLE_GROUPS.platformAdmin,
   ADMIN_ONLY: ROLE_GROUPS.tenantAdmin,
+  FINANCE_AREA: ROLE_GROUPS.tenantFinance,
   TENANT_STAFF: ROLE_GROUPS.tenantStaff,
   COACH_AREA: ROLE_GROUPS.coach,
   ATHLETE_AREA: ROLE_GROUPS.athlete,
@@ -56,6 +59,7 @@ export const PAGE_ROUTE_POLICY_RULES: RoutePolicyRule[] = [
   { prefix: "/", policy: "ATHLETE_AREA" },
   { prefix: "/super-admin", policy: "SUPER_ADMIN_ONLY" },
   { prefix: "/admin/atletas", policy: "ADMIN_ONLY" },
+  { prefix: "/admin/financeiro", policy: "FINANCE_AREA" },
   { prefix: "/admin", policy: "ADMIN_ONLY" },
   { prefix: "/coach", policy: "COACH_AREA" },
   { prefix: "/atletas", policy: "ADMIN_ONLY" },
@@ -79,6 +83,10 @@ export const API_ROUTE_POLICY_RULES: RoutePolicyRule[] = [
   { prefix: "/api/admin/athletes", policy: "ADMIN_ONLY" },
   { prefix: "/api/admin/invites", policy: "ADMIN_ONLY" },
   { prefix: "/api/admin", policy: "ADMIN_ONLY" },
+  { prefix: "/api/finance", policy: "FINANCE_AREA" },
+  { prefix: "/api/payments", policy: "FINANCE_AREA" },
+  { prefix: "/api/invites", policy: "TENANT_AUTHENTICATED", methods: ["POST"] },
+  { prefix: "/api/invites", policy: "ADMIN_ONLY" },
   { prefix: "/api/coach", policy: "COACH_AREA" },
   { prefix: "/api/notices", policy: "NOTICES_READ", methods: ["GET"] },
   { prefix: "/api/notices", policy: "NOTICES_MANAGE", methods: ["POST", "PATCH", "DELETE", "PUT"] },

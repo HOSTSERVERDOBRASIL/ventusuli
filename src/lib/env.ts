@@ -1,4 +1,4 @@
-import { z } from "zod";
+﻿import { z } from "zod";
 
 function emptyToUndefined(value: unknown): unknown {
   if (typeof value !== "string") return value;
@@ -47,11 +47,7 @@ const optionalIntegrationEnvSchema = z.object({
   EFI_CLIENT_SECRET: optionalNonEmptyString(),
   EFI_SANDBOX: optionalBooleanEnum(),
   EFI_CERT_PATH: optionalNonEmptyString(),
-  PAYMENT_WEBHOOK_SECRET: optionalNonEmptyString(16),
-  RATE_LIMIT_BACKEND: z.preprocess(
-    emptyToUndefined,
-    z.enum(["auto", "memory", "redis", "upstash"]).optional(),
-  ),
+  PAYMENT_WEBHOOK_SECRET: optionalNonEmptyString(8),
   REDIS_URL: optionalNonEmptyString(),
   UPSTASH_REDIS_REST_URL: optionalUrl(),
   UPSTASH_REDIS_REST_TOKEN: optionalNonEmptyString(),

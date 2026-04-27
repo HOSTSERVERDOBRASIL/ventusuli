@@ -15,6 +15,7 @@ datasource db {
 enum UserRole {
   SUPER_ADMIN
   ADMIN
+  FINANCE
   COACH
   ATHLETE
 
@@ -224,6 +225,7 @@ model Organization {
   events               Event[]
   registrations        Registration[]
   payments             Payment[]
+  financial_entries    FinancialEntry[]
   collective_signups   CollectiveSignup[]
   invites              OrganizationInvite[]
   admin_invites        AdminActivationInvite[]
@@ -236,6 +238,7 @@ model Organization {
   athlete_point_ledger AthletePointLedger[]
   reward_items         RewardItem[]
   reward_redemptions   RewardRedemption[]
+  platform_billing_invoices PlatformBillingInvoice[]
   strava_connections   StravaConnection[]
   activities           Activity[]
   strava_sync_logs     StravaSyncLog[]
@@ -267,6 +270,7 @@ model User {
   created_events             Event[]              @relation("EventCreator")
   registrations              Registration[]
   payments                   Payment[]
+  financial_entries_created  FinancialEntry[]     @relation("FinancialEntryCreator")
   created_collective_signups CollectiveSignup[]   @relation("CollectiveSignupCreator")
   collective_memberships     CollectiveMember[]
   community_posts            CommunityPost[]
@@ -559,6 +563,59 @@ model Payment {
   @@index([efi_tx_id])
   @@index([status])
   @@map("payments")
+  @@schema("public")
+}
+
+model FinancialEntry {
+  id              String       @id @default(uuid())
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  type            String
+  amount_cents    Int
+  category        String
+  description     String?
+  occurred_at     DateTime
+  due_at          DateTime?
+  settled_at      DateTime?
+  status          String       @default("PAID")
+  entry_kind      String       @default("CASH")
+  account_code    String?
+  cost_center     String?
+  counterparty    String?
+  payment_method  String?
+  document_url    String?
+  created_by      String
+  creator         User         @relation("FinancialEntryCreator", fields: [created_by], references: [id], onDelete: Restrict)
+  created_at      DateTime     @default(now())
+
+  @@index([organization_id, occurred_at(sort: Desc)])
+  @@index([organization_id, type])
+  @@index([organization_id, status])
+  @@index([organization_id, entry_kind])
+  @@map("financial_entries")
+  @@schema("public")
+}
+
+model PlatformBillingInvoice {
+  id              String       @id @default(uuid())
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  type            String       @default("SUBSCRIPTION")
+  status          String       @default("OPEN")
+  amount_cents    Int
+  due_at          DateTime
+  paid_at         DateTime?
+  period_start    DateTime
+  period_end      DateTime
+  description     String?
+  payment_method  String?
+  document_url    String?
+  created_by      String
+  created_at      DateTime     @default(now())
+
+  @@index([organization_id, due_at(sort: Desc)])
+  @@index([status, due_at])
+  @@map("platform_billing_invoices")
   @@schema("public")
 }
 

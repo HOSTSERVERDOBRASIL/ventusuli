@@ -45,26 +45,6 @@ npm run docker:prod:up
 npm run docker:prod:db:migrate
 ```
 
-## cPanel / Node.js App
-
-This project can run on cPanel **only when the hosting provider offers Node.js Application support** and access to a PostgreSQL database.
-
-Recommended flow on cPanel:
-
-1. configure `.env` from `.env.cpanel.example`
-2. run `npm ci`
-3. run `npm run cpanel:build`
-4. run `npm run cpanel:migrate`
-5. start or restart the app with `npm run cpanel:start` (or restart via panel)
-
-Notes for cPanel:
-
-- use `scripts/cpanel-start.mjs` as the startup file when the panel asks for one
-- if the hosting does not provide Redis/Upstash, set `RATE_LIMIT_BACKEND=memory`
-- `RATE_LIMIT_BACKEND=memory` should be used only for a single app instance
-
-Detailed guide: [DEPLOY_CPANEL_NODEJS.md](./DEPLOY_CPANEL_NODEJS.md)
-
 ## Railway instructions (exact)
 
 You can deploy in two ways.
@@ -117,7 +97,7 @@ This command executes `prisma migrate deploy` before `next start`.
   - `scope`: `events` | `avatars` | `rewards` | `branding`
   - `file`: image file
 - Validation:
-  - MIME/content: `image/jpeg`, `image/jpg`, `image/png`, `image/webp`, `image/gif`
+  - MIME: `image/jpeg`, `image/jpg`, `image/png`, `image/webp`, `image/gif`, `image/svg+xml`
   - max size: `UPLOAD_MAX_FILE_MB` (default `5MB`)
 - Current storage driver: `local`
   - files are saved to `public/uploads/<organization>/<scope>/...`

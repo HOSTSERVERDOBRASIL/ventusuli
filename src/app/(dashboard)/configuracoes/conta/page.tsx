@@ -1,14 +1,15 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { PlugZap, RefreshCcw, Unplug, UserCircle2 } from "lucide-react";
+import { Copy, Link2, PlugZap, RefreshCcw, Unplug, UserCircle2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { useAuthToken } from "@/components/auth/AuthTokenProvider";
 import { ActionButton } from "@/components/system/action-button";
 import { LoadingState } from "@/components/system/loading-state";
 import { PageHeader } from "@/components/system/page-header";
 import { SectionCard } from "@/components/system/section-card";
+import { createInvite, OrgInvite } from "@/services/organization-service";
 import {
   disconnectStrava,
   getStravaConnectUrl,
@@ -26,6 +27,8 @@ export default function ConfiguracoesContaPage() {
   const [syncing, setSyncing] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [creatingInvite, setCreatingInvite] = useState(false);
+  const [lastInvite, setLastInvite] = useState<OrgInvite | null>(null);
 
   const isAthlete = userRole === UserRole.ATHLETE;
 
@@ -128,6 +131,42 @@ export default function ConfiguracoesContaPage() {
     }
   };
 
+  const inviteUrl = lastInvite
+    ? `${typeof window !== "undefined" ? window.location.origin : ""}/register/atleta?inviteToken=${lastInvite.token}`
+    : "";
+
+  const handleCreateInvite = async () => {
+    if (!isAthlete) return;
+
+    setCreatingInvite(true);
+    try {
+      const invite = await createInvite(
+        {
+          label: "Indicacao de atleta",
+          max_uses: 1,
+        },
+        accessToken,
+      );
+      setLastInvite(invite);
+      toast.success("Convite gerado. O novo atleta ficara aguardando aprovacao.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Nao foi possivel gerar o convite.");
+    } finally {
+      setCreatingInvite(false);
+    }
+  };
+
+  const handleCopyInvite = async () => {
+    if (!inviteUrl) return;
+
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      toast.success("Link de convite copiado.");
+    } catch {
+      toast.error("Nao foi possivel copiar o link.");
+    }
+  };
+
   return (
     <div className="space-y-6 text-white">
       <PageHeader
@@ -153,6 +192,50 @@ export default function ConfiguracoesContaPage() {
           </ActionButton>
         </div>
       </SectionCard>
+
+      {isAthlete ? (
+        <SectionCard
+          title="Indicar atleta"
+          description="Gere um convite para outro atleta entrar na sua assessoria."
+        >
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#24486f] bg-[#0f233d] p-4">
+              <div className="inline-flex items-center gap-3">
+                <div className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#2f5d8f] bg-[#12355d]">
+                  <UserPlus className="h-5 w-5 text-[#8eb0dc]" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-white">Convite com aprovacao</p>
+                  <p className="text-xs text-[#8eb0dc]">
+                    Quem usar seu link entra na fila para revisao dos administradores.
+                  </p>
+                </div>
+              </div>
+              <ActionButton onClick={() => void handleCreateInvite()} disabled={creatingInvite} size="sm">
+                <Link2 className="mr-1.5 h-3.5 w-3.5" />
+                {creatingInvite ? "Gerando..." : "Gerar convite"}
+              </ActionButton>
+            </div>
+
+            {lastInvite ? (
+              <div className="rounded-xl border border-[#24486f] bg-[#0a1d36] p-3">
+                <p className="mb-2 text-xs uppercase tracking-wide text-[#8eb0dc]">
+                  Link gerado
+                </p>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <div className="min-w-0 flex-1 rounded-lg border border-white/10 bg-[#0f233d] px-3 py-2 font-mono text-xs text-white">
+                    <span className="block truncate">{inviteUrl}</span>
+                  </div>
+                  <ActionButton intent="secondary" onClick={() => void handleCopyInvite()} size="sm">
+                    <Copy className="mr-1.5 h-3.5 w-3.5" />
+                    Copiar
+                  </ActionButton>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </SectionCard>
+      ) : null}
 
       <SectionCard
         title="Integracao Strava"

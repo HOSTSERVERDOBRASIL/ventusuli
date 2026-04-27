@@ -1,5 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { randomUUID } from "crypto";
+import { buildAvailableCreditBuckets } from "@/lib/points/expirationService";
+import { getOrganizationPointPolicy } from "@/lib/points/policy";
 import { prisma } from "@/lib/prisma";
 
 export type LedgerType = "CREDIT" | "DEBIT" | "EXPIRATION" | "ADJUSTMENT" | "REFUND";
@@ -39,8 +41,12 @@ interface AggregateRow {
   totalDebited: number | bigint | null;
 }
 
-interface PointsValueRow {
-  points: number | bigint | null;
+interface ExpiringLedgerRow {
+  id: string;
+  userId: string;
+  points: number | bigint;
+  type: string;
+  createdAt: Date;
 }
 
 export interface PointsBalanceResult {
@@ -116,6 +122,10 @@ async function createLedgerEntryInTransaction(
   const previousBalance = toNumber(latest[0]?.balanceAfter);
   const balanceAfter = previousBalance + input.points;
 
+  if (balanceAfter < 0) {
+    throw new Error("points_balance_cannot_be_negative");
+  }
+
   const created = await tx.$queryRaw<LedgerRow[]>`
     INSERT INTO public."AthletePointLedger" (
       id,
@@ -154,7 +164,7 @@ async function createLedgerEntryInTransaction(
 }
 
 export async function getUserPointsBalance(userId: string, orgId: string): Promise<PointsBalanceResult> {
-  const [latest, aggregate] = await Promise.all([
+  const [latest, aggregate, policy] = await Promise.all([
     prisma.$queryRaw<Array<{ balanceAfter: number | bigint | null }>>`
       SELECT "balanceAfter"
       FROM public."AthletePointLedger"
@@ -179,29 +189,36 @@ export async function getUserPointsBalance(userId: string, orgId: string): Promi
       WHERE "organizationId" = ${orgId}
         AND "userId" = ${userId}
     `,
+    getOrganizationPointPolicy(orgId),
   ]);
 
   const now = new Date();
   const start = new Date(now);
-  start.setUTCMonth(start.getUTCMonth() - 12);
-  const end = new Date(now);
-  end.setUTCMonth(end.getUTCMonth() - 11);
+  start.setUTCMonth(start.getUTCMonth() - policy.expirationMonths);
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 30);
 
-  const expiringRows = await prisma.$queryRaw<PointsValueRow[]>`
-    SELECT COALESCE(SUM(points), 0) AS points
+  const expiringLedgerRows = await prisma.$queryRaw<ExpiringLedgerRow[]>`
+    SELECT
+      id,
+      "userId",
+      points,
+      type,
+      "createdAt"
     FROM public."AthletePointLedger"
     WHERE "organizationId" = ${orgId}
       AND "userId" = ${userId}
-      AND type = 'CREDIT'
-      AND "createdAt" >= ${start}
-      AND "createdAt" < ${end}
+    ORDER BY "createdAt" ASC, id ASC
   `;
+  const pointsExpiringIn30Days = buildAvailableCreditBuckets(expiringLedgerRows)
+    .filter((bucket) => bucket.createdAt >= start && bucket.createdAt < end)
+    .reduce((total, bucket) => total + bucket.remaining, 0);
 
   return {
     balance: toNumber(latest[0]?.balanceAfter),
     totalCredited: toNumber(aggregate[0]?.totalCredited),
     totalDebited: toNumber(aggregate[0]?.totalDebited),
-    pointsExpiringIn30Days: toNumber(expiringRows[0]?.points),
+    pointsExpiringIn30Days,
   };
 }
 

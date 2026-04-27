@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { apiError } from "@/lib/api-error";
@@ -62,6 +62,28 @@ const createSchema = z.object({
   minimumCashCents: z.number().int().min(0),
   stockQuantity: z.number().int().min(0),
   active: z.boolean().default(true),
+}).superRefine((value, ctx) => {
+  if (!value.allowPoints && !value.allowCash) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Informe pelo menos uma forma de resgate: pontos ou PIX.",
+      path: ["allowPoints"],
+    });
+  }
+  if (value.allowMixed && (!value.allowPoints || !value.allowCash)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Resgate misto exige pontos e PIX habilitados.",
+      path: ["allowMixed"],
+    });
+  }
+  if (value.minimumCashCents > value.cashPriceCents) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Valor minimo em PIX nao pode superar o preco do produto.",
+      path: ["minimumCashCents"],
+    });
+  }
 });
 
 function toCuidLike(): string {

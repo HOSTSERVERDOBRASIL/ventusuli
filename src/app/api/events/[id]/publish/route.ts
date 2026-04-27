@@ -1,18 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { EventStatus, Prisma, UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { apiError } from "@/lib/api-error";
-
-function getAuthContext(req: NextRequest) {
-  const role = req.headers.get("x-user-role") as UserRole | null;
-  const organizationId = req.headers.get("x-org-id");
-
-  if (!role || !organizationId) {
-    return null;
-  }
-
-  return { role, organizationId };
-}
+import { getAuthContext } from "@/lib/request-auth";
 
 function isAdminRole(role: UserRole): boolean {
   return role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN;
@@ -21,10 +11,10 @@ function isAdminRole(role: UserRole): boolean {
 function prismaToApiError(error: unknown): NextResponse {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === "P2002") {
-      return apiError("VALIDATION_ERROR", "Conflito de dados únicos.", 409);
+      return apiError("VALIDATION_ERROR", "Conflito de dados Ãºnicos.", 409);
     }
     if (error.code === "P2025") {
-      return apiError("USER_NOT_FOUND", "Registro não encontrado.", 404);
+      return apiError("USER_NOT_FOUND", "Registro nÃ£o encontrado.", 404);
     }
   }
   return apiError("INTERNAL_ERROR", "Erro interno ao publicar evento.", 500);
@@ -53,17 +43,17 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     });
 
     if (!event) {
-      return apiError("USER_NOT_FOUND", "Prova não encontrada.", 404);
+      return apiError("USER_NOT_FOUND", "Prova nÃ£o encontrada.", 404);
     }
 
     if (!event.name || event.name.trim().length < 3) {
-      return apiError("VALIDATION_ERROR", "Nome da prova inválido para publicação.", 400);
+      return apiError("VALIDATION_ERROR", "Nome da prova invÃ¡lido para publicaÃ§Ã£o.", 400);
     }
     if (!event.city || !event.state || !event.event_date) {
-      return apiError("VALIDATION_ERROR", "Campos obrigatórios ausentes para publicação.", 400);
+      return apiError("VALIDATION_ERROR", "Campos obrigatÃ³rios ausentes para publicaÃ§Ã£o.", 400);
     }
     if (event.distances.length < 1) {
-      return apiError("VALIDATION_ERROR", "Adicione ao menos uma distância para publicar.", 400);
+      return apiError("VALIDATION_ERROR", "Adicione ao menos uma distÃ¢ncia para publicar.", 400);
     }
 
     const published = await prisma.event.update({
@@ -77,4 +67,3 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     return prismaToApiError(error);
   }
 }
-

@@ -21,13 +21,17 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import {
   cancelPayment,
+  createFinancialEntry,
+  FinancialEntryRow,
   getPaymentDetail,
+  getFinancialEntries,
   getPayments,
   markPaymentExpired,
   PaymentDetail,
   PaymentFilterOptions,
   PaymentQueueSummary,
   PaymentRow,
+  patchFinancialEntry,
   reopenPayment,
   simulatePayment,
 } from "@/services/payment-service";
@@ -112,6 +116,30 @@ export default function AdminFinanceiroPage() {
   const [selectedPayment, setSelectedPayment] = useState<PaymentDetail | null>(null);
   const [loadingPaymentDetail, setLoadingPaymentDetail] = useState(false);
   const [runningAction, setRunningAction] = useState(false);
+  const [manualEntries, setManualEntries] = useState<FinancialEntryRow[]>([]);
+  const [manualSummary, setManualSummary] = useState({
+    incomeCents: 0,
+    expenseCents: 0,
+    balanceCents: 0,
+    openReceivableCents: 0,
+    openPayableCents: 0,
+  });
+  const [entryForm, setEntryForm] = useState({
+    type: "INCOME" as "INCOME" | "EXPENSE",
+    entryKind: "CASH" as "CASH" | "RECEIVABLE" | "PAYABLE",
+    status: "PAID" as "OPEN" | "PAID" | "CANCELLED",
+    amount: "",
+    category: "",
+    description: "",
+    accountCode: "MENSALIDADE",
+    costCenter: "Associacao",
+    counterparty: "",
+    paymentMethod: "PIX",
+    documentUrl: "",
+    occurredAt: todayIso,
+    dueAt: todayIso,
+  });
+  const [savingEntry, setSavingEntry] = useState(false);
 
   useEffect(() => {
     const statusParam = searchParams.get("status");
@@ -178,12 +206,21 @@ export default function AdminFinanceiroPage() {
       setSummary(payload.summary);
       setQueue(payload.queue);
       setFilterOptions(payload.filters);
+      const entriesPayload = await getFinancialEntries({
+        startDate: filters.startDate,
+        endDate: filters.endDate,
+        accessToken,
+      });
+      setManualEntries(entriesPayload.data);
+      setManualSummary(entriesPayload.summary);
       setErrorMessage(null);
     } catch {
       setRows([]);
       setSummary(EMPTY_SUMMARY);
       setQueue(EMPTY_QUEUE);
       setFilterOptions(EMPTY_FILTERS);
+      setManualEntries([]);
+      setManualSummary({ incomeCents: 0, expenseCents: 0, balanceCents: 0, openReceivableCents: 0, openPayableCents: 0 });
       setErrorMessage("Não foi possível carregar os dados financeiros no momento.");
     } finally {
       setLoading(false);
@@ -238,7 +275,7 @@ export default function AdminFinanceiroPage() {
   const exportCsv = () => {
     const header = [
       "TxId",
-      "Atleta",
+      "Atleta Associado",
       "Email",
       "Prova",
       "Distancia",
@@ -278,10 +315,80 @@ export default function AdminFinanceiroPage() {
     toast.success("Exportacao financeira concluida.");
   };
 
+  const createManualEntry = async () => {
+    const amountNumber = Number(entryForm.amount.replace(",", "."));
+    if (!Number.isFinite(amountNumber) || amountNumber <= 0) {
+      toast.error("Informe um valor valido para o lancamento.");
+      return;
+    }
+    if (!entryForm.category.trim()) {
+      toast.error("Informe uma categoria.");
+      return;
+    }
+
+    setSavingEntry(true);
+    try {
+      await createFinancialEntry(
+        {
+          type: entryForm.type,
+          amountCents: Math.round(amountNumber * 100),
+          category: entryForm.category.trim(),
+          description: entryForm.description.trim() || undefined,
+          occurredAt: new Date(`${entryForm.occurredAt}T12:00:00.000Z`).toISOString(),
+          dueAt: entryForm.dueAt ? new Date(`${entryForm.dueAt}T12:00:00.000Z`).toISOString() : null,
+          status: entryForm.status,
+          entryKind: entryForm.entryKind,
+          accountCode: entryForm.accountCode.trim() || null,
+          costCenter: entryForm.costCenter.trim() || null,
+          counterparty: entryForm.counterparty.trim() || null,
+          paymentMethod: entryForm.paymentMethod.trim() || null,
+          documentUrl: entryForm.documentUrl.trim() || null,
+        },
+        accessToken,
+      );
+      toast.success("Lancamento financeiro criado.");
+      setEntryForm({
+        type: "INCOME",
+        entryKind: "CASH",
+        status: "PAID",
+        amount: "",
+        category: "",
+        description: "",
+        accountCode: "MENSALIDADE",
+        costCenter: "Associacao",
+        counterparty: "",
+        paymentMethod: "PIX",
+        documentUrl: "",
+        occurredAt: todayIso,
+        dueAt: todayIso,
+      });
+      await loadPayments();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Falha ao criar lancamento.");
+    } finally {
+      setSavingEntry(false);
+    }
+  };
+
+  const runEntryAction = async (
+    entryId: string,
+    action: "MARK_PAID" | "REOPEN" | "CANCEL",
+  ) => {
+    try {
+      await patchFinancialEntry(entryId, action, accessToken);
+      if (action === "MARK_PAID") toast.success("Lancamento baixado.");
+      if (action === "REOPEN") toast.success("Lancamento reaberto.");
+      if (action === "CANCEL") toast.success("Lancamento cancelado.");
+      await loadPayments();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Falha ao atualizar lancamento.");
+    }
+  };
+
   const queueColumns: DataTableColumn<PaymentRow>[] = [
     {
       key: "athlete",
-      header: "Atleta",
+      header: "Atleta Associado",
       className: "min-w-[150px]",
       cell: (row) => <span className="font-semibold text-white">{row.athleteName}</span>,
     },
@@ -322,7 +429,7 @@ export default function AdminFinanceiroPage() {
   const columns: DataTableColumn<PaymentRow>[] = [
     {
       key: "athlete",
-      header: "Atleta",
+      header: "Atleta Associado",
       className: "min-w-[160px]",
       cell: (row) => (
         <div>
@@ -449,6 +556,202 @@ export default function AdminFinanceiroPage() {
         </div>
       </SectionCard>
 
+      <SectionCard
+        title="Gestao financeira da associacao"
+        description="Mensalidades, contas a pagar/receber, plano de contas e livro-caixa do Ventu Suli"
+      >
+        <div className="grid gap-3 md:grid-cols-5">
+          <MetricCard label="Entradas realizadas" value={BRL.format(manualSummary.incomeCents / 100)} tone="highlight" />
+          <MetricCard label="Saidas realizadas" value={BRL.format(manualSummary.expenseCents / 100)} />
+          <MetricCard label="Saldo caixa" value={BRL.format(manualSummary.balanceCents / 100)} />
+          <MetricCard label="A receber" value={BRL.format(manualSummary.openReceivableCents / 100)} />
+          <MetricCard label="A pagar" value={BRL.format(manualSummary.openPayableCents / 100)} />
+        </div>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+          <Select
+            value={entryForm.type}
+            onChange={(event) => setEntryForm((current) => ({ ...current, type: event.target.value as "INCOME" | "EXPENSE" }))}
+            className="border-white/[0.1] bg-white/[0.05] text-white"
+          >
+            <option value="INCOME">Entrada</option>
+            <option value="EXPENSE">Saida</option>
+          </Select>
+          <Select
+            value={entryForm.entryKind}
+            onChange={(event) => setEntryForm((current) => ({ ...current, entryKind: event.target.value as "CASH" | "RECEIVABLE" | "PAYABLE" }))}
+            className="border-white/[0.1] bg-white/[0.05] text-white"
+          >
+            <option value="CASH">Livro-caixa</option>
+            <option value="RECEIVABLE">Conta a receber</option>
+            <option value="PAYABLE">Conta a pagar</option>
+          </Select>
+          <Select
+            value={entryForm.status}
+            onChange={(event) => setEntryForm((current) => ({ ...current, status: event.target.value as "OPEN" | "PAID" | "CANCELLED" }))}
+            className="border-white/[0.1] bg-white/[0.05] text-white"
+          >
+            <option value="PAID">Pago/baixado</option>
+            <option value="OPEN">Em aberto</option>
+            <option value="CANCELLED">Cancelado</option>
+          </Select>
+          <Input
+            value={entryForm.amount}
+            onChange={(event) => setEntryForm((current) => ({ ...current, amount: event.target.value }))}
+            placeholder="Valor R$"
+            className="border-white/[0.1] bg-white/[0.05] text-white placeholder:text-white/30"
+          />
+          <Input
+            value={entryForm.category}
+            onChange={(event) => setEntryForm((current) => ({ ...current, category: event.target.value }))}
+            placeholder="Categoria"
+            className="border-white/[0.1] bg-white/[0.05] text-white placeholder:text-white/30"
+            list="finance-categories"
+          />
+          <datalist id="finance-categories">
+            <option value="Mensalidade de associado" />
+            <option value="Inscricao em prova" />
+            <option value="Brindes e produtos" />
+            <option value="Patrocinio" />
+            <option value="Doacao" />
+            <option value="Fornecedor" />
+            <option value="Uniformes" />
+            <option value="Eventos" />
+            <option value="Taxas bancarias" />
+            <option value="Administrativo" />
+          </datalist>
+          <Input
+            type="date"
+            value={entryForm.occurredAt}
+            onChange={(event) => setEntryForm((current) => ({ ...current, occurredAt: event.target.value }))}
+            className="border-white/[0.1] bg-white/[0.05] text-white"
+          />
+          <Input
+            value={entryForm.description}
+            onChange={(event) => setEntryForm((current) => ({ ...current, description: event.target.value }))}
+            placeholder="Descricao"
+            className="border-white/[0.1] bg-white/[0.05] text-white placeholder:text-white/30"
+          />
+          <Input
+            type="date"
+            value={entryForm.dueAt}
+            onChange={(event) => setEntryForm((current) => ({ ...current, dueAt: event.target.value }))}
+            className="border-white/[0.1] bg-white/[0.05] text-white"
+          />
+          <Input
+            value={entryForm.accountCode}
+            onChange={(event) => setEntryForm((current) => ({ ...current, accountCode: event.target.value }))}
+            placeholder="Plano de contas"
+            className="border-white/[0.1] bg-white/[0.05] text-white placeholder:text-white/30"
+          />
+          <Input
+            value={entryForm.costCenter}
+            onChange={(event) => setEntryForm((current) => ({ ...current, costCenter: event.target.value }))}
+            placeholder="Centro de custo"
+            className="border-white/[0.1] bg-white/[0.05] text-white placeholder:text-white/30"
+          />
+          <Input
+            value={entryForm.counterparty}
+            onChange={(event) => setEntryForm((current) => ({ ...current, counterparty: event.target.value }))}
+            placeholder="Associado, fornecedor ou parceiro"
+            className="border-white/[0.1] bg-white/[0.05] text-white placeholder:text-white/30"
+          />
+          <Input
+            value={entryForm.paymentMethod}
+            onChange={(event) => setEntryForm((current) => ({ ...current, paymentMethod: event.target.value }))}
+            placeholder="Forma de pagamento"
+            className="border-white/[0.1] bg-white/[0.05] text-white placeholder:text-white/30"
+          />
+          <Input
+            value={entryForm.documentUrl}
+            onChange={(event) => setEntryForm((current) => ({ ...current, documentUrl: event.target.value }))}
+            placeholder="Link do comprovante/nota"
+            className="border-white/[0.1] bg-white/[0.05] text-white placeholder:text-white/30 xl:col-span-2"
+          />
+        </div>
+        <div className="mt-3">
+          <ActionButton disabled={savingEntry} onClick={() => void createManualEntry()}>
+            {savingEntry ? "Lancando..." : "Lancar entrada/saida"}
+          </ActionButton>
+        </div>
+
+        <div className="mt-4">
+          {manualEntries.length === 0 ? (
+            <EmptyState title="Sem lancamentos manuais" description="Entradas e saidas avulsas aparecerao aqui." />
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-white/[0.07]">
+              <table className="min-w-full text-sm">
+                <thead className="bg-white/[0.04] text-xs uppercase tracking-wide text-white/40">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Data</th>
+                    <th className="px-3 py-2 text-left">Tipo</th>
+                    <th className="px-3 py-2 text-left">Status</th>
+                    <th className="px-3 py-2 text-left">Categoria</th>
+                    <th className="px-3 py-2 text-left">Centro</th>
+                    <th className="px-3 py-2 text-left">Valor</th>
+                    <th className="px-3 py-2 text-left">Descricao</th>
+                    <th className="px-3 py-2 text-left">Acoes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {manualEntries.map((entry) => (
+                    <tr key={entry.id} className="border-t border-white/[0.07]">
+                      <td className="px-3 py-2 text-white/60">{format(new Date(entry.occurredAt), "dd/MM/yyyy", { locale: ptBR })}</td>
+                      <td className="px-3 py-2">
+                        <StatusBadge
+                          tone={entry.type === "INCOME" ? "positive" : "warning"}
+                          label={entry.type === "INCOME" ? "Entrada" : "Saida"}
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <StatusBadge
+                          tone={entry.status === "PAID" ? "positive" : entry.status === "OPEN" ? "warning" : "neutral"}
+                          label={entry.status === "PAID" ? "Baixado" : entry.status === "OPEN" ? "Aberto" : "Cancelado"}
+                        />
+                      </td>
+                      <td className="px-3 py-2 text-white">{entry.category}</td>
+                      <td className="px-3 py-2 text-white/60">{entry.costCenter ?? "-"}</td>
+                      <td className="px-3 py-2 font-semibold text-white">{BRL.format(entry.amountCents / 100)}</td>
+                      <td className="px-3 py-2 text-white/50">{entry.description ?? "-"}</td>
+                      <td className="px-3 py-2">
+                        <div className="flex flex-wrap gap-1.5">
+                          {entry.status !== "PAID" ? (
+                            <button
+                              type="button"
+                              className="rounded-lg border border-emerald-400/30 px-2 py-1 text-xs text-emerald-200"
+                              onClick={() => void runEntryAction(entry.id, "MARK_PAID")}
+                            >
+                              Baixar
+                            </button>
+                          ) : null}
+                          {entry.status !== "OPEN" ? (
+                            <button
+                              type="button"
+                              className="rounded-lg border border-white/10 px-2 py-1 text-xs text-white/70"
+                              onClick={() => void runEntryAction(entry.id, "REOPEN")}
+                            >
+                              Reabrir
+                            </button>
+                          ) : null}
+                          {entry.status !== "CANCELLED" ? (
+                            <button
+                              type="button"
+                              className="rounded-lg border border-red-400/30 px-2 py-1 text-xs text-red-200"
+                              onClick={() => void runEntryAction(entry.id, "CANCEL")}
+                            >
+                              Cancelar
+                            </button>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </SectionCard>
       <SectionCard title="Fila de trabalho" description="Priorize cobrancas em risco de perda de receita">
         <div className="grid gap-3 md:grid-cols-4 xl:grid-cols-8">
           <MetricCard label="Abertas" value={queue.totalOpenCount} />
@@ -685,7 +988,7 @@ export default function AdminFinanceiroPage() {
             />
 
             <div className="rounded-xl border border-white/[0.07] bg-white/[0.04] p-3 text-[12px] text-white/55">
-              <p>Atleta: {selectedPayment.athleteName} ({selectedPayment.athleteEmail})</p>
+              <p>Atleta associado: {selectedPayment.athleteName} ({selectedPayment.athleteEmail})</p>
               <p className="mt-1">Prova: {selectedPayment.eventName} - {selectedPayment.distanceLabel}</p>
               <p className="mt-1">Criado em: {formatDateTime(selectedPayment.createdAt)}</p>
               <p className="mt-1">Vencimento: {formatDateTime(selectedPayment.expiresAt)}</p>

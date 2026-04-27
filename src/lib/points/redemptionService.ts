@@ -1,6 +1,7 @@
-import { Prisma } from "@prisma/client";
+﻿import { Prisma } from "@prisma/client";
 import { calculateRedemption } from "@/lib/points/redemptionCalculator";
 import { creditPointsInTransaction, debitPointsInTransaction } from "@/lib/points/pointsService";
+import { getOrganizationPointPolicy } from "@/lib/points/policy";
 import { prisma } from "@/lib/prisma";
 
 interface RewardItemRow {
@@ -126,6 +127,7 @@ export async function createRedemption(params: {
     }
 
     const userBalance = await getCurrentBalanceInTransaction(tx, params.orgId, params.userId);
+    const policy = await getOrganizationPointPolicy(params.orgId, tx);
     const calculation = calculateRedemption(
       {
         cashPriceCents: rewardItem.cashPriceCents,
@@ -139,6 +141,7 @@ export async function createRedemption(params: {
       },
       userBalance,
       params.requestedPoints,
+      policy.pointValueCents,
     );
 
     if (!calculation.isValid) {

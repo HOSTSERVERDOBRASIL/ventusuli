@@ -56,7 +56,11 @@ export function verifyStravaOAuthState(state: string): StravaOAuthStatePayload |
 export function buildStravaAuthorizeUrl(state: string): string {
   const clientId = process.env.STRAVA_CLIENT_ID;
   if (!clientId) {
-    throw new Error("STRAVA_CLIENT_ID not configured.");
+    const query = new URLSearchParams({
+      unavailable: "strava_client_not_configured",
+      state,
+    });
+    return `${appBaseUrl()}/api/integrations/strava/connect?${query.toString()}`;
   }
 
   const query = new URLSearchParams({

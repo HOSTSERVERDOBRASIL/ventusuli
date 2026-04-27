@@ -1,9 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { verifyAccessToken } from "@/lib/auth";
 import { apiError } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 import { clearAccessCookie, clearRefreshCookie } from "@/lib/cookies";
-import { sanitizeOrganizationSettings } from "@/lib/organization-settings";
 import { getAccessTokenFromRequest } from "@/lib/request-auth";
 import { logWarn, withRequestContext } from "@/lib/logger";
 
@@ -97,7 +96,7 @@ export async function GET(req: NextRequest) {
                 status: user.organization.status,
                 setup_completed_at: user.organization.setup_completed_at,
                 logo_url: user.organization.logo_url,
-                settings: sanitizeOrganizationSettings(user.organization.settings),
+                settings: user.organization.settings,
               }
             : null,
           profile: { hasCpf, athleteStatus },

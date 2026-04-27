@@ -1,18 +1,8 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import {
-  AlertTriangle,
-  Check,
-  CircleUserRound,
-  Copy,
-  Mail,
-  Pencil,
-  ShieldCheck,
-  UserPlus,
-  X,
-} from "lucide-react";
+import { AlertTriangle, Check, CircleUserRound, Copy, Mail, Pencil, ShieldCheck, UserPlus, X } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/system/empty-state";
 import { LoadingState } from "@/components/system/loading-state";
@@ -24,7 +14,7 @@ import { AthleteIdentity } from "@/services/types";
 import { createInvite, listInvites, OrgInvite } from "@/services/organization-service";
 import { formatCpf, isValidCpf, normalizeCpf } from "@/lib/cpf";
 import { uploadImageFile } from "@/services/upload-service";
-import { UserRole } from "@/types";
+import { roleLabel as formatRoleLabel } from "@/lib/role-labels";
 
 const BRAZILIAN_STATES = [
   "AC",
@@ -57,13 +47,6 @@ const BRAZILIAN_STATES = [
 ];
 
 const GENDER_LABELS: Record<string, string> = { M: "Masculino", F: "Feminino", O: "Outro" };
-const ROLE_LABELS: Record<string, string> = {
-  [UserRole.ATHLETE]: "Atleta",
-  [UserRole.ADMIN]: "Administrador",
-  [UserRole.COACH]: "Treinador",
-  [UserRole.SUPER_ADMIN]: "Super administrador",
-};
-
 interface FormState {
   cpf: string;
   phone: string;
@@ -145,7 +128,7 @@ export default function PerfilPage() {
           setForm(toFormState(data));
         }
       } catch {
-        if (!cancelled) setError("Não foi possível carregar os dados do perfil.");
+        if (!cancelled) setError("NÃ£o foi possÃ­vel carregar os dados do perfil.");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -163,7 +146,7 @@ export default function PerfilPage() {
   }, [organization?.name, refreshSession, userRole]);
 
   const isAthleteRole = userRole === "ATHLETE" || !userRole;
-  const roleLabel = userRole ? (ROLE_LABELS[userRole] ?? userRole) : "Atleta";
+  const roleLabel = formatRoleLabel(userRole);
   const organizationName =
     organization?.name ?? currentUser?.organization?.name ?? "Assessoria nao identificada";
 
@@ -205,7 +188,7 @@ export default function PerfilPage() {
     setForm((f) => ({ ...f, cpf: formatted }));
 
     if (digits.length === 11) {
-      setCpfError(isValidCpf(digits) ? null : "CPF inválido. Verifique os dígitos.");
+      setCpfError(isValidCpf(digits) ? null : "CPF invÃ¡lido. Verifique os dÃ­gitos.");
     } else {
       setCpfError(null);
     }
@@ -213,13 +196,13 @@ export default function PerfilPage() {
 
   async function handleSave() {
     if (!form.cpf && identity?.cpf) {
-      toast.error("CPF não pode ser removido após cadastro.");
+      toast.error("CPF nÃ£o pode ser removido apÃ³s cadastro.");
       return;
     }
 
     const cpfDigits = normalizeCpf(form.cpf);
     if (cpfDigits && !isValidCpf(cpfDigits)) {
-      setCpfError("CPF inválido. Verifique os dígitos.");
+      setCpfError("CPF invÃ¡lido. Verifique os dÃ­gitos.");
       return;
     }
 
@@ -294,7 +277,7 @@ export default function PerfilPage() {
   }
 
   function buildInviteUrl(invite: OrgInvite): string {
-    const path = invite.signupUrl ?? `/register/atleta?token=${invite.token}`;
+    const path = invite.signupUrl ?? `/register/atleta?inviteToken=${invite.token}`;
     if (typeof window === "undefined") return path;
     return path.startsWith("http") ? path : `${window.location.origin}${path}`;
   }
@@ -341,12 +324,12 @@ export default function PerfilPage() {
 
   return (
     <div className="space-y-6 text-white">
-      <PageHeader title="Meu perfil" subtitle="Dados da conta e informações esportivas." />
+      <PageHeader title="Meu perfil" subtitle="Dados da conta e informaÃ§Ãµes esportivas." />
 
       {loading ? <LoadingState lines={4} /> : null}
       {error ? (
         <EmptyState
-          title="Perfil indisponível"
+          title="Perfil indisponÃ­vel"
           description={error}
           action={
             <button
@@ -367,9 +350,9 @@ export default function PerfilPage() {
             <div className="flex items-start gap-3 rounded-xl border border-amber-400/40 bg-amber-400/10 p-4 text-amber-100">
               <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
               <div>
-                <p className="font-semibold text-amber-200">CPF não cadastrado</p>
+                <p className="font-semibold text-amber-200">CPF nÃ£o cadastrado</p>
                 <p className="mt-0.5 text-sm text-amber-100/80">
-                  Para se inscrever em provas e gerar pagamentos PIX, você precisa informar seu CPF.{" "}
+                  Para se inscrever em provas e gerar pagamentos PIX, vocÃª precisa informar seu CPF.{" "}
                   <button
                     type="button"
                     className="underline hover:text-amber-200"
@@ -383,7 +366,7 @@ export default function PerfilPage() {
           ) : null}
 
           {/* Account info */}
-          <SectionCard title="Informações da conta" description="Dados de autenticação e acesso">
+          <SectionCard title="InformaÃ§Ãµes da conta" description="Dados de autenticaÃ§Ã£o e acesso">
             <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-[#24486f] bg-[#0a1d36] p-4">
               <div className="h-16 w-16 overflow-hidden rounded-full border border-[#2f5d8f] bg-[#0f233d]">
                 {identity.avatarUrl ? (
@@ -425,11 +408,26 @@ export default function PerfilPage() {
               </div>
             </div>
 
+            <div className="mb-4">
+              <label className={labelClass()}>Codigo de associado</label>
+              <input
+                className={inputClass(
+                  "cursor-not-allowed border-[#34587d] bg-[#091a30] font-semibold text-[#dce9ff] opacity-100",
+                )}
+                type="text"
+                value={identity.memberNumber ?? "Aguardando aprovacao"}
+                disabled
+              />
+              <p className="mt-1 text-xs text-[#6a9ac8]">
+                Identificacao oficial do associado, gerada pela assessoria e bloqueada para edicao.
+              </p>
+            </div>
+
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               {[
                 { label: "Nome", value: identity.name },
                 { label: "Email", value: identity.email },
-                { label: "Associado", value: identity.memberNumber ?? "Aguardando aprovação" },
+                { label: "Associado", value: identity.memberNumber ?? "Aguardando aprovaÃ§Ã£o" },
                 { label: "Perfil", value: roleLabel },
                 { label: "Assessoria", value: organizationName },
               ].map(({ label, value }) => (
@@ -492,13 +490,7 @@ export default function PerfilPage() {
                     const accepted = Boolean(invite.accepted_at);
                     const exhausted =
                       typeof invite.max_uses === "number" && invite.used_count >= invite.max_uses;
-                    const status = accepted
-                      ? "Usado"
-                      : exhausted
-                        ? "Esgotado"
-                        : invite.active
-                          ? "Ativo"
-                          : "Inativo";
+                    const status = accepted ? "Usado" : exhausted ? "Esgotado" : invite.active ? "Ativo" : "Inativo";
 
                     return (
                       <div
@@ -509,11 +501,9 @@ export default function PerfilPage() {
                           <p className="font-semibold text-white">
                             {invite.invited_name ?? invite.label ?? "Convite individual"}
                           </p>
-                          <p className="text-sm text-[#8eb0dc]">
-                            {invite.invited_email ?? "E-mail nao informado"}
-                          </p>
+                          <p className="text-sm text-[#8eb0dc]">{invite.invited_email ?? "E-mail nao informado"}</p>
                           <p className="text-xs text-[#6a9ac8]">
-                            {status} · usos {invite.used_count}/{invite.max_uses ?? "ilimitado"}
+                            {status} Â· usos {invite.used_count}/{invite.max_uses ?? "ilimitado"}
                           </p>
                         </div>
                         <button
@@ -535,7 +525,7 @@ export default function PerfilPage() {
           {/* Profile data */}
           <SectionCard
             title="Dados esportivos"
-            description="Informações usadas em inscrições e pagamentos"
+            description="InformaÃ§Ãµes usadas em inscriÃ§Ãµes e pagamentos"
           >
             {!editing ? (
               <>
@@ -559,7 +549,7 @@ export default function PerfilPage() {
                     }
                   />
                   <ProfileField
-                    label="Gênero"
+                    label="GÃªnero"
                     value={identity.gender ? GENDER_LABELS[identity.gender] : null}
                   />
                 </div>
@@ -567,7 +557,7 @@ export default function PerfilPage() {
                 {identity.emergencyContact ? (
                   <div className="mb-4 rounded-xl border border-[#24486f] bg-[#0a1d36] p-4">
                     <p className="mb-2 text-xs uppercase tracking-wide text-[#8eb0dc]">
-                      Contato de emergência
+                      Contato de emergÃªncia
                     </p>
                     <p className="text-sm font-semibold text-white">
                       {identity.emergencyContact.name}
@@ -625,9 +615,9 @@ export default function PerfilPage() {
                     />
                   </div>
 
-                  {/* Gênero */}
+                  {/* GÃªnero */}
                   <div>
-                    <label className={labelClass()}>Gênero</label>
+                    <label className={labelClass()}>GÃªnero</label>
                     <select
                       className={inputClass()}
                       value={form.gender}
@@ -636,7 +626,7 @@ export default function PerfilPage() {
                       <option value="">Selecionar</option>
                       <option value="M">Masculino</option>
                       <option value="F">Feminino</option>
-                      <option value="O">Outro / Prefiro não informar</option>
+                      <option value="O">Outro / Prefiro nÃ£o informar</option>
                     </select>
                   </div>
 
@@ -646,7 +636,7 @@ export default function PerfilPage() {
                     <input
                       className={inputClass()}
                       type="text"
-                      placeholder="São Paulo"
+                      placeholder="SÃ£o Paulo"
                       value={form.city}
                       onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
                     />
@@ -681,10 +671,10 @@ export default function PerfilPage() {
                   </div>
                 </div>
 
-                {/* Contato de emergência */}
+                {/* Contato de emergÃªncia */}
                 <div className="rounded-xl border border-[#24486f] bg-[#0a1d36] p-4">
                   <p className="mb-3 text-xs uppercase tracking-wide text-[#8eb0dc]">
-                    Contato de emergência
+                    Contato de emergÃªncia
                   </p>
                   <div className="grid gap-3 sm:grid-cols-3">
                     <div>
@@ -708,11 +698,11 @@ export default function PerfilPage() {
                       />
                     </div>
                     <div>
-                      <label className={labelClass()}>Parentesco / Relação</label>
+                      <label className={labelClass()}>Parentesco / RelaÃ§Ã£o</label>
                       <input
                         className={inputClass()}
                         type="text"
-                        placeholder="Ex: Mãe, Cônjuge"
+                        placeholder="Ex: MÃ£e, CÃ´njuge"
                         value={form.ec_relation}
                         onChange={(e) => setForm((f) => ({ ...f, ec_relation: e.target.value }))}
                       />
@@ -743,13 +733,13 @@ export default function PerfilPage() {
           </SectionCard>
 
           {/* Quick links */}
-          <SectionCard title="Acessos rápidos" description="Atalhos para a área do atleta">
+          <SectionCard title="Acessos rÃ¡pidos" description="Atalhos para a Ã¡rea do atleta">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <Link
                 href="/minhas-inscricoes"
                 className="inline-flex items-center gap-2 rounded-xl border border-[#2f5d8f] bg-[#12355d] px-4 py-3 text-sm font-medium text-[#dce9ff] transition hover:bg-[#18436f]"
               >
-                <CircleUserRound className="h-4 w-4" /> Minhas inscrições
+                <CircleUserRound className="h-4 w-4" /> Minhas inscriÃ§Ãµes
               </Link>
               <Link
                 href="/financeiro"
@@ -761,7 +751,7 @@ export default function PerfilPage() {
                 href="/configuracoes/conta"
                 className="inline-flex items-center gap-2 rounded-xl border border-[#2f5d8f] bg-[#12355d] px-4 py-3 text-sm font-medium text-[#dce9ff] transition hover:bg-[#18436f]"
               >
-                <ShieldCheck className="h-4 w-4" /> Configurações
+                <ShieldCheck className="h-4 w-4" /> ConfiguraÃ§Ãµes
               </Link>
             </div>
           </SectionCard>
@@ -780,7 +770,7 @@ function ProfileField({
   value: string | null | undefined;
   sensitive?: boolean;
 }) {
-  const display = value ?? "—";
+  const display = value ?? "â€”";
   const masked = sensitive && value ? `${value.slice(0, 3)}.***.***-${value.slice(-2)}` : display;
 
   return (

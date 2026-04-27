@@ -1,14 +1,21 @@
-"use client";
+﻿"use client";
 
 import {
+  AlertTriangle,
+  BarChart3,
   BellRing,
   CalendarDays,
   ClipboardList,
   Coins,
+  CreditCard,
+  FileSpreadsheet,
+  Dumbbell,
+  FileSearch,
   Gift,
   Heart,
   IdCard,
   LayoutDashboard,
+  Receipt,
   Settings,
   Shield,
   TrendingUp,
@@ -20,7 +27,16 @@ import { ComponentType } from "react";
 import { AccessPolicy, ROLE_GROUPS, canAccessPolicy } from "@/lib/authorization";
 import { UserRole } from "@/types";
 
-export type NavSection = "journey" | "operation" | "coaching" | "platform" | "account";
+export type NavSection =
+  | "home"
+  | "events"
+  | "finance"
+  | "points"
+  | "communication"
+  | "coaching"
+  | "admin"
+  | "platform"
+  | "account";
 
 export interface NavItem {
   href: string;
@@ -39,7 +55,7 @@ export const navItems: NavItem[] = [
     icon: LayoutDashboard,
     roles: [...ROLE_GROUPS.athlete],
     policy: "ATHLETE_AREA",
-    section: "journey",
+    section: "home",
     quickSearch: true,
   },
   {
@@ -48,7 +64,7 @@ export const navItems: NavItem[] = [
     icon: Trophy,
     roles: [...ROLE_GROUPS.athlete],
     policy: "ATHLETE_AREA",
-    section: "journey",
+    section: "events",
     quickSearch: true,
   },
   {
@@ -57,7 +73,7 @@ export const navItems: NavItem[] = [
     icon: ClipboardList,
     roles: [...ROLE_GROUPS.athlete],
     policy: "ATHLETE_AREA",
-    section: "journey",
+    section: "events",
     quickSearch: true,
   },
   {
@@ -66,7 +82,7 @@ export const navItems: NavItem[] = [
     icon: Wallet,
     roles: [...ROLE_GROUPS.athlete],
     policy: "ATHLETE_AREA",
-    section: "journey",
+    section: "finance",
     quickSearch: true,
   },
   {
@@ -75,7 +91,7 @@ export const navItems: NavItem[] = [
     icon: CalendarDays,
     roles: [...ROLE_GROUPS.athlete],
     policy: "ATHLETE_AREA",
-    section: "journey",
+    section: "events",
     quickSearch: true,
   },
   {
@@ -84,7 +100,7 @@ export const navItems: NavItem[] = [
     icon: TrendingUp,
     roles: [...ROLE_GROUPS.athlete],
     policy: "ATHLETE_AREA",
-    section: "journey",
+    section: "home",
     quickSearch: true,
   },
   {
@@ -93,7 +109,7 @@ export const navItems: NavItem[] = [
     icon: Heart,
     roles: [...ROLE_GROUPS.athlete],
     policy: "ATHLETE_AREA",
-    section: "journey",
+    section: "communication",
     quickSearch: true,
   },
   {
@@ -102,7 +118,7 @@ export const navItems: NavItem[] = [
     icon: BellRing,
     roles: [...ROLE_GROUPS.athlete],
     policy: "ATHLETE_AREA",
-    section: "journey",
+    section: "communication",
     quickSearch: true,
   },
   {
@@ -111,7 +127,7 @@ export const navItems: NavItem[] = [
     icon: Gift,
     roles: [...ROLE_GROUPS.athlete],
     policy: "ATHLETE_AREA",
-    section: "journey",
+    section: "points",
     quickSearch: true,
   },
   {
@@ -120,26 +136,26 @@ export const navItems: NavItem[] = [
     icon: Coins,
     roles: [...ROLE_GROUPS.athlete],
     policy: "ATHLETE_AREA",
-    section: "journey",
+    section: "points",
     quickSearch: true,
   },
 
   {
     href: "/admin",
-    label: "Cockpit Admin",
+    label: "Visao Geral",
     icon: Shield,
     roles: [...ROLE_GROUPS.tenantAdmin],
     policy: "ADMIN_ONLY",
-    section: "operation",
+    section: "home",
     quickSearch: true,
   },
   {
     href: "/admin/eventos",
-    label: "Gestao de Provas",
+    label: "Provas",
     icon: Trophy,
     roles: [...ROLE_GROUPS.tenantAdmin],
     policy: "ADMIN_ONLY",
-    section: "operation",
+    section: "events",
     quickSearch: true,
   },
   {
@@ -148,61 +164,124 @@ export const navItems: NavItem[] = [
     icon: Users,
     roles: [...ROLE_GROUPS.tenantAdmin],
     policy: "ADMIN_ONLY",
-    section: "operation",
+    section: "admin",
     quickSearch: true,
   },
   {
     href: "/admin/financeiro",
-    label: "Financeiro Admin",
+    label: "Painel Financeiro",
+    icon: BarChart3,
+    roles: [...ROLE_GROUPS.tenantFinance],
+    policy: "FINANCE_AREA",
+    section: "finance",
+    quickSearch: true,
+  },
+  {
+    href: "/admin/financeiro?status=PENDING&due=ALL",
+    label: "Gestao de Cobrancas",
+    icon: Receipt,
+    roles: [...ROLE_GROUPS.tenantFinance],
+    policy: "FINANCE_AREA",
+    section: "finance",
+    quickSearch: true,
+  },
+  {
+    href: "/admin/financeiro?status=PENDING&due=OVERDUE",
+    label: "Inadimplencia",
+    icon: AlertTriangle,
+    roles: [...ROLE_GROUPS.tenantFinance],
+    policy: "FINANCE_AREA",
+    section: "finance",
+    quickSearch: true,
+  },
+  {
+    href: "/admin/financeiro?status=PENDING&due=TODAY",
+    label: "Vencem Hoje",
+    icon: Receipt,
+    roles: [...ROLE_GROUPS.tenantFinance],
+    policy: "FINANCE_AREA",
+    section: "finance",
+    quickSearch: true,
+  },
+  {
+    href: "/admin/financeiro?status=PENDING&due=NEXT_7_DAYS",
+    label: "Proximos 7 Dias",
+    icon: CalendarDays,
+    roles: [...ROLE_GROUPS.tenantFinance],
+    policy: "FINANCE_AREA",
+    section: "finance",
+    quickSearch: true,
+  },
+  {
+    href: "/admin/financeiro?status=PAID&period=MONTH",
+    label: "Recebimentos do Mes",
     icon: Wallet,
-    roles: [...ROLE_GROUPS.tenantAdmin],
-    policy: "ADMIN_ONLY",
-    section: "operation",
+    roles: [...ROLE_GROUPS.tenantFinance],
+    policy: "FINANCE_AREA",
+    section: "finance",
+    quickSearch: true,
+  },
+  {
+    href: "/admin/financeiro?period=MONTH",
+    label: "Caixa e Lancamentos",
+    icon: FileSpreadsheet,
+    roles: [...ROLE_GROUPS.tenantFinance],
+    policy: "FINANCE_AREA",
+    section: "finance",
+    quickSearch: true,
+  },
+  {
+    href: "/admin/financeiro?period=YEAR",
+    label: "Relatorio Anual",
+    icon: BarChart3,
+    roles: [...ROLE_GROUPS.tenantFinance],
+    policy: "FINANCE_AREA",
+    section: "finance",
     quickSearch: true,
   },
   {
     href: "/admin/recompensas",
-    label: "Recompensas Admin",
+    label: "Catalogo de Recompensas",
     icon: Gift,
     roles: [...ROLE_GROUPS.tenantAdmin],
     policy: "ADMIN_ONLY",
-    section: "operation",
+    section: "points",
     quickSearch: true,
   },
   {
     href: "/admin/resgates",
-    label: "Resgates Admin",
+    label: "Resgates",
     icon: Coins,
     roles: [...ROLE_GROUPS.tenantAdmin],
     policy: "ADMIN_ONLY",
-    section: "operation",
+    section: "points",
     quickSearch: true,
   },
   {
     href: "/admin/pontos",
-    label: "Pontos Admin",
+    label: "Pontos e Auditoria",
     icon: TrendingUp,
     roles: [...ROLE_GROUPS.tenantAdmin],
     policy: "ADMIN_ONLY",
-    section: "operation",
+    section: "points",
     quickSearch: true,
   },
   {
     href: "/admin/avisos",
-    label: "Avisos Admin",
+    label: "Avisos",
     icon: BellRing,
     roles: [...ROLE_GROUPS.tenantAdmin],
     policy: "NOTICES_MANAGE",
-    section: "operation",
+    section: "communication",
     quickSearch: true,
   },
   {
     href: "/admin/configuracoes",
-    label: "Configuracoes Admin",
+    label: "Configuracoes",
     icon: Settings,
     roles: [...ROLE_GROUPS.tenantAdmin],
     policy: "ADMIN_ONLY",
-    section: "operation",
+    section: "admin",
     quickSearch: true,
   },
 
@@ -210,6 +289,24 @@ export const navItems: NavItem[] = [
     href: "/coach",
     label: "Painel Tecnico",
     icon: LayoutDashboard,
+    roles: [...ROLE_GROUPS.coach],
+    policy: "COACH_AREA",
+    section: "coaching",
+    quickSearch: true,
+  },
+  {
+    href: "/coach/treinos",
+    label: "Treinos",
+    icon: Dumbbell,
+    roles: [...ROLE_GROUPS.coach],
+    policy: "COACH_AREA",
+    section: "coaching",
+    quickSearch: true,
+  },
+  {
+    href: "/coach/calendario",
+    label: "Calendario Tecnico",
+    icon: CalendarDays,
     roles: [...ROLE_GROUPS.coach],
     policy: "COACH_AREA",
     section: "coaching",
@@ -235,6 +332,15 @@ export const navItems: NavItem[] = [
   },
 
   {
+    href: "/super-admin",
+    label: "Painel Plataforma",
+    icon: LayoutDashboard,
+    roles: [UserRole.SUPER_ADMIN],
+    policy: "SUPER_ADMIN_ONLY",
+    section: "home",
+    quickSearch: true,
+  },
+  {
     href: "/super-admin/organizations",
     label: "Organizacoes",
     icon: Users,
@@ -245,8 +351,26 @@ export const navItems: NavItem[] = [
   },
   {
     href: "/super-admin/admin-invites",
-    label: "Convites Admin",
+    label: "Convites de Acesso",
     icon: BellRing,
+    roles: [UserRole.SUPER_ADMIN],
+    policy: "SUPER_ADMIN_ONLY",
+    section: "platform",
+    quickSearch: true,
+  },
+  {
+    href: "/super-admin/billing",
+    label: "Locacao da Plataforma",
+    icon: CreditCard,
+    roles: [UserRole.SUPER_ADMIN],
+    policy: "SUPER_ADMIN_ONLY",
+    section: "platform",
+    quickSearch: true,
+  },
+  {
+    href: "/super-admin/audit",
+    label: "Auditoria",
+    icon: FileSearch,
     roles: [UserRole.SUPER_ADMIN],
     policy: "SUPER_ADMIN_ONLY",
     section: "platform",
@@ -255,7 +379,7 @@ export const navItems: NavItem[] = [
 
   {
     href: "/perfil",
-    label: "Meu Perfil",
+    label: "Perfil",
     icon: IdCard,
     roles: [...ROLE_GROUPS.tenant],
     policy: "TENANT_AUTHENTICATED",
@@ -268,15 +392,6 @@ export const navItems: NavItem[] = [
     icon: Settings,
     roles: [...ROLE_GROUPS.tenant],
     policy: "TENANT_AUTHENTICATED",
-    section: "account",
-    quickSearch: true,
-  },
-  {
-    href: "/super-admin",
-    label: "Minha Conta Plataforma",
-    icon: IdCard,
-    roles: [UserRole.SUPER_ADMIN],
-    policy: "SUPER_ADMIN_ONLY",
     section: "account",
     quickSearch: true,
   },
@@ -297,26 +412,35 @@ export function getQuickSearchLinks(role: UserRole | null): Array<{ href: string
 }
 
 export function splitNavBySection(role: UserRole | null): {
-  journey: NavItem[];
-  operation: NavItem[];
+  home: NavItem[];
+  events: NavItem[];
+  finance: NavItem[];
+  points: NavItem[];
+  communication: NavItem[];
   coaching: NavItem[];
+  admin: NavItem[];
   platform: NavItem[];
   account: NavItem[];
 } {
   const visible = getVisibleNavItems(role);
   return {
-    journey: visible.filter((item) => item.section === "journey"),
-    operation: visible.filter((item) => item.section === "operation"),
+    home: visible.filter((item) => item.section === "home"),
+    events: visible.filter((item) => item.section === "events"),
+    finance: visible.filter((item) => item.section === "finance"),
+    points: visible.filter((item) => item.section === "points"),
+    communication: visible.filter((item) => item.section === "communication"),
     coaching: visible.filter((item) => item.section === "coaching"),
+    admin: visible.filter((item) => item.section === "admin"),
     platform: visible.filter((item) => item.section === "platform"),
     account: visible.filter((item) => item.section === "account"),
   };
 }
 
 export function isNavItemActive(pathname: string, href: string): boolean {
-  if (href === "/") return pathname === "/";
-  if (href === "/admin") return pathname === "/admin";
-  if (href === "/coach") return pathname === "/coach";
-  if (href === "/super-admin") return pathname === "/super-admin";
-  return pathname === href || pathname.startsWith(`${href}/`);
+  const hrefPath = href.split("?")[0] ?? href;
+  if (hrefPath === "/") return pathname === "/";
+  if (hrefPath === "/admin") return pathname === "/admin";
+  if (hrefPath === "/coach") return pathname === "/coach";
+  if (hrefPath === "/super-admin") return pathname === "/super-admin";
+  return pathname === hrefPath || pathname.startsWith(`${hrefPath}/`);
 }

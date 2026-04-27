@@ -16,6 +16,7 @@ const PUBLIC_API_PREFIXES = [
   "/api/health",
   "/api/organizations/by-slug",
   "/api/integrations/strava/webhook",
+  "/api/payments/webhook",
 ];
 const AUTH_PAGES = [
   "/login",
@@ -86,6 +87,7 @@ function parseRole(role: string): UserRole | null {
 function fallbackPathByRole(role: UserRole): string {
   if (role === UserRole.SUPER_ADMIN) return "/super-admin";
   if (role === UserRole.ADMIN) return "/admin";
+  if (role === UserRole.FINANCE) return "/admin/financeiro";
   if (role === UserRole.COACH) return "/coach";
   return "/";
 }

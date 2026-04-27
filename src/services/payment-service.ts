@@ -31,6 +31,38 @@ export interface PaymentQueueSummary {
   recentSettlementsCount: number;
 }
 
+export interface FinancialEntryRow {
+  id: string;
+  type: "INCOME" | "EXPENSE";
+  amountCents: number;
+  category: string;
+  description: string | null;
+  occurredAt: string;
+  dueAt: string | null;
+  settledAt: string | null;
+  status: "OPEN" | "PAID" | "CANCELLED";
+  entryKind: "CASH" | "RECEIVABLE" | "PAYABLE";
+  accountCode: string | null;
+  costCenter: string | null;
+  counterparty: string | null;
+  paymentMethod: string | null;
+  documentUrl: string | null;
+  createdAt: string;
+  createdByName: string;
+  createdByEmail: string;
+}
+
+export interface FinancialEntriesResult {
+  data: FinancialEntryRow[];
+  summary: {
+    incomeCents: number;
+    expenseCents: number;
+    balanceCents: number;
+    openReceivableCents: number;
+    openPayableCents: number;
+  };
+}
+
 export interface PaymentListResult {
   rows: PaymentRow[];
   summary: PaymentSummary;
@@ -135,5 +167,90 @@ export async function getPaymentDetail(paymentId: string, accessToken?: string |
   }
 
   const payload = (await response.json()) as PaymentDetailResponse;
+  return payload.data;
+}
+
+export async function getFinancialEntries(input: {
+  startDate: string;
+  endDate: string;
+  status?: string;
+  type?: string;
+  entryKind?: string;
+  accessToken?: string | null;
+}): Promise<FinancialEntriesResult> {
+  const query = new URLSearchParams({
+    startDate: input.startDate,
+    endDate: input.endDate,
+  });
+  if (input.status && input.status !== "ALL") query.set("status", input.status);
+  if (input.type && input.type !== "ALL") query.set("type", input.type);
+  if (input.entryKind && input.entryKind !== "ALL") query.set("entryKind", input.entryKind);
+
+  const response = await fetch(`/api/finance/entries?${query.toString()}`, {
+    cache: "no-store",
+    headers: buildAuthHeaders(input.accessToken),
+  });
+
+  if (!response.ok) throw new Error("Nao foi possivel carregar lancamentos manuais.");
+  return (await response.json()) as FinancialEntriesResult;
+}
+
+export async function createFinancialEntry(
+  input: {
+    type: "INCOME" | "EXPENSE";
+    amountCents: number;
+    category: string;
+    description?: string;
+    occurredAt: string;
+    dueAt?: string | null;
+    settledAt?: string | null;
+    status?: "OPEN" | "PAID" | "CANCELLED";
+    entryKind?: "CASH" | "RECEIVABLE" | "PAYABLE";
+    accountCode?: string | null;
+    costCenter?: string | null;
+    counterparty?: string | null;
+    paymentMethod?: string | null;
+    documentUrl?: string | null;
+  },
+  accessToken?: string | null,
+): Promise<FinancialEntryRow> {
+  const response = await fetch("/api/finance/entries", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...buildAuthHeaders(accessToken),
+    },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json()) as { error?: { message?: string } };
+    throw new Error(payload.error?.message ?? "Nao foi possivel criar lancamento.");
+  }
+
+  const payload = (await response.json()) as { data: FinancialEntryRow };
+  return payload.data;
+}
+
+export async function patchFinancialEntry(
+  entryId: string,
+  action: "MARK_PAID" | "REOPEN" | "CANCEL",
+  accessToken?: string | null,
+): Promise<FinancialEntryRow> {
+  const response = await fetch(`/api/finance/entries/${entryId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      ...buildAuthHeaders(accessToken),
+    },
+    body: JSON.stringify({ action }),
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json()) as { error?: { message?: string } };
+    throw new Error(payload.error?.message ?? "Nao foi possivel atualizar lancamento.");
+  }
+
+  const payload = (await response.json()) as { data: FinancialEntryRow };
   return payload.data;
 }

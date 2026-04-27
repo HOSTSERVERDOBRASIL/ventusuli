@@ -1,4 +1,4 @@
-import crypto from "crypto";
+﻿import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { apiError } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
@@ -15,8 +15,7 @@ function generateInviteToken(): string {
 export async function POST(req: NextRequest, { params }: RouteParams) {
   const auth = getAuthContext(req);
   if (!auth) return apiError("UNAUTHORIZED", "Token de acesso ausente.", 401);
-  if (!isStaffRole(auth.role))
-    return apiError("FORBIDDEN", "Acesso restrito ao time administrativo.", 403);
+  if (!isStaffRole(auth.role)) return apiError("FORBIDDEN", "Acesso restrito ao time administrativo.", 403);
 
   const current = await prisma.organizationInvite.findFirst({
     where: {
@@ -72,7 +71,8 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       usedCount: resent.used_count,
       reusable: resent.max_uses === null,
       createdAt: resent.created_at,
-      signupUrl: `${req.nextUrl.origin}/register/atleta?token=${resent.token}`,
+      signupUrl: `${req.nextUrl.origin}/register/atleta?inviteToken=${resent.token}`,
     },
   });
 }
+

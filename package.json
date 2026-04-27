@@ -33,13 +33,7 @@
     "docker:prod:logs": "docker compose --env-file .env.production -f docker-compose.prod.yml logs -f app proxy db",
     "docker:prod:db:status": "docker compose --env-file .env.production -f docker-compose.prod.yml exec -T app ./node_modules/.bin/prisma migrate status",
     "docker:prod:db:migrate": "docker compose --env-file .env.production -f docker-compose.prod.yml exec -T app ./node_modules/.bin/prisma migrate deploy",
-    "docker:prod:db:seed": "docker compose --env-file .env.production -f docker-compose.prod.yml exec -T app npm run db:seed",
-    "postinstall": "prisma generate",
-    "cpanel:prepare": "node scripts/cpanel-prepare.mjs",
-    "cpanel:build": "npm run cpanel:prepare && npm run build",
-    "cpanel:start": "node scripts/cpanel-start.mjs",
-    "cpanel:migrate": "prisma migrate deploy",
-    "cpanel:seed": "node prisma/seed.js"
+    "docker:prod:db:seed": "docker compose --env-file .env.production -f docker-compose.prod.yml exec -T app npm run db:seed"
   },
   "keywords": [],
   "author": "",

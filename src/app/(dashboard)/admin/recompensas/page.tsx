@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -9,10 +9,7 @@ import { LoadingState } from "@/components/system/loading-state";
 import { PageHeader } from "@/components/system/page-header";
 import { SectionCard } from "@/components/system/section-card";
 import { StatusBadge } from "@/components/system/status-badge";
-import {
-  ACCEPTED_IMAGE_FILE_INPUT_ACCEPT,
-  uploadImageFile,
-} from "@/services/upload-service";
+import { uploadImageFile } from "@/services/upload-service";
 import { useAuthToken } from "@/components/auth/AuthTokenProvider";
 
 interface RewardItem {
@@ -47,7 +44,7 @@ const initialForm = {
   maxPointsDiscountPercent: "40",
   minimumCashCents: "0",
   allowPoints: true,
-  allowCash: false,
+  allowCash: true,
   allowMixed: true,
 };
 
@@ -182,6 +179,19 @@ export default function AdminRecompensasPage() {
     },
     { key: "price", header: "Preco", cell: (row) => BRL.format(row.cashPriceCents / 100) },
     { key: "points", header: "Pontos", cell: (row) => `${row.pointsCost} pts` },
+    {
+      key: "policy",
+      header: "Troca",
+      cell: (row) =>
+        row.allowMixed
+          ? `Pontos + PIX (max. ${row.maxPointsDiscountPercent}%)`
+          : row.allowPoints && row.cashPriceCents === 0
+            ? "Somente pontos"
+            : row.allowCash && !row.allowPoints
+              ? "Somente PIX"
+              : "Pontos",
+      className: "min-w-[170px]",
+    },
     { key: "stock", header: "Estoque", cell: (row) => String(row.stockQuantity) },
     {
       key: "active",
@@ -195,14 +205,14 @@ export default function AdminRecompensasPage() {
     },
     {
       key: "actions",
-      header: "Ações",
+      header: "AÃ§Ãµes",
       className: "min-w-[160px]",
       cell: (row) => (
         <div className="flex flex-nowrap gap-1.5">
           <label className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-lg border border-[#2f5d8f]/60 bg-[#12355d] px-2.5 text-[11px] font-semibold text-[#dce9ff] transition hover:bg-[#18436f] whitespace-nowrap">
             <input
               type="file"
-              accept={ACCEPTED_IMAGE_FILE_INPUT_ACCEPT}
+              accept="image/png,image/jpeg,image/jpg,image/webp,image/gif,image/svg+xml"
               className="hidden"
               onChange={async (event) => {
                 const file = event.target.files?.[0];
@@ -300,7 +310,7 @@ export default function AdminRecompensasPage() {
               <label className="inline-flex cursor-pointer items-center rounded-lg border border-white/[0.1] bg-white/[0.08] px-3 py-2 text-[12px] font-medium text-white/80 transition hover:bg-white/[0.14]">
                 <input
                   type="file"
-                  accept={ACCEPTED_IMAGE_FILE_INPUT_ACCEPT}
+                  accept="image/png,image/jpeg,image/jpg,image/webp,image/gif,image/svg+xml"
                   className="hidden"
                   disabled={uploadingImage}
                   onChange={async (event) => {
@@ -383,6 +393,47 @@ export default function AdminRecompensasPage() {
                 }
                 required
               />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                className="rounded-lg border border-white/[0.1] bg-white/[0.05] px-3 py-2 text-[13px] text-white"
+                placeholder="Minimo em PIX (centavos)"
+                type="number"
+                value={form.minimumCashCents}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, minimumCashCents: event.target.value }))
+                }
+                required
+              />
+              <div className="rounded-lg border border-white/[0.1] bg-white/[0.05] px-3 py-2 text-[12px] text-white/80">
+                Valor do ponto definido em Pontos admin
+              </div>
+            </div>
+            <div className="grid gap-2 rounded-lg border border-white/[0.1] bg-white/[0.04] p-3 text-[12px] text-white/80">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={form.allowPoints}
+                  onChange={(event) => setForm((prev) => ({ ...prev, allowPoints: event.target.checked }))}
+                />
+                Permitir troca com pontos
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={form.allowCash}
+                  onChange={(event) => setForm((prev) => ({ ...prev, allowCash: event.target.checked }))}
+                />
+                Permitir pagamento em PIX
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={form.allowMixed}
+                  onChange={(event) => setForm((prev) => ({ ...prev, allowMixed: event.target.checked }))}
+                />
+                Permitir pontos + PIX
+              </label>
             </div>
             <ActionButton type="submit" disabled={saving || !form.name.trim()} className="w-full">
               {saving ? "Salvando..." : "Criar recompensa"}
