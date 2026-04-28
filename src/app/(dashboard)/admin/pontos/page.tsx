@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ActionButton } from "@/components/system/action-button";
 import { DataTable, type DataTableColumn } from "@/components/system/data-table";
@@ -232,7 +232,7 @@ export default function AdminPontosPage() {
     proofUrl: "",
   });
 
-  const loadEntries = async () => {
+  const loadEntries = useCallback(async () => {
     const params = new URLSearchParams({
       page: String(entryMeta.page),
       limit: "20",
@@ -250,9 +250,9 @@ export default function AdminPontosPage() {
       page: payload.page ?? 1,
       totalPages: payload.totalPages ?? 1,
     });
-  };
+  }, [activityFilters.activityId, activityFilters.status, activityFilters.userId, entryMeta.page]);
 
-  const loadReport = async () => {
+  const loadReport = useCallback(async () => {
     if (!dateRange.start || !dateRange.end) {
       toast.error("Informe data inicial e final para carregar o relatorio.");
       return;
@@ -271,18 +271,12 @@ export default function AdminPontosPage() {
       if (filters.eventId) params.set("eventId", filters.eventId);
       if (filters.sourceType) params.set("sourceType", filters.sourceType);
 
-      const entriesParams = new URLSearchParams({ page: "1", limit: "20" });
-      if (activityFilters.status) entriesParams.set("status", activityFilters.status);
-      if (activityFilters.activityId) entriesParams.set("activityId", activityFilters.activityId);
-      if (activityFilters.userId) entriesParams.set("userId", activityFilters.userId);
-
       const [
         reportResponse,
         warningsResponse,
         policyResponse,
         rulesResponse,
         activitiesResponse,
-        entriesResponse,
         athletesResponse,
       ] = await Promise.all([
         fetch(`/api/admin/points/report?${params.toString()}`, { cache: "no-store" }),
@@ -290,7 +284,6 @@ export default function AdminPontosPage() {
         fetch("/api/admin/points/policy", { cache: "no-store" }),
         fetch("/api/admin/points/rules", { cache: "no-store" }),
         fetch("/api/admin/points/activities?active=true", { cache: "no-store" }),
-        fetch(`/api/admin/points/entries?${entriesParams.toString()}`, { cache: "no-store" }),
         fetch("/api/admin/athletes?status=ACTIVE&page=1&pageSize=100", { cache: "no-store" }),
       ]);
 
@@ -299,7 +292,6 @@ export default function AdminPontosPage() {
       const policyPayload = (await policyResponse.json()) as { data?: PointPolicy };
       const rulesPayload = (await rulesResponse.json()) as { data?: PointRule[]; events?: PointRuleEvent[] };
       const activitiesPayload = (await activitiesResponse.json()) as { data?: PointActivity[] };
-      const entriesPayload = (await entriesResponse.json()) as PointActivityEntriesResponse;
       const athletesPayload = (await athletesResponse.json()) as { data?: AthleteOption[] };
 
       if (!reportResponse.ok) throw new Error("points_report_unavailable");
@@ -311,12 +303,6 @@ export default function AdminPontosPage() {
       setEvents(rulesResponse.ok ? rulesPayload.events ?? [] : []);
       const nextActivities = activitiesResponse.ok ? activitiesPayload.data ?? [] : [];
       setActivities(nextActivities);
-      setEntries(entriesResponse.ok ? entriesPayload.data ?? [] : []);
-      setEntryMeta({
-        total: entriesResponse.ok ? entriesPayload.total ?? 0 : 0,
-        page: entriesResponse.ok ? entriesPayload.page ?? 1 : 1,
-        totalPages: entriesResponse.ok ? entriesPayload.totalPages ?? 1 : 1,
-      });
       setAthletes(athletesResponse.ok ? athletesPayload.data ?? [] : []);
       setEntryForm((prev) => {
         const activityId = prev.activityId || nextActivities[0]?.id || "";
@@ -340,17 +326,19 @@ export default function AdminPontosPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [dateRange.end, dateRange.start, filters.eventId, filters.sourceType]);
 
   useEffect(() => {
     void loadReport();
-  }, []);
+  }, [loadReport]);
 
   useEffect(() => {
-    if (!loading) {
-      void loadEntries();
-    }
-  }, [activityFilters.status, activityFilters.activityId, activityFilters.userId, entryMeta.page]);
+    void loadEntries();
+  }, [loadEntries]);
+
+  useEffect(() => {
+    setEntryMeta((prev) => (prev.page === 1 ? prev : { ...prev, page: 1 }));
+  }, [activityFilters.activityId, activityFilters.status, activityFilters.userId]);
 
   const runRecurrence = async () => {
     try {
@@ -518,7 +506,7 @@ export default function AdminPontosPage() {
         note: "",
         proofUrl: "",
       }));
-      await loadReport();
+      await Promise.all([loadReport(), loadEntries()]);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Nao foi possivel criar o lancamento.");
     } finally {
@@ -542,7 +530,7 @@ export default function AdminPontosPage() {
         throw new Error(payload.error?.message ?? "entry_review_error");
       }
       toast.success(action === "APPROVE" ? "Lancamento aprovado." : "Lancamento reprovado.");
-      await loadReport();
+      await Promise.all([loadReport(), loadEntries()]);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Nao foi possivel revisar o lancamento.");
     } finally {

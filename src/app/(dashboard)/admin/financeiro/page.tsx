@@ -158,7 +158,6 @@ export default function AdminFinanceiroPage() {
   const [customEnd, setCustomEnd] = useState(todayIso);
 
   const [rows, setRows] = useState<PaymentRow[]>([]);
-  const [summary, setSummary] = useState<PaymentSummary>(EMPTY_SUMMARY);
   const [queue, setQueue] = useState<PaymentQueueSummary>(EMPTY_QUEUE);
   const [filterOptions, setFilterOptions] = useState<PaymentFilterOptions>(EMPTY_FILTERS);
   const [loading, setLoading] = useState(true);
@@ -226,6 +225,22 @@ export default function AdminFinanceiroPage() {
     setEventName(eventParam ?? "");
   }, [searchParams]);
 
+  const filteredPaymentsSummary = useMemo<PaymentSummary>(
+    () =>
+      rows.reduce(
+        (acc, row) => {
+          acc.totalCobrado += row.amountCents;
+          if (row.status === "PAID") acc.totalPago += row.amountCents;
+          if (row.status === "PENDING") acc.totalPendente += row.amountCents;
+          if (row.status === "EXPIRED") acc.totalExpirado += row.amountCents;
+          if (row.status === "CANCELLED") acc.totalCancelado += row.amountCents;
+          return acc;
+        },
+        { ...EMPTY_SUMMARY },
+      ),
+    [rows],
+  );
+
   const filters = useMemo(() => {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -283,7 +298,6 @@ export default function AdminFinanceiroPage() {
         ]);
 
       setRows(payload.rows);
-      setSummary(payload.summary);
       setQueue(payload.queue);
       setFilterOptions(payload.filters);
       setManualEntries(entriesPayload.data);
@@ -295,7 +309,6 @@ export default function AdminFinanceiroPage() {
       setErrorMessage(null);
     } catch {
       setRows([]);
-      setSummary(EMPTY_SUMMARY);
       setQueue(EMPTY_QUEUE);
       setFilterOptions(EMPTY_FILTERS);
       setManualEntries([]);
@@ -461,20 +474,27 @@ export default function AdminFinanceiroPage() {
 
     const ensureBucket = (isoDate: string) => {
       const key = bucketKeyFromIso(isoDate, bucketMode);
-      if (!buckets.has(key)) {
+      let bucket = buckets.get(key);
+      if (!bucket) {
         buckets.set(key, {
           label: bucketMode === "month" ? formatMonthLabel(`${key}-01T00:00:00.000Z`) : formatShortDate(`${key}T00:00:00.000Z`),
           inflowCents: 0,
           outflowCents: 0,
         });
+        bucket = buckets.get(key);
       }
-      return buckets.get(key)!;
+      if (!bucket) {
+        throw new Error("cash_flow_bucket_unavailable");
+      }
+      return bucket;
     };
 
     periodPayments
       .filter((row) => row.status === "PAID" && row.paidAt)
       .forEach((row) => {
-        const bucket = ensureBucket(row.paidAt!);
+        const paidAt = row.paidAt;
+        if (!paidAt) return;
+        const bucket = ensureBucket(paidAt);
         bucket.inflowCents += row.amountCents;
       });
 
@@ -800,9 +820,9 @@ export default function AdminFinanceiroPage() {
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <MetricCard label="Recebido no periodo" value={BRL.format(periodPaymentSummary.totalPago / 100)} tone="highlight" />
-          <MetricCard label="Titulos pendentes" value={queue.totalOpenCount} />
+          <MetricCard label="Titulos pendentes" value={pendingRows.length} />
           <MetricCard label="Lancamentos no caixa" value={cashEntries.length} />
-          <MetricCard label="Contas em aberto" value={ledgerOpenCount + cashEntriesOpen} />
+          <MetricCard label="Contas em aberto" value={ledgerOpenCount + queue.totalOpenCount + cashEntriesOpen} />
         </div>
       </SectionCard>
 
@@ -1242,6 +1262,12 @@ export default function AdminFinanceiroPage() {
       </SectionCard>
 
       <SectionCard title="Cobrancas" description="Tabela operacional de cobranca e conciliacao">
+        <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <MetricCard label="Cobrado no filtro" value={BRL.format(filteredPaymentsSummary.totalCobrado / 100)} />
+          <MetricCard label="Pago no filtro" value={BRL.format(filteredPaymentsSummary.totalPago / 100)} tone="highlight" />
+          <MetricCard label="Em aberto no filtro" value={BRL.format(filteredPaymentsSummary.totalPendente / 100)} />
+          <MetricCard label="Recebimentos filtrados" value={BRL.format(paidRowsAmount / 100)} />
+        </div>
         {loading ? (
           <LoadingState lines={4} />
         ) : rows.length === 0 ? (
@@ -1260,8 +1286,8 @@ export default function AdminFinanceiroPage() {
             <div className="grid gap-3 md:grid-cols-4">
               <MetricCard label="A receber" value={BRL.format(manualSummary.openReceivableCents / 100)} tone="highlight" />
               <MetricCard label="A pagar" value={BRL.format(manualSummary.openPayableCents / 100)} />
-              <MetricCard label="Titulos a receber" value={ledgerReceivableOpenCount} />
-              <MetricCard label="Titulos a pagar" value={ledgerPayableOpenCount} />
+              <MetricCard label="Titulos a receber" value={Math.max(ledgerReceivableOpenCount, receivableEntries.length)} />
+              <MetricCard label="Titulos a pagar" value={Math.max(ledgerPayableOpenCount, payableEntries.length)} />
             </div>
 
             <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">

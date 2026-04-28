@@ -17,16 +17,14 @@
 # misc
 .DS_Store
 *.pem
-<<<<<<< HEAD
 .claude/
 public/uploads/
-=======
->>>>>>> ae14154 (primeiro commit)
 
 # debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+next-start*.log
 
 # local env files
 .env*.local
@@ -38,10 +36,4 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-<<<<<<< HEAD
-.env
-node_modules/
-.next/
 dist/
-=======
->>>>>>> ae14154 (primeiro commit)
