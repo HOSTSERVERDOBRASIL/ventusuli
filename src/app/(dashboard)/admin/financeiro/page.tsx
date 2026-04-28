@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -92,57 +91,6 @@ const WORKSPACE_LABELS: Record<FinanceWorkspace, string> = {
   cashbook: "Livro-caixa",
   ledger: "Contas e recebimentos",
 };
-
-function FinanceVisualBanner({
-  receivedCents,
-  pendingCount,
-  openCount,
-}: {
-  receivedCents: number;
-  pendingCount: number;
-  openCount: number;
-}) {
-  return (
-    <section className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#0b1d33] shadow-[0_18px_50px_rgba(0,0,0,0.22)]">
-      <Image
-        src="/auth/beira-mar.png"
-        alt="Beira-Mar Norte em Florianopolis"
-        fill
-        priority
-        sizes="(min-width: 1280px) 1180px, 100vw"
-        className="object-cover opacity-45"
-      />
-      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(7,17,31,0.96),rgba(7,17,31,0.76),rgba(7,17,31,0.48))]" />
-      <div className="relative grid min-h-[210px] gap-6 p-5 sm:p-6 lg:grid-cols-[1.05fr_0.95fr] lg:p-7">
-        <div className="flex max-w-2xl flex-col justify-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#f7b529]">
-            Operacao financeira
-          </p>
-          <h2 className="mt-3 text-2xl font-semibold leading-tight text-white sm:text-3xl">
-            Cobrancas, caixa e contas abertas no mesmo painel.
-          </h2>
-          <p className="mt-3 max-w-xl text-sm leading-6 text-slate-200">
-            Acompanhe o dinheiro recebido, priorize pendencias e mantenha a conciliacao pronta para decisao.
-          </p>
-        </div>
-        <div className="grid content-end gap-3 sm:grid-cols-3 lg:content-center">
-          <div className="rounded-xl border border-white/12 bg-black/25 p-4 backdrop-blur-sm">
-            <p className="text-xs uppercase tracking-[0.16em] text-slate-300">Recebido</p>
-            <p className="mt-2 text-lg font-semibold text-white">{BRL.format(receivedCents / 100)}</p>
-          </div>
-          <div className="rounded-xl border border-white/12 bg-black/25 p-4 backdrop-blur-sm">
-            <p className="text-xs uppercase tracking-[0.16em] text-slate-300">Pendentes</p>
-            <p className="mt-2 text-lg font-semibold text-white">{pendingCount}</p>
-          </div>
-          <div className="rounded-xl border border-white/12 bg-black/25 p-4 backdrop-blur-sm">
-            <p className="text-xs uppercase tracking-[0.16em] text-slate-300">Em aberto</p>
-            <p className="mt-2 text-lg font-semibold text-white">{openCount}</p>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
 
 function paymentTone(status: PaymentRow["status"]): "positive" | "warning" | "danger" | "neutral" {
   if (status === "PAID") return "positive";
@@ -853,12 +801,6 @@ export default function AdminFinanceiroPage() {
             </ActionButton>
           </div>
         }
-      />
-
-      <FinanceVisualBanner
-        receivedCents={periodPaymentSummary.totalPago}
-        pendingCount={pendingRows.length}
-        openCount={ledgerOpenCount + queue.totalOpenCount + cashEntriesOpen}
       />
 
       <SectionCard
