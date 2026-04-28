@@ -99,13 +99,13 @@ function SocialButton({
     <button
       type="button"
       onClick={onClick}
-      className="flex h-16 items-center justify-center gap-3 rounded-2xl border border-white/12 bg-white/5 text-base font-semibold text-white transition hover:border-white/30 hover:bg-white/8"
+      className="flex h-14 items-center justify-center gap-3 rounded-2xl border border-white/12 bg-white/5 px-4 text-sm font-semibold text-white transition hover:border-white/30 hover:bg-white/8 sm:h-16 sm:text-base"
       aria-label={`Entrar com ${label}`}
     >
-      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-lg font-bold text-[#0b1324]">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-lg font-bold text-[#0b1324]">
         {brand}
       </span>
-      <span className="hidden sm:inline">{label}</span>
+      <span>{label}</span>
     </button>
   );
 }
@@ -254,7 +254,7 @@ export function LoginForm() {
     >
       {demoUiEnabled ? (
         <section className="mb-6 rounded-[1.6rem] border border-[#f7b529]/20 bg-[#f7b529]/8 p-4">
-          <div className="flex items-center gap-3">
+          <div className="flex items-start gap-3">
             <ShieldCheck className="h-5 w-5 text-[#f7b529]" />
             <div>
               <p className="text-sm font-semibold text-white">Modo demonstracao</p>
@@ -352,16 +352,16 @@ export function LoginForm() {
         <Button
           type="submit"
           disabled={isSubmitting || !isValid}
-          className="h-16 w-full rounded-2xl bg-[#f7b529] text-lg font-bold text-[#0a1220] shadow-[0_18px_45px_rgba(247,181,41,0.3)] hover:bg-[#ffbf3e]"
+          className="h-auto min-h-14 w-full rounded-2xl bg-[#f7b529] px-5 py-4 text-base font-bold text-[#0a1220] shadow-[0_18px_45px_rgba(247,181,41,0.3)] hover:bg-[#ffbf3e] sm:min-h-16 sm:text-lg"
         >
           {isSubmitting ? (
-            <span className="flex items-center gap-2">
+            <span className="flex items-center justify-center gap-2 text-center">
               <Loader2 className="h-5 w-5 animate-spin" />
               Validando acesso...
             </span>
           ) : (
-            <span className="flex items-center gap-3">
-              ACESSAR MINHA EVOLUCAO
+            <span className="flex items-center justify-center gap-2 text-center leading-5 sm:gap-3">
+              <span>ACESSAR MINHA EVOLUCAO</span>
               <ArrowRight className="h-5 w-5" />
             </span>
           )}
@@ -372,7 +372,7 @@ export function LoginForm() {
           <div className="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-white/10" />
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <SocialButton label="Google" brand="G" onClick={() => notifySocialLogin("Google")} />
           <SocialButton label="Apple" brand="A" onClick={() => notifySocialLogin("Apple")} />
           <SocialButton label="Facebook" brand="f" onClick={() => notifySocialLogin("Facebook")} />
