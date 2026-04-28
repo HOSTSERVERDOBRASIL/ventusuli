@@ -145,6 +145,18 @@ export function AuthShell({
               </Link>
             </div>
 
+            <div className="mb-5 grid grid-cols-3 gap-2 lg:hidden">
+              {showcaseCards.map((card) => (
+                <div key={card.title} className="relative aspect-[1.35] overflow-hidden rounded-xl border border-white/12">
+                  <Image src={card.image} alt={card.title} fill sizes="33vw" className="object-cover" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                  <p className="absolute bottom-2 left-2 right-2 text-[0.62rem] font-semibold uppercase tracking-[0.08em] text-white">
+                    {card.title}
+                  </p>
+                </div>
+              ))}
+            </div>
+
             <div className="rounded-[2rem] border border-white/14 bg-[linear-gradient(180deg,rgba(9,18,34,0.96),rgba(6,12,25,0.92))] p-6 shadow-[0_30px_100px_rgba(0,0,0,0.55)] backdrop-blur-xl sm:p-8 lg:p-10">
               <div className="mb-8">
                 <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#f7b529]">Acesso seguro</p>

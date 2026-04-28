@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { toast } from "sonner";
 import { ActionButton } from "@/components/system/action-button";
 import { DataTable, type DataTableColumn } from "@/components/system/data-table";
@@ -185,6 +186,57 @@ function statusLabel(status: PointActivityEntry["status"]) {
 
 function sourceLabel(source: PointActivityEntry["source"]) {
   return source === "ADMIN" ? "Lancado pelo admin" : "Solicitado pelo usuario";
+}
+
+function PointsVisualBanner({
+  issuedPoints,
+  pendingCount,
+  activeActivities,
+}: {
+  issuedPoints: number;
+  pendingCount: number;
+  activeActivities: number;
+}) {
+  return (
+    <section className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#0b1d33] shadow-[0_18px_50px_rgba(0,0,0,0.22)]">
+      <Image
+        src="/auth/campeche.webp"
+        alt="Praia do Campeche em Florianopolis"
+        fill
+        priority
+        sizes="(min-width: 1280px) 1180px, 100vw"
+        className="object-cover opacity-45"
+      />
+      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(7,17,31,0.96),rgba(7,17,31,0.74),rgba(7,17,31,0.5))]" />
+      <div className="relative grid min-h-[210px] gap-6 p-5 sm:p-6 lg:grid-cols-[1.05fr_0.95fr] lg:p-7">
+        <div className="flex max-w-2xl flex-col justify-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#f7b529]">
+            Programa de pontos
+          </p>
+          <h2 className="mt-3 text-2xl font-semibold leading-tight text-white sm:text-3xl">
+            Recompense participacao sem perder controle de aprovacao.
+          </h2>
+          <p className="mt-3 max-w-xl text-sm leading-6 text-slate-200">
+            Visualize emissao, fila de revisao e atividades ativas antes de liberar saldo para os associados.
+          </p>
+        </div>
+        <div className="grid content-end gap-3 sm:grid-cols-3 lg:content-center">
+          <div className="rounded-xl border border-white/12 bg-black/25 p-4 backdrop-blur-sm">
+            <p className="text-xs uppercase tracking-[0.16em] text-slate-300">Emitidos</p>
+            <p className="mt-2 text-lg font-semibold text-white">{issuedPoints} pts</p>
+          </div>
+          <div className="rounded-xl border border-white/12 bg-black/25 p-4 backdrop-blur-sm">
+            <p className="text-xs uppercase tracking-[0.16em] text-slate-300">Pendentes</p>
+            <p className="mt-2 text-lg font-semibold text-white">{pendingCount}</p>
+          </div>
+          <div className="rounded-xl border border-white/12 bg-black/25 p-4 backdrop-blur-sm">
+            <p className="text-xs uppercase tracking-[0.16em] text-slate-300">Atividades</p>
+            <p className="mt-2 text-lg font-semibold text-white">{activeActivities}</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
 }
 
 export default function AdminPontosPage() {
@@ -722,6 +774,12 @@ export default function AdminPontosPage() {
             </ActionButton>
           </form>
         }
+      />
+
+      <PointsVisualBanner
+        issuedPoints={report?.totalPointsIssued ?? 0}
+        pendingCount={pendingEntries.length}
+        activeActivities={activities.length}
       />
 
       {loading || !report ? (
