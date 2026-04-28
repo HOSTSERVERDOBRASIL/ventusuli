@@ -253,7 +253,7 @@ export function LoginForm() {
       description="Faca login para continuar sua jornada com seguranca, consistencia e foco em evolucao."
     >
       {demoUiEnabled ? (
-        <section className="mb-6 rounded-[1.6rem] border border-[#f7b529]/20 bg-[#f7b529]/8 p-4">
+        <section className="mb-4 hidden rounded-[1.6rem] border border-[#f7b529]/20 bg-[#f7b529]/8 p-4 sm:block">
           <div className="flex items-start gap-3">
             <ShieldCheck className="h-5 w-5 text-[#f7b529]" />
             <div>
@@ -282,7 +282,7 @@ export function LoginForm() {
         </section>
       ) : null}
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-3.5 sm:space-y-5">
         {error ? (
           <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
             {error}
@@ -300,7 +300,7 @@ export function LoginForm() {
               type="email"
               placeholder="seu@email.com"
               autoComplete="email"
-              className="h-16 rounded-2xl border-white/12 bg-white/6 pl-12 text-base text-white placeholder:text-slate-400 focus-visible:ring-[#f7b529]"
+              className="h-14 rounded-2xl border-white/12 bg-white/6 pl-12 text-base text-white placeholder:text-slate-400 focus-visible:ring-[#f7b529] sm:h-16"
               {...register("email")}
             />
           </div>
@@ -318,7 +318,7 @@ export function LoginForm() {
               type={showPassword ? "text" : "password"}
               placeholder="Digite sua senha"
               autoComplete="current-password"
-              className="h-16 rounded-2xl border-white/12 bg-white/6 pl-12 pr-12 text-base text-white placeholder:text-slate-400 focus-visible:ring-[#f7b529]"
+              className="h-14 rounded-2xl border-white/12 bg-white/6 pl-12 pr-12 text-base text-white placeholder:text-slate-400 focus-visible:ring-[#f7b529] sm:h-16"
               {...register("password")}
             />
             <button
@@ -335,7 +335,7 @@ export function LoginForm() {
           ) : null}
         </div>
 
-        <div className="flex flex-col gap-3 text-sm text-slate-300 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-2 text-sm text-slate-300 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
           <label className="flex items-center gap-3">
             <input
               type="checkbox"
@@ -352,7 +352,7 @@ export function LoginForm() {
         <Button
           type="submit"
           disabled={isSubmitting || !isValid}
-          className="h-auto min-h-14 w-full rounded-2xl bg-[#f7b529] px-5 py-4 text-base font-bold text-[#0a1220] shadow-[0_18px_45px_rgba(247,181,41,0.3)] hover:bg-[#ffbf3e] sm:min-h-16 sm:text-lg"
+          className="h-auto min-h-12 w-full rounded-2xl bg-[#f7b529] px-4 py-3 text-sm font-bold text-[#0a1220] shadow-[0_18px_45px_rgba(247,181,41,0.3)] hover:bg-[#ffbf3e] sm:min-h-16 sm:px-5 sm:py-4 sm:text-lg"
         >
           {isSubmitting ? (
             <span className="flex items-center justify-center gap-2 text-center">
@@ -367,12 +367,12 @@ export function LoginForm() {
           )}
         </Button>
 
-        <div className="relative py-2 text-center">
-          <span className="relative z-10 bg-[#091223] px-4 text-sm text-slate-400">ou continue com</span>
+        <div className="relative py-1 text-center">
+          <span className="relative z-10 bg-[#091223] px-3 text-xs text-slate-400 sm:px-4 sm:text-sm">ou continue com</span>
           <div className="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-white/10" />
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="hidden gap-3 sm:grid sm:grid-cols-3">
           <SocialButton label="Google" brand="G" onClick={() => notifySocialLogin("Google")} />
           <SocialButton label="Apple" brand="A" onClick={() => notifySocialLogin("Apple")} />
           <SocialButton label="Facebook" brand="f" onClick={() => notifySocialLogin("Facebook")} />
@@ -386,8 +386,8 @@ export function LoginForm() {
             </Link>
           </p>
         ) : (
-          <div className="space-y-2 text-center text-sm text-slate-400">
-            <p>Cadastro de assessoria por convite comercial.</p>
+          <div className="space-y-1.5 text-center text-xs text-slate-400 sm:space-y-2 sm:text-sm">
+            <p className="hidden sm:block">Cadastro de assessoria por convite comercial.</p>
             <p>
               Sou atleta e tenho convite:{" "}
               <Link href="/register/atleta" className="font-semibold text-[#f7b529] hover:text-[#ffd27a]">

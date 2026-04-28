@@ -120,7 +120,7 @@ export function AuthShell({
           </div>
         </section>
 
-        <section className="relative flex min-h-svh items-center justify-center px-3 py-5 sm:px-6 sm:py-8 lg:px-8">
+        <section className="relative flex h-svh items-center justify-center overflow-hidden px-3 py-3 sm:min-h-svh sm:px-6 sm:py-8 lg:px-8">
           <div className="absolute inset-0 lg:hidden">
             <Image
               src="/auth/hercules-sunrise.webp"
@@ -133,7 +133,7 @@ export function AuthShell({
           </div>
 
           <div className="relative z-10 w-full max-w-[34rem]">
-            <div className="mb-5 flex items-center justify-between lg:hidden">
+            <div className="mb-3 flex items-center justify-between sm:mb-5 lg:hidden">
               <Link href="/login" className="flex items-center gap-3">
                 <Image
                   src="/auth/ventu-suli-logo.png"
@@ -151,7 +151,7 @@ export function AuthShell({
               </Link>
             </div>
 
-            <div className="mb-4 grid grid-cols-2 gap-2 sm:mb-5 sm:grid-cols-3 lg:hidden">
+            <div className="mb-4 hidden grid-cols-2 gap-2 sm:mb-5 sm:grid sm:grid-cols-3 lg:hidden">
               {showcaseCards.map((card) => (
                 <div
                   key={card.title}
@@ -166,11 +166,13 @@ export function AuthShell({
               ))}
             </div>
 
-            <div className="rounded-[1.75rem] border border-white/14 bg-[linear-gradient(180deg,rgba(9,18,34,0.96),rgba(6,12,25,0.92))] p-4 shadow-[0_30px_100px_rgba(0,0,0,0.55)] backdrop-blur-xl sm:rounded-[2rem] sm:p-8 lg:p-10">
-              <div className="mb-6 sm:mb-8">
-                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#f7b529]">Acesso seguro</p>
-                <h2 className="mt-3 text-3xl font-semibold leading-tight text-white sm:text-4xl">{title}</h2>
-                <p className="mt-3 max-w-lg text-sm leading-6 text-slate-300 sm:text-base sm:leading-7">{description}</p>
+            <div className="rounded-[1.5rem] border border-white/14 bg-[linear-gradient(180deg,rgba(9,18,34,0.96),rgba(6,12,25,0.92))] p-3.5 shadow-[0_30px_100px_rgba(0,0,0,0.55)] backdrop-blur-xl sm:rounded-[2rem] sm:p-8 lg:p-10">
+              <div className="mb-4 sm:mb-8">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#f7b529] sm:text-sm sm:tracking-[0.24em]">
+                  Acesso seguro
+                </p>
+                <h2 className="mt-2 text-[1.75rem] font-semibold leading-tight text-white sm:mt-3 sm:text-4xl">{title}</h2>
+                <p className="mt-2 max-w-lg text-sm leading-5 text-slate-300 sm:mt-3 sm:text-base sm:leading-7">{description}</p>
               </div>
               {children}
             </div>
