@@ -1,6 +1,18 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { MfaMethod } from "@prisma/client";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyPassword, generateAccessToken, generateRefreshToken, hashRefreshToken } from "@/lib/auth";
+import { generateAccessToken, generateRefreshToken } from "@/lib/auth";
+import { verifyPassword } from "@/lib/auth";
+import {
+  createChallengeToken,
+  generateTotpSecret,
+  getAvailableMfaMethods,
+  isMfaMandatoryForRole,
+  maskEmail,
+  MFA_LOGIN_TTL_MS,
+  MFA_MAX_ATTEMPTS,
+} from "@/lib/auth-mfa";
+import { createSessionTokens } from "@/lib/auth-session";
 import { loginSchema } from "@/lib/validations/auth";
 import { apiError } from "@/lib/api-error";
 import { clearAccessCookie, clearRefreshCookie, setAccessCookie, setRefreshCookie } from "@/lib/cookies";
@@ -9,7 +21,6 @@ import { getAuthConfigError, isDemoRuntimeEnabled, isProductionRuntime } from "@
 import { logError, logWarn, toErrorContext, withRequestContext } from "@/lib/logger";
 import { UserRole } from "@/types";
 
-const REFRESH_TTL_DAYS = 30;
 const RATE_LIMIT = 5;
 const RATE_WINDOW_MS = 15 * 60 * 1_000;
 const DEMO_EMAIL = process.env.DEMO_EMAIL ?? "admin@ventu.demo";
@@ -38,6 +49,69 @@ function accountStatusMessage(
     return "Conta suspensa. Entre em contato com a assessoria.";
   }
   return "Conta temporariamente indisponivel.";
+}
+
+async function resolveHasCpf(userId: string, role: UserRole): Promise<boolean> {
+  if (role !== UserRole.ATHLETE) return true;
+
+  const athleteProfile = await prisma.athleteProfile.findUnique({
+    where: { user_id: userId },
+    select: { cpf: true },
+  });
+
+  return Boolean(athleteProfile?.cpf);
+}
+
+async function createMfaChallenge(params: {
+  userId: string;
+  organizationId: string;
+  rememberMe: boolean;
+  email: string;
+  setupRequired: boolean;
+  emailOtpEnabled: boolean;
+}) {
+  const { rawToken, tokenHash } = createChallengeToken();
+  const expiresAt = new Date(Date.now() + MFA_LOGIN_TTL_MS);
+  const availableMethods = params.setupRequired
+    ? [MfaMethod.TOTP]
+    : getAvailableMfaMethods(params.emailOtpEnabled);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.authChallenge.updateMany({
+      where: {
+        user_id: params.userId,
+        purpose: params.setupRequired ? "MFA_SETUP" : "LOGIN_MFA",
+        consumed_at: null,
+      },
+      data: { consumed_at: new Date() },
+    });
+
+    await tx.authChallenge.create({
+      data: {
+        user_id: params.userId,
+        organization_id: params.organizationId,
+        purpose: params.setupRequired ? "MFA_SETUP" : "LOGIN_MFA",
+        token_hash: tokenHash,
+        primary_method: MfaMethod.TOTP,
+        available_methods: availableMethods,
+        remember_me: params.rememberMe,
+        max_attempts: MFA_MAX_ATTEMPTS,
+        expires_at: expiresAt,
+        temp_totp_secret: params.setupRequired ? generateTotpSecret() : null,
+        metadata: {
+          maskedEmail: maskEmail(params.email),
+        },
+      },
+    });
+  });
+
+  return {
+    mfa_required: true as const,
+    mfa_token: rawToken,
+    mfa_setup_required: params.setupRequired,
+    available_methods: availableMethods,
+    masked_email: maskEmail(params.email),
+  };
 }
 
 export async function POST(req: NextRequest) {
@@ -97,7 +171,7 @@ export async function POST(req: NextRequest) {
     return apiError("VALIDATION_ERROR", parsed.error.errors[0]?.message ?? "Dados invalidos.", 400);
   }
 
-  const { email, password } = parsed.data;
+  const { email, password, rememberMe } = parsed.data;
   const demoEnabled = isDemoRuntimeEnabled();
 
   if (isProductionRuntime() && isReservedDemoEmail(email)) {
@@ -132,7 +206,6 @@ export async function POST(req: NextRequest) {
         email: true,
         role: true,
         organization_id: true,
-        account_status: true,
       },
     });
 
@@ -143,16 +216,14 @@ export async function POST(req: NextRequest) {
       return response;
     }
 
-    const demoAccessToken = generateAccessToken(demoUser.id, demoUser.role as UserRole, demoUser.organization_id, "ACTIVE", "7d");
-
-    let hasCpf = true;
-    if (demoUser.role === UserRole.ATHLETE) {
-      const athleteProfile = await prisma.athleteProfile.findUnique({
-        where: { user_id: demoUser.id },
-        select: { cpf: true },
-      });
-      hasCpf = Boolean(athleteProfile?.cpf);
-    }
+    const accessToken = generateAccessToken(
+      demoUser.id,
+      demoUser.role as UserRole,
+      demoUser.organization_id,
+      "ACTIVE",
+      "7d",
+    );
+    const hasCpf = await resolveHasCpf(demoUser.id, demoUser.role as UserRole);
 
     const response = NextResponse.json(
       {
@@ -163,7 +234,7 @@ export async function POST(req: NextRequest) {
           role: demoUser.role,
         },
         profile: { hasCpf },
-        accessToken: demoAccessToken,
+        accessToken,
       },
       {
         status: 200,
@@ -176,8 +247,8 @@ export async function POST(req: NextRequest) {
       },
     );
 
-    setAccessCookie(response, demoAccessToken, 7 * 24 * 60 * 60);
-    setRefreshCookie(response, generateRefreshToken());
+    setAccessCookie(response, accessToken, 7 * 24 * 60 * 60);
+    setRefreshCookie(response, generateRefreshToken(), rememberMe);
     return response;
   }
 
@@ -198,6 +269,13 @@ export async function POST(req: NextRequest) {
         select: {
           status: true,
           setup_completed_at: true,
+        },
+      },
+      mfa_settings: {
+        select: {
+          enabled: true,
+          totp_secret: true,
+          email_otp_enabled: true,
         },
       },
     },
@@ -226,46 +304,58 @@ export async function POST(req: NextRequest) {
   }
 
   const role = user.role as UserRole;
-  const accessToken = generateAccessToken(user.id, role, user.organization_id, "ACTIVE");
-  const refreshToken = generateRefreshToken();
-  const token_hash = hashRefreshToken(refreshToken);
-  const expires_at = new Date(Date.now() + REFRESH_TTL_DAYS * 24 * 60 * 60 * 1_000);
+  const mfaEnabled = Boolean(user.mfa_settings?.enabled && user.mfa_settings?.totp_secret);
+  const mfaRequired = mfaEnabled || isMfaMandatoryForRole(role);
 
-  const hasCpf = await prisma.$transaction(async (tx) => {
-    await tx.user.update({
-      where: { id: user.id },
-      data: { last_login_at: new Date() },
+  if (mfaRequired) {
+    const challenge = await createMfaChallenge({
+      userId: user.id,
+      organizationId: user.organization_id,
+      rememberMe,
+      email: user.email,
+      setupRequired: !mfaEnabled,
+      emailOtpEnabled: user.mfa_settings?.email_otp_enabled ?? true,
     });
 
-    await tx.refreshToken.create({
-      data: {
-        user_id: user.id,
-        organization_id: user.organization_id,
-        token_hash,
-        expires_at,
+    return NextResponse.json(challenge, {
+      status: 200,
+      headers: {
+        "Cache-Control": "no-store",
+        "X-RateLimit-Limit": String(RATE_LIMIT),
+        "X-RateLimit-Remaining": String(remaining),
+        "X-RateLimit-Reset": String(Math.ceil(resetAt / 1_000)),
       },
     });
+  }
 
-    if (role !== UserRole.ATHLETE) return true;
+  const hasCpf = await resolveHasCpf(user.id, role);
 
-    const athleteProfile = await tx.athleteProfile.findUnique({
-      where: { user_id: user.id },
-      select: { cpf: true },
-    });
-
-    return Boolean(athleteProfile?.cpf);
+  const { accessToken, refreshToken } = await createSessionTokens({
+    userId: user.id,
+    role,
+    organizationId: user.organization_id,
+    rememberMe,
   });
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { last_login_at: new Date() },
+  });
+
+  const responseBody = {
+    user: { id: user.id, name: user.name, email: user.email, role },
+    profile: { hasCpf },
+    organization: user.organization
+      ? {
+          status: user.organization.status,
+          setup_completed_at: user.organization.setup_completed_at,
+        }
+      : null,
+  };
 
   const response = NextResponse.json(
     {
-      user: { id: user.id, name: user.name, email: user.email, role },
-      profile: { hasCpf },
-      organization: user.organization
-        ? {
-            status: user.organization.status,
-            setup_completed_at: user.organization.setup_completed_at,
-          }
-        : null,
+      ...responseBody,
       accessToken,
     },
     {
@@ -279,7 +369,8 @@ export async function POST(req: NextRequest) {
     },
   );
 
-  setRefreshCookie(response, refreshToken);
   setAccessCookie(response, accessToken);
+  setRefreshCookie(response, refreshToken, rememberMe);
+
   return response;
 }

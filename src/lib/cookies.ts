@@ -5,6 +5,7 @@ export const REFRESH_TOKEN_COOKIE = "vs_refresh_token";
 export const ACCESS_TOKEN_COOKIE = "vs_access_token";
 
 const REFRESH_TOKEN_TTL_DAYS = 30;
+const SHORT_REFRESH_TOKEN_TTL_DAYS = 1;
 const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
 
 function baseCookieOptions(path: string, maxAge: number): Partial<ResponseCookie> {
@@ -28,11 +29,14 @@ export function setAccessCookie(
   response.cookies.set(ACCESS_TOKEN_COOKIE, token, baseCookieOptions("/", maxAgeSeconds));
 }
 
-export function setRefreshCookie(response: NextResponse, token: string): void {
+export function setRefreshCookie(response: NextResponse, token: string, rememberMe = true): void {
   response.cookies.set(
     REFRESH_TOKEN_COOKIE,
     token,
-    baseCookieOptions("/api/auth", REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60),
+    baseCookieOptions(
+      "/api/auth",
+      (rememberMe ? REFRESH_TOKEN_TTL_DAYS : SHORT_REFRESH_TOKEN_TTL_DAYS) * 24 * 60 * 60,
+    ),
   );
 }
 

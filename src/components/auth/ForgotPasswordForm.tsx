@@ -5,11 +5,10 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, Mail } from "lucide-react";
 import { z } from "zod";
 import { forgotPasswordSchema } from "@/lib/validations/auth";
-import { AuthCard } from "@/components/ui/auth-card";
-import { Label } from "@/components/ui/label";
+import { AuthShell } from "@/components/auth/AuthShell";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
@@ -63,31 +62,37 @@ export function ForgotPasswordForm() {
   };
 
   return (
-    <AuthCard title="Esqueci minha senha" description="Informe seu email para recuperar o acesso.">
+    <AuthShell
+      title="Recupere seu acesso"
+      description="Informe seu email para receber o link de redefinicao e retomar sua jornada."
+    >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         <div className="space-y-2">
-          <Label htmlFor="email" className="text-slate-100">
-            Email
-          </Label>
-          <Input
-            id="email"
-            type="email"
-            placeholder="voce@assessoria.com"
-            autoComplete="email"
-            className="border-white/15 bg-[#0F2743] text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]"
-            {...register("email")}
-          />
+          <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300" htmlFor="email">
+            E-mail
+          </label>
+          <div className="relative">
+            <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+            <Input
+              id="email"
+              type="email"
+              placeholder="voce@assessoria.com"
+              autoComplete="email"
+              className="h-16 rounded-2xl border-white/12 bg-white/6 pl-12 text-white placeholder:text-slate-400 focus-visible:ring-[#f7b529]"
+              {...register("email")}
+            />
+          </div>
           {errors.email ? <p className="text-xs text-amber-300">{errors.email.message}</p> : null}
         </div>
 
         <Button
           type="submit"
           disabled={isSubmitting}
-          className="h-11 w-full bg-[#F5A623] font-semibold text-[#0A1628] hover:bg-[#e59a1f]"
+          className="h-16 w-full rounded-2xl bg-[#f7b529] text-base font-bold text-[#091223] hover:bg-[#ffbf3e]"
         >
           {isSubmitting ? (
             <span className="flex items-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="h-5 w-5 animate-spin" />
               Enviando...
             </span>
           ) : (
@@ -112,12 +117,12 @@ export function ForgotPasswordForm() {
         ) : null}
 
         <p className="text-center text-sm text-slate-200">
-          Lembrou a senha?{" "}
-          <Link href="/login" className="font-semibold text-[#F5A623] hover:underline">
+          <Link href="/login" className="inline-flex items-center gap-2 font-semibold text-[#f7b529] hover:text-[#ffd27a]">
+            <ArrowLeft className="h-4 w-4" />
             Entrar
           </Link>
         </p>
       </form>
-    </AuthCard>
+    </AuthShell>
   );
 }

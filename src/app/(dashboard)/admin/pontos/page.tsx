@@ -1,6 +1,6 @@
-﻿"use client";
+"use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ActionButton } from "@/components/system/action-button";
 import { DataTable, type DataTableColumn } from "@/components/system/data-table";
@@ -70,13 +70,72 @@ interface PointPolicy {
   athletePolicyText: string;
 }
 
+interface PointActivity {
+  id: string;
+  organizationId: string;
+  name: string;
+  description: string | null;
+  suggestedPoints: number;
+  activityDate: string;
+  active: boolean;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface PointActivityEntry {
+  id: string;
+  organizationId: string;
+  activityId: string;
+  userId: string;
+  points: number;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  source: "ADMIN" | "USER";
+  note: string | null;
+  proofUrl: string | null;
+  referenceCode: string;
+  ledgerEntryId: string | null;
+  createdBy: string;
+  approvedBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+  approvedAt: string | null;
+  rejectedAt: string | null;
+  activityName: string | null;
+  userName: string | null;
+  userEmail: string | null;
+}
+
+interface PointActivityEntriesResponse {
+  data: PointActivityEntry[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
+interface AthleteOption {
+  id: string;
+  name: string;
+  email: string;
+  memberNumber: string | null;
+  status: "PENDING_APPROVAL" | "ACTIVE" | "REJECTED" | "BLOCKED";
+}
+
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+const DATETIME = new Intl.DateTimeFormat("pt-BR", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
 
 const SOURCE_LABELS: Record<string, string> = {
   EVENT_PARTICIPATION: "Participacao em prova",
   EARLY_SIGNUP: "Inscricao antecipada",
   EARLY_PAYMENT: "Pagamento antecipado",
   CAMPAIGN_BONUS: "Campanha",
+  ACTIVITY_APPROVAL: "Atividade aprovada",
   REFERRAL: "Indicacao",
   RECURRENCE: "Recorrencia",
   MANUAL: "Ajuste manual",
@@ -91,6 +150,7 @@ const SOURCE_OPTIONS = [
   { value: "EARLY_SIGNUP", label: "Inscricao antecipada" },
   { value: "EARLY_PAYMENT", label: "Pagamento antecipado" },
   { value: "CAMPAIGN_BONUS", label: "Campanha" },
+  { value: "ACTIVITY_APPROVAL", label: "Atividade aprovada" },
   { value: "MANUAL", label: "Ajuste manual" },
   { value: "REDEMPTION", label: "Resgate" },
   { value: "EXPIRATION", label: "Expiracao" },
@@ -103,6 +163,28 @@ function defaultDateRange() {
     start: start.toISOString().slice(0, 10),
     end: end.toISOString().slice(0, 10),
   };
+}
+
+function formatDateTime(value: string | null) {
+  if (!value) return "-";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : DATETIME.format(date);
+}
+
+function statusTone(status: PointActivityEntry["status"]) {
+  if (status === "APPROVED") return "border-emerald-400/20 bg-emerald-500/10 text-emerald-200";
+  if (status === "REJECTED") return "border-rose-400/20 bg-rose-500/10 text-rose-200";
+  return "border-amber-400/20 bg-amber-500/10 text-amber-100";
+}
+
+function statusLabel(status: PointActivityEntry["status"]) {
+  if (status === "APPROVED") return "Aprovado";
+  if (status === "REJECTED") return "Reprovado";
+  return "Pendente";
+}
+
+function sourceLabel(source: PointActivityEntry["source"]) {
+  return source === "ADMIN" ? "Lancado pelo admin" : "Solicitado pelo usuario";
 }
 
 export default function AdminPontosPage() {
@@ -128,14 +210,55 @@ export default function AdminPontosPage() {
     campaignBonus: 0,
     active: true,
   });
+  const [activities, setActivities] = useState<PointActivity[]>([]);
+  const [entries, setEntries] = useState<PointActivityEntry[]>([]);
+  const [entryMeta, setEntryMeta] = useState({ total: 0, page: 1, totalPages: 1 });
+  const [athletes, setAthletes] = useState<AthleteOption[]>([]);
+  const [activityFilters, setActivityFilters] = useState({ status: "PENDING", activityId: "", userId: "" });
+  const [creatingActivity, setCreatingActivity] = useState(false);
+  const [creatingEntry, setCreatingEntry] = useState(false);
+  const [reviewingEntryId, setReviewingEntryId] = useState<string | null>(null);
+  const [activityForm, setActivityForm] = useState({
+    name: "",
+    description: "",
+    suggestedPoints: 50,
+    activityDate: new Date().toISOString().slice(0, 16),
+  });
+  const [entryForm, setEntryForm] = useState({
+    activityId: "",
+    userId: "",
+    points: 0,
+    note: "",
+    proofUrl: "",
+  });
+
+  const loadEntries = async () => {
+    const params = new URLSearchParams({
+      page: String(entryMeta.page),
+      limit: "20",
+    });
+    if (activityFilters.status) params.set("status", activityFilters.status);
+    if (activityFilters.activityId) params.set("activityId", activityFilters.activityId);
+    if (activityFilters.userId) params.set("userId", activityFilters.userId);
+
+    const response = await fetch(`/api/admin/points/entries?${params.toString()}`, { cache: "no-store" });
+    const payload = (await response.json()) as PointActivityEntriesResponse;
+    if (!response.ok) throw new Error("entries_unavailable");
+    setEntries(payload.data ?? []);
+    setEntryMeta({
+      total: payload.total ?? 0,
+      page: payload.page ?? 1,
+      totalPages: payload.totalPages ?? 1,
+    });
+  };
 
   const loadReport = async () => {
     if (!dateRange.start || !dateRange.end) {
-      toast.error("Informe data inicial e final para carregar o relatÃ³rio.");
+      toast.error("Informe data inicial e final para carregar o relatorio.");
       return;
     }
     if (dateRange.start > dateRange.end) {
-      toast.error("A data inicial nÃ£o pode ser maior que a data final.");
+      toast.error("A data inicial nao pode ser maior que a data final.");
       return;
     }
 
@@ -148,27 +271,62 @@ export default function AdminPontosPage() {
       if (filters.eventId) params.set("eventId", filters.eventId);
       if (filters.sourceType) params.set("sourceType", filters.sourceType);
 
-      const [reportResponse, warningsResponse, policyResponse] = await Promise.all([
+      const entriesParams = new URLSearchParams({ page: "1", limit: "20" });
+      if (activityFilters.status) entriesParams.set("status", activityFilters.status);
+      if (activityFilters.activityId) entriesParams.set("activityId", activityFilters.activityId);
+      if (activityFilters.userId) entriesParams.set("userId", activityFilters.userId);
+
+      const [
+        reportResponse,
+        warningsResponse,
+        policyResponse,
+        rulesResponse,
+        activitiesResponse,
+        entriesResponse,
+        athletesResponse,
+      ] = await Promise.all([
         fetch(`/api/admin/points/report?${params.toString()}`, { cache: "no-store" }),
         fetch("/api/admin/points/expiring-warnings?daysAhead=30", { cache: "no-store" }),
         fetch("/api/admin/points/policy", { cache: "no-store" }),
+        fetch("/api/admin/points/rules", { cache: "no-store" }),
+        fetch("/api/admin/points/activities?active=true", { cache: "no-store" }),
+        fetch(`/api/admin/points/entries?${entriesParams.toString()}`, { cache: "no-store" }),
+        fetch("/api/admin/athletes?status=ACTIVE&page=1&pageSize=100", { cache: "no-store" }),
       ]);
 
       const reportPayload = (await reportResponse.json()) as PointsReport;
       const warningsPayload = (await warningsResponse.json()) as { data?: ExpiringWarning[] };
       const policyPayload = (await policyResponse.json()) as { data?: PointPolicy };
+      const rulesPayload = (await rulesResponse.json()) as { data?: PointRule[]; events?: PointRuleEvent[] };
+      const activitiesPayload = (await activitiesResponse.json()) as { data?: PointActivity[] };
+      const entriesPayload = (await entriesResponse.json()) as PointActivityEntriesResponse;
+      const athletesPayload = (await athletesResponse.json()) as { data?: AthleteOption[] };
 
       if (!reportResponse.ok) throw new Error("points_report_unavailable");
 
       setReport(reportPayload);
       setWarnings(warningsPayload.data ?? []);
       setPolicy(policyPayload.data ?? null);
-      const rulesResponse = await fetch("/api/admin/points/rules", { cache: "no-store" });
-      const rulesPayload = (await rulesResponse.json()) as { data?: PointRule[]; events?: PointRuleEvent[] };
-      if (rulesResponse.ok) {
-        setRules(rulesPayload.data ?? []);
-        setEvents(rulesPayload.events ?? []);
-      }
+      setRules(rulesResponse.ok ? rulesPayload.data ?? [] : []);
+      setEvents(rulesResponse.ok ? rulesPayload.events ?? [] : []);
+      const nextActivities = activitiesResponse.ok ? activitiesPayload.data ?? [] : [];
+      setActivities(nextActivities);
+      setEntries(entriesResponse.ok ? entriesPayload.data ?? [] : []);
+      setEntryMeta({
+        total: entriesResponse.ok ? entriesPayload.total ?? 0 : 0,
+        page: entriesResponse.ok ? entriesPayload.page ?? 1 : 1,
+        totalPages: entriesResponse.ok ? entriesPayload.totalPages ?? 1 : 1,
+      });
+      setAthletes(athletesResponse.ok ? athletesPayload.data ?? [] : []);
+      setEntryForm((prev) => {
+        const activityId = prev.activityId || nextActivities[0]?.id || "";
+        const selectedActivity = nextActivities.find((item) => item.id === activityId) ?? nextActivities[0];
+        return {
+          ...prev,
+          activityId,
+          points: prev.points > 0 ? prev.points : selectedActivity?.suggestedPoints ?? 0,
+        };
+      });
     } catch {
       toast.error("Nao foi possivel carregar o painel de pontos.");
       setReport(null);
@@ -176,6 +334,9 @@ export default function AdminPontosPage() {
       setRules([]);
       setEvents([]);
       setPolicy(null);
+      setActivities([]);
+      setEntries([]);
+      setAthletes([]);
     } finally {
       setLoading(false);
     }
@@ -185,14 +346,20 @@ export default function AdminPontosPage() {
     void loadReport();
   }, []);
 
+  useEffect(() => {
+    if (!loading) {
+      void loadEntries();
+    }
+  }, [activityFilters.status, activityFilters.activityId, activityFilters.userId, entryMeta.page]);
+
   const runRecurrence = async () => {
     try {
       if (recurrenceMonth < 1 || recurrenceMonth > 12) {
-        toast.error("Informe um mÃªs vÃ¡lido entre 1 e 12.");
+        toast.error("Informe um mes valido entre 1 e 12.");
         return;
       }
       if (recurrenceYear < 2000 || recurrenceYear > 2100) {
-        toast.error("Informe um ano vÃ¡lido entre 2000 e 2100.");
+        toast.error("Informe um ano valido entre 2000 e 2100.");
         return;
       }
 
@@ -208,11 +375,11 @@ export default function AdminPontosPage() {
         quarterly?: { credited?: number };
       };
       toast.success(
-        `RecorrÃªncia concluÃ­da. Mensal: ${payload.monthly?.credited ?? 0} | Trimestral: ${payload.quarterly?.credited ?? 0}.`,
+        `Recorrencia concluida. Mensal: ${payload.monthly?.credited ?? 0} | Trimestral: ${payload.quarterly?.credited ?? 0}.`,
       );
       await loadReport();
     } catch {
-      toast.error("Falha ao processar bÃ´nus de recorrÃªncia.");
+      toast.error("Falha ao processar bonus de recorrencia.");
     } finally {
       setProcessingRecurrence(false);
     }
@@ -225,11 +392,11 @@ export default function AdminPontosPage() {
       if (!response.ok) throw new Error("expiration_error");
       const payload = (await response.json()) as { usersAffected?: number; pointsExpired?: number };
       toast.success(
-        `ExpiraÃ§Ã£o concluÃ­da. UsuÃ¡rios afetados: ${payload.usersAffected ?? 0} | Pontos expirados: ${payload.pointsExpired ?? 0}.`,
+        `Expiracao concluida. Usuarios afetados: ${payload.usersAffected ?? 0} | Pontos expirados: ${payload.pointsExpired ?? 0}.`,
       );
       await loadReport();
     } catch {
-      toast.error("Falha ao processar expiraÃ§Ã£o de pontos.");
+      toast.error("Falha ao processar expiracao de pontos.");
     } finally {
       setProcessingExpiration(false);
     }
@@ -282,18 +449,114 @@ export default function AdminPontosPage() {
     }
   };
 
+  const createActivity = async () => {
+    if (!activityForm.name.trim()) {
+      toast.error("Informe o nome da atividade.");
+      return;
+    }
+
+    setCreatingActivity(true);
+    try {
+      const response = await fetch("/api/admin/points/activities", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: activityForm.name.trim(),
+          description: activityForm.description.trim() || null,
+          suggestedPoints: Number(activityForm.suggestedPoints),
+          activityDate: new Date(activityForm.activityDate).toISOString(),
+        }),
+      });
+      const payload = (await response.json()) as { error?: { message?: string } };
+      if (!response.ok) {
+        throw new Error(payload.error?.message ?? "activity_create_error");
+      }
+      toast.success("Atividade criada.");
+      setActivityForm({
+        name: "",
+        description: "",
+        suggestedPoints: 50,
+        activityDate: new Date().toISOString().slice(0, 16),
+      });
+      await loadReport();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Nao foi possivel criar a atividade.");
+    } finally {
+      setCreatingActivity(false);
+    }
+  };
+
+  const createEntry = async () => {
+    if (!entryForm.activityId || !entryForm.userId || entryForm.points <= 0) {
+      toast.error("Selecione atividade, associado e quantidade de pontos.");
+      return;
+    }
+
+    setCreatingEntry(true);
+    try {
+      const response = await fetch("/api/admin/points/entries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          activityId: entryForm.activityId,
+          userId: entryForm.userId,
+          points: Number(entryForm.points),
+          note: entryForm.note.trim() || null,
+          proofUrl: entryForm.proofUrl.trim() || null,
+        }),
+      });
+      const payload = (await response.json()) as { error?: { message?: string } };
+      if (!response.ok) {
+        throw new Error(payload.error?.message ?? "entry_create_error");
+      }
+      toast.success("Lancamento criado como pendente.");
+      const activity = activities.find((item) => item.id === entryForm.activityId);
+      setEntryForm((prev) => ({
+        ...prev,
+        userId: "",
+        points: activity?.suggestedPoints ?? prev.points,
+        note: "",
+        proofUrl: "",
+      }));
+      await loadReport();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Nao foi possivel criar o lancamento.");
+    } finally {
+      setCreatingEntry(false);
+    }
+  };
+
+  const reviewEntry = async (entry: PointActivityEntry, action: "APPROVE" | "REJECT") => {
+    setReviewingEntryId(entry.id);
+    try {
+      const response = await fetch(`/api/admin/points/entries/${entry.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          points: entry.points,
+        }),
+      });
+      const payload = (await response.json()) as { error?: { message?: string } };
+      if (!response.ok) {
+        throw new Error(payload.error?.message ?? "entry_review_error");
+      }
+      toast.success(action === "APPROVE" ? "Lancamento aprovado." : "Lancamento reprovado.");
+      await loadReport();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Nao foi possivel revisar o lancamento.");
+    } finally {
+      setReviewingEntryId(null);
+    }
+  };
+
   const topItemsColumns: DataTableColumn<PointsReport["topItems"][number]>[] = [
     { key: "name", header: "Item", cell: (row) => row.name, className: "min-w-[220px]" },
     { key: "count", header: "Resgates", cell: (row) => String(row.count) },
   ];
 
   const categoryColumns: DataTableColumn<PointsReport["redemptionsByCategory"][number]>[] = [
-    {
-      key: "category",
-      header: "Categoria",
-      cell: (row) => row.category,
-      className: "min-w-[180px]",
-    },
+    { key: "category", header: "Categoria", cell: (row) => row.category, className: "min-w-[180px]" },
     { key: "count", header: "Resgates", cell: (row) => String(row.count) },
     { key: "points", header: "Pontos", cell: (row) => `${row.pointsUsed} pts` },
     { key: "cash", header: "Caixa", cell: (row) => BRL.format(row.cashCollectedCents / 100) },
@@ -302,7 +565,7 @@ export default function AdminPontosPage() {
   const warningColumns: DataTableColumn<ExpiringWarning>[] = [
     {
       key: "user",
-      header: "Atleta Associado",
+      header: "Atleta associado",
       cell: (row) => (
         <div>
           <p className="font-semibold text-white">{row.userName}</p>
@@ -324,7 +587,7 @@ export default function AdminPontosPage() {
   const movementColumns: DataTableColumn<PointsReport["recentMovements"][number]>[] = [
     {
       key: "athlete",
-      header: "Atleta Associado",
+      header: "Atleta associado",
       cell: (row) => (
         <div>
           <p className="font-semibold text-white">{row.athleteName ?? "Atleta"}</p>
@@ -338,11 +601,91 @@ export default function AdminPontosPage() {
     { key: "balance", header: "Saldo", cell: (row) => `${row.balanceAfter} pts` },
   ];
 
+  const entryColumns: DataTableColumn<PointActivityEntry>[] = [
+    {
+      key: "activity",
+      header: "Atividade",
+      cell: (row) => (
+        <div>
+          <p className="font-semibold text-white">{row.activityName ?? "Atividade"}</p>
+          <p className="text-xs text-slate-400">{sourceLabel(row.source)}</p>
+        </div>
+      ),
+      className: "min-w-[220px]",
+    },
+    {
+      key: "athlete",
+      header: "Associado",
+      cell: (row) => (
+        <div>
+          <p className="font-semibold text-white">{row.userName ?? "Usuario"}</p>
+          <p className="text-xs text-slate-400">{row.userEmail ?? "Sem e-mail"}</p>
+        </div>
+      ),
+      className: "min-w-[220px]",
+    },
+    { key: "points", header: "Pontos", cell: (row) => `${row.points} pts` },
+    {
+      key: "status",
+      header: "Status",
+      cell: (row) => (
+        <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs ${statusTone(row.status)}`}>
+          {statusLabel(row.status)}
+        </span>
+      ),
+    },
+    {
+      key: "timestamps",
+      header: "Auditoria",
+      cell: (row) => (
+        <div className="text-xs text-slate-300">
+          <p>Criado: {formatDateTime(row.createdAt)}</p>
+          <p>{row.approvedAt ? `Aprovado: ${formatDateTime(row.approvedAt)}` : row.rejectedAt ? `Reprovado: ${formatDateTime(row.rejectedAt)}` : "Aguardando revisao"}</p>
+        </div>
+      ),
+      className: "min-w-[210px]",
+    },
+    {
+      key: "actions",
+      header: "Acoes",
+      cell: (row) =>
+        row.status === "PENDING" ? (
+          <div className="flex gap-2">
+            <ActionButton
+              className="h-8 px-3 text-xs"
+              disabled={reviewingEntryId === row.id}
+              onClick={() => void reviewEntry(row, "APPROVE")}
+            >
+              Aprovar
+            </ActionButton>
+            <ActionButton
+              intent="secondary"
+              className="h-8 px-3 text-xs"
+              disabled={reviewingEntryId === row.id}
+              onClick={() => void reviewEntry(row, "REJECT")}
+            >
+              Reprovar
+            </ActionButton>
+          </div>
+        ) : (
+          <div className="text-xs text-slate-400">{row.note ?? "Sem observacao"}</div>
+        ),
+      className: "min-w-[180px]",
+    },
+  ];
+
+  const pendingEntries = useMemo(() => entries.filter((entry) => entry.status === "PENDING"), [entries]);
+  const approvedEntries = useMemo(() => entries.filter((entry) => entry.status === "APPROVED"), [entries]);
+  const totalApprovedPoints = useMemo(
+    () => approvedEntries.reduce((sum, entry) => sum + entry.points, 0),
+    [approvedEntries],
+  );
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Pontos admin"
-        subtitle="Relatorios, recorrencia e expiracao do programa de recompensas."
+        subtitle="Relatorios, recorrencia, aprovacao manual por atividade e operacao do programa de recompensas."
         actions={
           <form
             className="flex flex-wrap items-center gap-2"
@@ -398,19 +741,215 @@ export default function AdminPontosPage() {
       ) : (
         <>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            <MetricCard
-              label="Pontos emitidos"
-              value={`${report.totalPointsIssued} pts`}
-              tone="highlight"
-            />
+            <MetricCard label="Pontos emitidos" value={`${report.totalPointsIssued} pts`} tone="highlight" />
             <MetricCard label="Pontos resgatados" value={`${report.totalPointsRedeemed} pts`} />
             <MetricCard label="Pontos expirados" value={`${report.totalPointsExpired} pts`} />
             <MetricCard label="Associados com saldo" value={String(report.activeUsersWithBalance)} />
-            <MetricCard
-              label="Caixa de resgates"
-              value={BRL.format(report.cashCollectedCents / 100)}
-            />
+            <MetricCard label="Caixa de resgates" value={BRL.format(report.cashCollectedCents / 100)} />
           </div>
+
+          <SectionCard
+            title="Aprovacao por atividade"
+            description="Controle manual para registrar participacoes, validar solicitacoes e liberar pontos so depois da revisao."
+          >
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <MetricCard label="Atividades ativas" value={String(activities.length)} />
+              <MetricCard label="Pendentes na fila" value={String(pendingEntries.length)} />
+              <MetricCard label="Aprovados na pagina" value={String(approvedEntries.length)} />
+              <MetricCard label="Pontos aprovados" value={`${totalApprovedPoints} pts`} />
+            </div>
+
+            <div className="mt-4 grid gap-4 xl:grid-cols-[1.1fr_1.2fr]">
+              <div className="rounded-2xl border border-white/10 bg-[#0c1f35] p-4">
+                <div className="mb-4">
+                  <p className="text-sm font-semibold text-white">Nova atividade</p>
+                  <p className="text-xs text-slate-400">Cadastre a atividade com pontos sugeridos para orientar os lancamentos.</p>
+                </div>
+                <div className="grid gap-3">
+                  <input
+                    value={activityForm.name}
+                    onChange={(event) => setActivityForm((prev) => ({ ...prev, name: event.target.value }))}
+                    className="rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white"
+                    placeholder="Nome da atividade"
+                  />
+                  <textarea
+                    value={activityForm.description}
+                    onChange={(event) => setActivityForm((prev) => ({ ...prev, description: event.target.value }))}
+                    className="min-h-[96px] rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white"
+                    placeholder="Descricao, regras ou observacoes"
+                  />
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <input
+                      type="number"
+                      min={0}
+                      value={activityForm.suggestedPoints}
+                      onChange={(event) =>
+                        setActivityForm((prev) => ({ ...prev, suggestedPoints: Number(event.target.value) }))
+                      }
+                      className="rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white"
+                      placeholder="Pontos sugeridos"
+                    />
+                    <input
+                      type="datetime-local"
+                      value={activityForm.activityDate}
+                      onChange={(event) => setActivityForm((prev) => ({ ...prev, activityDate: event.target.value }))}
+                      className="rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white"
+                    />
+                  </div>
+                  <ActionButton disabled={creatingActivity} onClick={() => void createActivity()}>
+                    {creatingActivity ? "Criando..." : "Criar atividade"}
+                  </ActionButton>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-[#0c1f35] p-4">
+                <div className="mb-4">
+                  <p className="text-sm font-semibold text-white">Novo lancamento pendente</p>
+                  <p className="text-xs text-slate-400">Use para lancamento direto do admin ou para revisar depois em dupla aprovacao.</p>
+                </div>
+                <div className="grid gap-3">
+                  <select
+                    value={entryForm.activityId}
+                    onChange={(event) => {
+                      const activityId = event.target.value;
+                      const activity = activities.find((item) => item.id === activityId);
+                      setEntryForm((prev) => ({
+                        ...prev,
+                        activityId,
+                        points: activity?.suggestedPoints ?? prev.points,
+                      }));
+                    }}
+                    className="rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white"
+                  >
+                    <option value="">Selecione a atividade</option>
+                    {activities.map((activity) => (
+                      <option key={activity.id} value={activity.id}>
+                        {activity.name}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={entryForm.userId}
+                    onChange={(event) => setEntryForm((prev) => ({ ...prev, userId: event.target.value }))}
+                    className="rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white"
+                  >
+                    <option value="">Selecione o associado</option>
+                    {athletes.map((athlete) => (
+                      <option key={athlete.id} value={athlete.id}>
+                        {athlete.name} {athlete.memberNumber ? `- ${athlete.memberNumber}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="number"
+                    min={1}
+                    value={entryForm.points}
+                    onChange={(event) => setEntryForm((prev) => ({ ...prev, points: Number(event.target.value) }))}
+                    className="rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white"
+                    placeholder="Quantidade de pontos"
+                  />
+                  <textarea
+                    value={entryForm.note}
+                    onChange={(event) => setEntryForm((prev) => ({ ...prev, note: event.target.value }))}
+                    className="min-h-[84px] rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white"
+                    placeholder="Observacao para auditoria"
+                  />
+                  <input
+                    value={entryForm.proofUrl}
+                    onChange={(event) => setEntryForm((prev) => ({ ...prev, proofUrl: event.target.value }))}
+                    className="rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white"
+                    placeholder="URL do comprovante (opcional)"
+                  />
+                  <ActionButton disabled={creatingEntry} onClick={() => void createEntry()}>
+                    {creatingEntry ? "Salvando..." : "Criar pendencia"}
+                  </ActionButton>
+                </div>
+              </div>
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title="Fila de aprovacao"
+            description="Revise solicitacoes dos usuarios e lancamentos administrativos antes de liberar os pontos no saldo."
+            action={
+              <div className="flex flex-wrap gap-2">
+                <select
+                  value={activityFilters.status}
+                  onChange={(event) => {
+                    setEntryMeta((prev) => ({ ...prev, page: 1 }));
+                    setActivityFilters((prev) => ({ ...prev, status: event.target.value }));
+                  }}
+                  className="rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white"
+                >
+                  <option value="PENDING">Pendentes</option>
+                  <option value="APPROVED">Aprovados</option>
+                  <option value="REJECTED">Reprovados</option>
+                  <option value="">Todos</option>
+                </select>
+                <select
+                  value={activityFilters.activityId}
+                  onChange={(event) => {
+                    setEntryMeta((prev) => ({ ...prev, page: 1 }));
+                    setActivityFilters((prev) => ({ ...prev, activityId: event.target.value }));
+                  }}
+                  className="rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white"
+                >
+                  <option value="">Todas as atividades</option>
+                  {activities.map((activity) => (
+                    <option key={activity.id} value={activity.id}>
+                      {activity.name}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={activityFilters.userId}
+                  onChange={(event) => {
+                    setEntryMeta((prev) => ({ ...prev, page: 1 }));
+                    setActivityFilters((prev) => ({ ...prev, userId: event.target.value }));
+                  }}
+                  className="rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white"
+                >
+                  <option value="">Todos os associados</option>
+                  {athletes.map((athlete) => (
+                    <option key={athlete.id} value={athlete.id}>
+                      {athlete.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            }
+          >
+            {entries.length === 0 ? (
+              <EmptyState title="Sem lancamentos" description="As solicitacoes e os lancamentos pendentes aparecerao aqui." />
+            ) : (
+              <div className="space-y-3">
+                <DataTable columns={entryColumns} data={entries} getRowKey={(row) => row.id} />
+                <div className="flex items-center justify-between text-xs text-slate-400">
+                  <span>
+                    {entryMeta.total} registro(s) | pagina {entryMeta.page} de {entryMeta.totalPages}
+                  </span>
+                  <div className="flex gap-2">
+                    <ActionButton
+                      intent="secondary"
+                      className="h-8 px-3 text-xs"
+                      disabled={entryMeta.page <= 1}
+                      onClick={() => setEntryMeta((prev) => ({ ...prev, page: prev.page - 1 }))}
+                    >
+                      Anterior
+                    </ActionButton>
+                    <ActionButton
+                      intent="secondary"
+                      className="h-8 px-3 text-xs"
+                      disabled={entryMeta.page >= entryMeta.totalPages}
+                      onClick={() => setEntryMeta((prev) => ({ ...prev, page: prev.page + 1 }))}
+                    >
+                      Proxima
+                    </ActionButton>
+                  </div>
+                </div>
+              </div>
+            )}
+          </SectionCard>
 
           {policy ? (
             <SectionCard
@@ -427,9 +966,7 @@ export default function AdminPontosPage() {
                       min={1}
                       value={policy.pointValueCents}
                       onChange={(event) =>
-                        setPolicy((prev) =>
-                          prev ? { ...prev, pointValueCents: Number(event.target.value) } : prev,
-                        )
+                        setPolicy((prev) => (prev ? { ...prev, pointValueCents: Number(event.target.value) } : prev))
                       }
                       className="ml-2 w-full bg-transparent text-sm text-white outline-none"
                     />
@@ -444,9 +981,7 @@ export default function AdminPontosPage() {
                       min={1}
                       value={policy.expirationMonths}
                       onChange={(event) =>
-                        setPolicy((prev) =>
-                          prev ? { ...prev, expirationMonths: Number(event.target.value) } : prev,
-                        )
+                        setPolicy((prev) => (prev ? { ...prev, expirationMonths: Number(event.target.value) } : prev))
                       }
                       className="w-full bg-transparent text-sm text-white outline-none"
                     />
@@ -458,9 +993,7 @@ export default function AdminPontosPage() {
                   <textarea
                     value={policy.athletePolicyText}
                     onChange={(event) =>
-                      setPolicy((prev) =>
-                        prev ? { ...prev, athletePolicyText: event.target.value } : prev,
-                      )
+                      setPolicy((prev) => (prev ? { ...prev, athletePolicyText: event.target.value } : prev))
                     }
                     className="min-h-[86px] w-full rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white outline-none"
                   />
@@ -498,10 +1031,7 @@ export default function AdminPontosPage() {
                     onChange={(event) => setRecurrenceYear(Number(event.target.value))}
                     className="w-28 rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white"
                   />
-                  <ActionButton
-                    disabled={processingRecurrence}
-                    onClick={() => void runRecurrence()}
-                  >
+                  <ActionButton disabled={processingRecurrence} onClick={() => void runRecurrence()}>
                     {processingRecurrence ? "Processando..." : "Processar"}
                   </ActionButton>
                 </div>
@@ -513,16 +1043,13 @@ export default function AdminPontosPage() {
                   disabled={processingExpiration}
                   onClick={() => void runExpiration()}
                 >
-                  {processingExpiration ? "Processando..." : "Rodar expiraÃ§Ã£o agora"}
+                  {processingExpiration ? "Processando..." : "Rodar expiracao agora"}
                 </ActionButton>
               </div>
             </div>
           </SectionCard>
 
-          <SectionCard
-            title="Pontos por prova"
-            description="Configure quantos pontos cada prova gera para associados"
-          >
+          <SectionCard title="Pontos por prova" description="Configure quantos pontos cada prova gera para associados">
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
               <select
                 value={ruleForm.eventId}
@@ -548,7 +1075,9 @@ export default function AdminPontosPage() {
                 type="number"
                 min={0}
                 value={ruleForm.earlySignupBonus}
-                onChange={(event) => setRuleForm((prev) => ({ ...prev, earlySignupBonus: Number(event.target.value) }))}
+                onChange={(event) =>
+                  setRuleForm((prev) => ({ ...prev, earlySignupBonus: Number(event.target.value) }))
+                }
                 className="rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white"
                 placeholder="Inscricao antecipada"
               />
@@ -556,7 +1085,9 @@ export default function AdminPontosPage() {
                 type="number"
                 min={0}
                 value={ruleForm.earlyPaymentBonus}
-                onChange={(event) => setRuleForm((prev) => ({ ...prev, earlyPaymentBonus: Number(event.target.value) }))}
+                onChange={(event) =>
+                  setRuleForm((prev) => ({ ...prev, earlyPaymentBonus: Number(event.target.value) }))
+                }
                 className="rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white"
                 placeholder="Pagamento antecipado"
               />
@@ -564,7 +1095,9 @@ export default function AdminPontosPage() {
                 type="number"
                 min={0}
                 value={ruleForm.campaignBonus}
-                onChange={(event) => setRuleForm((prev) => ({ ...prev, campaignBonus: Number(event.target.value) }))}
+                onChange={(event) =>
+                  setRuleForm((prev) => ({ ...prev, campaignBonus: Number(event.target.value) }))
+                }
                 className="rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white"
                 placeholder="Bonus campanha"
               />
@@ -607,11 +1140,7 @@ export default function AdminPontosPage() {
               {report.pointsBySource.length === 0 ? (
                 <EmptyState title="Sem movimentos" description="Nenhuma movimentacao no periodo filtrado." />
               ) : (
-                <DataTable
-                  columns={sourceColumns}
-                  data={report.pointsBySource}
-                  getRowKey={(row) => `${row.sourceType}-${row.type}`}
-                />
+                <DataTable columns={sourceColumns} data={report.pointsBySource} getRowKey={(row) => `${row.sourceType}-${row.type}`} />
               )}
             </SectionCard>
 
@@ -625,44 +1154,24 @@ export default function AdminPontosPage() {
           </div>
 
           <div className="grid gap-4 xl:grid-cols-2">
-            <SectionCard
-              title="Resgates por categoria"
-              description="Performance comercial por classe de recompensa"
-            >
+            <SectionCard title="Resgates por categoria" description="Performance comercial por classe de recompensa">
               {report.redemptionsByCategory.length === 0 ? (
-                <EmptyState
-                  title="Sem dados"
-                  description="Nenhum resgate no periodo selecionado."
-                />
+                <EmptyState title="Sem dados" description="Nenhum resgate no periodo selecionado." />
               ) : (
-                <DataTable
-                  columns={categoryColumns}
-                  data={report.redemptionsByCategory}
-                  getRowKey={(row) => row.category}
-                />
+                <DataTable columns={categoryColumns} data={report.redemptionsByCategory} getRowKey={(row) => row.category} />
               )}
             </SectionCard>
 
             <SectionCard title="Top itens" description="Itens com maior volume de resgate">
               {report.topItems.length === 0 ? (
-                <EmptyState
-                  title="Sem dados"
-                  description="Nenhum item resgatado no periodo selecionado."
-                />
+                <EmptyState title="Sem dados" description="Nenhum item resgatado no periodo selecionado." />
               ) : (
-                <DataTable
-                  columns={topItemsColumns}
-                  data={report.topItems}
-                  getRowKey={(row) => row.rewardItemId}
-                />
+                <DataTable columns={topItemsColumns} data={report.topItems} getRowKey={(row) => row.rewardItemId} />
               )}
             </SectionCard>
           </div>
 
-          <SectionCard
-            title="Avisos de expiracao"
-            description="Atletas associados com pontos prestes a expirar (30 dias)"
-          >
+          <SectionCard title="Avisos de expiracao" description="Atletas associados com pontos prestes a expirar (30 dias)">
             {warnings.length === 0 ? (
               <EmptyState title="Sem avisos" description="Nenhum usuario com expiracao proxima." />
             ) : (

@@ -9,6 +9,42 @@ export const loginSchema = z.object({
   password: z
     .string({ required_error: "Senha e obrigatoria" })
     .min(8, "Senha deve ter pelo menos 8 caracteres"),
+  rememberMe: z.boolean().optional().default(false),
+});
+
+export const mfaChallengeSchema = z.object({
+  mfa_token: z.string({ required_error: "Token MFA obrigatorio" }).trim().min(20, "Token MFA invalido"),
+});
+
+export const mfaVerifySchema = mfaChallengeSchema.extend({
+  code: z
+    .string({ required_error: "Codigo obrigatorio" })
+    .trim()
+    .min(6, "Codigo invalido")
+    .max(32, "Codigo invalido"),
+  method: z.enum(["TOTP", "EMAIL_OTP", "RECOVERY_CODE"]).optional().default("TOTP"),
+});
+
+export const mfaDisableSchema = z.object({
+  password: z
+    .string({ required_error: "Senha e obrigatoria" })
+    .min(8, "Senha deve ter pelo menos 8 caracteres"),
+  code: z
+    .string({ required_error: "Codigo obrigatorio" })
+    .trim()
+    .min(6, "Codigo invalido")
+    .max(32, "Codigo invalido"),
+});
+
+export const recoveryCodesRegenerateSchema = z.object({
+  password: z
+    .string({ required_error: "Senha e obrigatoria" })
+    .min(8, "Senha deve ter pelo menos 8 caracteres"),
+  code: z
+    .string({ required_error: "Codigo obrigatorio" })
+    .trim()
+    .min(6, "Codigo invalido")
+    .max(32, "Codigo invalido"),
 });
 
 export const registerAdminSchema = z.object({
@@ -127,7 +163,7 @@ export const updateOrganizationBySuperAdminSchema = z.object({
   status: z.enum(["PENDING_SETUP", "ACTIVE", "SUSPENDED", "TRIAL", "CANCELLED"]).optional(),
 });
 
-export type LoginInput = z.infer<typeof loginSchema>;
+export type LoginInput = z.output<typeof loginSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type RegisterAdminInput = z.infer<typeof registerAdminSchema>;
@@ -135,3 +171,4 @@ export type RegisterAthleteInput = z.infer<typeof registerAthleteSchema>;
 export type ActivateAdminInput = z.infer<typeof activateAdminSchema>;
 export type CreateOrganizationBySuperAdminInput = z.infer<typeof createOrganizationBySuperAdminSchema>;
 export type UpdateOrganizationBySuperAdminInput = z.infer<typeof updateOrganizationBySuperAdminSchema>;
+export type MfaVerifyInput = z.infer<typeof mfaVerifySchema>;

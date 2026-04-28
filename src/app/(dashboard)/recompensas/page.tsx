@@ -71,6 +71,95 @@ interface PointSummary {
   pointsExpiringIn30Days: number;
 }
 
+interface LoyaltyLevelSummary {
+  key: string;
+  name: string;
+  multiplier: number;
+  benefits: string[];
+  progressPercent: number;
+  progressInLevel: number;
+  nextLevelPoints: number;
+  nextLevel: {
+    key: string;
+    name: string;
+    multiplier: number;
+    minLifetimePoints: number;
+  } | null;
+}
+
+interface LoyaltyMission {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  type: string;
+  rewardPoints: number;
+  progressValue: number;
+  targetValue: number;
+  progressPercent: number;
+  repeatable: boolean;
+  status: string;
+  eligible: boolean;
+  levelRequirement: string | null;
+}
+
+interface LoyaltyBadge {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  icon: string | null;
+  category: string;
+  awardedAt: string | null;
+  unlocked: boolean;
+}
+
+interface LoyaltySnapshot {
+  availablePoints: number;
+  lifetimePoints: number;
+  pointsExpiringIn30Days: number;
+  segment: string;
+  streak: {
+    current: number;
+    best: number;
+    lastWeekAt: string | null;
+  };
+  level: LoyaltyLevelSummary;
+  levels: Array<{
+    key: string;
+    name: string;
+    minLifetimePoints: number;
+    multiplier: number;
+    benefits: string[];
+  }>;
+  missions: LoyaltyMission[];
+  badges: LoyaltyBadge[];
+}
+
+interface PointActivity {
+  id: string;
+  organizationId: string;
+  name: string;
+  description: string | null;
+  suggestedPoints: number;
+  activityDate: string;
+  active: boolean;
+}
+
+interface UserPointActivityEntry {
+  id: string;
+  activityId: string;
+  points: number;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  source: "ADMIN" | "USER";
+  note: string | null;
+  proofUrl: string | null;
+  createdAt: string;
+  approvedAt: string | null;
+  rejectedAt: string | null;
+  activityName: string | null;
+}
+
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
 function randomIdempotencyKey(rewardItemId: string): string {
@@ -86,15 +175,25 @@ export default function RecompensasPage() {
   const [policy, setPolicy] = useState<PointPolicy | null>(null);
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [pointSummary, setPointSummary] = useState<PointSummary>({ pointsExpiringIn30Days: 0 });
+  const [loyalty, setLoyalty] = useState<LoyaltySnapshot | null>(null);
+  const [activities, setActivities] = useState<PointActivity[]>([]);
+  const [activityEntries, setActivityEntries] = useState<UserPointActivityEntry[]>([]);
   const [pointsInput, setPointsInput] = useState<Record<string, string>>({});
   const [calculations, setCalculations] = useState<Record<string, CalculationResult>>({});
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [submittingActivity, setSubmittingActivity] = useState(false);
+  const [activityForm, setActivityForm] = useState({
+    activityId: "",
+    points: "",
+    note: "",
+    proofUrl: "",
+  });
 
   const loadRewards = async () => {
     setLoading(true);
     setError(null);
     try {
-      const [response, ledgerResponse, summaryResponse] = await Promise.all([
+      const [response, ledgerResponse, summaryResponse, loyaltyResponse, activitiesResponse, activityEntriesResponse] = await Promise.all([
         fetch("/api/rewards", {
           cache: "no-store",
           headers: buildAuthHeaders(accessToken),
@@ -107,20 +206,51 @@ export default function RecompensasPage() {
           cache: "no-store",
           headers: buildAuthHeaders(accessToken),
         }),
+        fetch("/api/loyalty/me", {
+          cache: "no-store",
+          headers: buildAuthHeaders(accessToken),
+        }),
+        fetch("/api/points/activity-entries", {
+          cache: "no-store",
+          headers: buildAuthHeaders(accessToken),
+        }),
+        fetch("/api/points/activity-entries/me?page=1&limit=8", {
+          cache: "no-store",
+          headers: buildAuthHeaders(accessToken),
+        }),
       ]);
       const payload = (await response.json()) as RewardsResponse;
       if (!response.ok) throw new Error("rewards_unavailable");
       const ledgerPayload = (await ledgerResponse.json()) as { data?: LedgerEntry[] };
       const summaryPayload = (await summaryResponse.json()) as { data?: PointSummary };
+      const loyaltyPayload = (await loyaltyResponse.json()) as { data?: LoyaltySnapshot };
+      const activitiesPayload = (await activitiesResponse.json()) as { data?: PointActivity[] };
+      const activityEntriesPayload = (await activityEntriesResponse.json()) as { data?: UserPointActivityEntry[] };
       setItems(payload.data ?? []);
       setBalance(payload.currentBalance ?? 0);
       setPolicy(payload.pointsPolicy ?? null);
       setLedger(ledgerResponse.ok ? ledgerPayload.data ?? [] : []);
       setPointSummary(summaryResponse.ok ? summaryPayload.data ?? { pointsExpiringIn30Days: 0 } : { pointsExpiringIn30Days: 0 });
+      setLoyalty(loyaltyResponse.ok ? loyaltyPayload.data ?? null : null);
+      const nextActivities = activitiesResponse.ok ? activitiesPayload.data ?? [] : [];
+      setActivities(nextActivities);
+      setActivityEntries(activityEntriesResponse.ok ? activityEntriesPayload.data ?? [] : []);
+      setActivityForm((prev) => {
+        const activityId = prev.activityId || nextActivities[0]?.id || "";
+        const selectedActivity = nextActivities.find((item) => item.id === activityId) ?? nextActivities[0];
+        return {
+          ...prev,
+          activityId,
+          points: prev.points || String(selectedActivity?.suggestedPoints ?? ""),
+        };
+      });
     } catch (error) {
       setItems([]);
       setLedger([]);
       setPointSummary({ pointsExpiringIn30Days: 0 });
+      setLoyalty(null);
+      setActivities([]);
+      setActivityEntries([]);
       setError(
         error instanceof Error
           ? error.message
@@ -210,6 +340,59 @@ export default function RecompensasPage() {
     }
   };
 
+  const submitActivityRequest = async () => {
+    if (!activityForm.activityId || Number(activityForm.points) <= 0) {
+      toast.error("Selecione a atividade e informe os pontos.");
+      return;
+    }
+
+    setSubmittingActivity(true);
+    try {
+      const response = await fetch("/api/points/activity-entries", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...buildAuthHeaders(accessToken),
+        },
+        body: JSON.stringify({
+          activityId: activityForm.activityId,
+          points: Number(activityForm.points),
+          note: activityForm.note.trim() || null,
+          proofUrl: activityForm.proofUrl.trim() || null,
+        }),
+      });
+      const payload = (await response.json()) as { error?: { message?: string } };
+      if (!response.ok) {
+        throw new Error(payload.error?.message ?? "activity_request_error");
+      }
+      toast.success("Solicitacao enviada para aprovacao.");
+      const activity = activities.find((item) => item.id === activityForm.activityId);
+      setActivityForm((prev) => ({
+        ...prev,
+        points: String(activity?.suggestedPoints ?? prev.points),
+        note: "",
+        proofUrl: "",
+      }));
+      await loadRewards();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Nao foi possivel enviar a solicitacao.");
+    } finally {
+      setSubmittingActivity(false);
+    }
+  };
+
+  const activityStatusTone = (status: UserPointActivityEntry["status"]) => {
+    if (status === "APPROVED") return "border-emerald-300/20 bg-emerald-400/10 text-emerald-100";
+    if (status === "REJECTED") return "border-rose-300/20 bg-rose-400/10 text-rose-100";
+    return "border-amber-300/20 bg-amber-400/10 text-amber-100";
+  };
+
+  const activityStatusLabel = (status: UserPointActivityEntry["status"]) => {
+    if (status === "APPROVED") return "Aprovado";
+    if (status === "REJECTED") return "Reprovado";
+    return "Pendente";
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -223,10 +406,114 @@ export default function RecompensasPage() {
       />
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <MetricCard label="Saldo atual" value={`${balance} pts`} tone="highlight" />
-        <MetricCard label="Itens disponiveis" value={String(items.length)} />
-        <MetricCard label="A expirar" value={`${pointSummary.pointsExpiringIn30Days} pts`} />
+        <MetricCard label="Saldo atual" value={`${loyalty?.availablePoints ?? balance} pts`} tone="highlight" />
+        <MetricCard label="Lifetime points" value={`${loyalty?.lifetimePoints ?? balance} pts`} />
+        <MetricCard label="A expirar" value={`${loyalty?.pointsExpiringIn30Days ?? pointSummary.pointsExpiringIn30Days} pts`} />
       </div>
+
+      {loyalty ? (
+        <SectionCard
+          title={loyalty.level.name}
+          description={`Multiplicador ${loyalty.level.multiplier.toFixed(1)}x | Segmento ${loyalty.segment} | Streak ${loyalty.streak.current} semanas`}
+        >
+          <div className="space-y-4">
+            <div>
+              <div className="mb-2 flex items-center justify-between text-sm text-slate-300">
+                <span>Progresso de nivel</span>
+                <span>
+                  {loyalty.level.nextLevel
+                    ? `${loyalty.level.nextLevelPoints} pts para ${loyalty.level.nextLevel.name}`
+                    : "Nivel maximo"}
+                </span>
+              </div>
+              <div className="h-3 overflow-hidden rounded-full bg-slate-900/70">
+                <div
+                  className="h-full rounded-full bg-[linear-gradient(90deg,#38bdf8,#22c55e)] transition-all"
+                  style={{ width: `${loyalty.level.progressPercent}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-xl border border-white/10 bg-[#102640] p-4">
+                <p className="text-xs uppercase tracking-wide text-slate-400">Beneficios ativos</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {loyalty.level.benefits.map((benefit) => (
+                    <span
+                      key={benefit}
+                      className="rounded-full border border-sky-300/20 bg-sky-400/10 px-3 py-1 text-xs text-sky-100"
+                    >
+                      {benefit}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-white/10 bg-[#102640] p-4">
+                <p className="text-xs uppercase tracking-wide text-slate-400">Conquistas</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {loyalty.badges.filter((badge) => badge.unlocked).length === 0 ? (
+                    <span className="text-sm text-slate-400">Suas badges desbloqueadas aparecerao aqui.</span>
+                  ) : (
+                    loyalty.badges
+                      .filter((badge) => badge.unlocked)
+                      .slice(0, 4)
+                      .map((badge) => (
+                        <span
+                          key={badge.id}
+                          className="rounded-full border border-emerald-300/20 bg-emerald-400/10 px-3 py-1 text-xs text-emerald-100"
+                        >
+                          {badge.name}
+                        </span>
+                      ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </SectionCard>
+      ) : null}
+
+      {loyalty ? (
+        <SectionCard title="Missoes" description="Objetivos ativos para acelerar nivel, engajamento e recorrencia">
+          {loyalty.missions.length === 0 ? (
+            <EmptyState title="Sem missoes ativas" description="As proximas missoes aparecerao aqui." />
+          ) : (
+            <div className="grid gap-3 lg:grid-cols-3">
+              {loyalty.missions.map((mission) => (
+                <article key={mission.id} className="rounded-2xl border border-white/10 bg-[#102640] p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-slate-400">{mission.type}</p>
+                      <h3 className="mt-1 text-lg font-semibold text-white">{mission.name}</h3>
+                    </div>
+                    <span className="rounded-full border border-amber-300/20 bg-amber-400/10 px-2.5 py-1 text-xs text-amber-100">
+                      +{mission.rewardPoints} pts
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm text-slate-300">
+                    {mission.description ?? "Missao ativa para acelerar seu progresso no programa."}
+                  </p>
+                  <div className="mt-4">
+                    <div className="mb-2 flex items-center justify-between text-xs text-slate-400">
+                      <span>
+                        {mission.progressValue}/{mission.targetValue}
+                      </span>
+                      <span>{mission.status}</span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-slate-900/70">
+                      <div
+                        className="h-full rounded-full bg-[linear-gradient(90deg,#f59e0b,#38bdf8)]"
+                        style={{ width: `${mission.progressPercent}%` }}
+                      />
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </SectionCard>
+      ) : null}
 
       {policy ? (
         <SectionCard
@@ -236,6 +523,96 @@ export default function RecompensasPage() {
           <p className="text-sm leading-6 text-slate-200">{policy.athletePolicyText}</p>
         </SectionCard>
       ) : null}
+
+      <SectionCard
+        title="Pontos por atividade"
+        description="Solicite creditos por participacao em atividades e acompanhe a aprovacao antes de entrar no seu saldo."
+      >
+        <div className="grid gap-4 xl:grid-cols-[1.05fr_1.35fr]">
+          <div className="rounded-2xl border border-white/10 bg-[#102640] p-4">
+            <p className="text-sm font-semibold text-white">Nova solicitacao</p>
+            <p className="mt-1 text-xs text-slate-400">Os pontos so entram no ranking e no saldo depois da aprovacao administrativa.</p>
+            <div className="mt-4 grid gap-3">
+              <select
+                value={activityForm.activityId}
+                onChange={(event) => {
+                  const activityId = event.target.value;
+                  const activity = activities.find((item) => item.id === activityId);
+                  setActivityForm((prev) => ({
+                    ...prev,
+                    activityId,
+                    points: String(activity?.suggestedPoints ?? prev.points),
+                  }));
+                }}
+                className="rounded-lg border border-white/15 bg-[#0b1f35] px-3 py-2 text-sm text-white outline-none"
+              >
+                <option value="">Selecione a atividade</option>
+                {activities.map((activity) => (
+                  <option key={activity.id} value={activity.id}>
+                    {activity.name}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="number"
+                min={1}
+                value={activityForm.points}
+                onChange={(event) => setActivityForm((prev) => ({ ...prev, points: event.target.value }))}
+                className="rounded-lg border border-white/15 bg-[#0b1f35] px-3 py-2 text-sm text-white outline-none"
+                placeholder="Quantidade de pontos"
+              />
+              <textarea
+                value={activityForm.note}
+                onChange={(event) => setActivityForm((prev) => ({ ...prev, note: event.target.value }))}
+                className="min-h-[84px] rounded-lg border border-white/15 bg-[#0b1f35] px-3 py-2 text-sm text-white outline-none"
+                placeholder="Descreva sua participacao ou anexe contexto"
+              />
+              <input
+                value={activityForm.proofUrl}
+                onChange={(event) => setActivityForm((prev) => ({ ...prev, proofUrl: event.target.value }))}
+                className="rounded-lg border border-white/15 bg-[#0b1f35] px-3 py-2 text-sm text-white outline-none"
+                placeholder="URL do comprovante (opcional)"
+              />
+              <ActionButton disabled={submittingActivity || activities.length === 0} onClick={() => void submitActivityRequest()}>
+                {submittingActivity ? "Enviando..." : "Solicitar pontos"}
+              </ActionButton>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {activityEntries.length === 0 ? (
+              <EmptyState title="Sem solicitacoes" description="Seus pedidos e lancamentos aprovados por atividade aparecerao aqui." />
+            ) : (
+              activityEntries.map((entry) => (
+                <article key={entry.id} className="rounded-2xl border border-white/10 bg-[#102640] p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-lg font-semibold text-white">{entry.activityName ?? "Atividade"}</p>
+                      <p className="text-xs text-slate-400">
+                        {new Date(entry.createdAt).toLocaleDateString("pt-BR")} | {entry.source === "USER" ? "Solicitado por voce" : "Lancado pela assessoria"}
+                      </p>
+                    </div>
+                    <span className={`rounded-full border px-3 py-1 text-xs ${activityStatusTone(entry.status)}`}>
+                      {activityStatusLabel(entry.status)}
+                    </span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-slate-200">
+                    <span className="rounded-full border border-sky-300/20 bg-sky-400/10 px-3 py-1 text-sky-100">
+                      {entry.points} pts
+                    </span>
+                    {entry.proofUrl ? (
+                      <a href={entry.proofUrl} target="_blank" rel="noreferrer" className="text-sky-200 underline underline-offset-2">
+                        Ver comprovante
+                      </a>
+                    ) : null}
+                  </div>
+                  {entry.note ? <p className="mt-3 text-sm text-slate-300">{entry.note}</p> : null}
+                </article>
+              ))
+            )}
+          </div>
+        </div>
+      </SectionCard>
 
       <SectionCard title="Catalogo" description="Selecione um item, simule e finalize o resgate">
         {loading ? (

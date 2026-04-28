@@ -1,11 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import {
-  generateAccessToken,
-  generateRefreshToken,
-  hashRefreshToken,
-  verifyAccessToken,
-} from "@/lib/auth";
+import { generateAccessToken, generateRefreshToken, hashRefreshToken, verifyAccessToken } from "@/lib/auth";
 import { apiError } from "@/lib/api-error";
 import {
   REFRESH_TOKEN_COOKIE,
@@ -15,12 +10,12 @@ import {
   setRefreshCookie,
 } from "@/lib/cookies";
 import { getAuthConfigError, isDemoRuntimeEnabled } from "@/lib/auth-config";
+import { getRefreshTtlDays } from "@/lib/auth-session";
 import { checkRateLimit, getClientIp, isRateLimiterUnavailableError } from "@/lib/rate-limiter";
 import { getAccessTokenFromRequest } from "@/lib/request-auth";
 import { logError, logWarn, toErrorContext, withRequestContext } from "@/lib/logger";
 import { UserRole } from "@/types";
 
-const REFRESH_TTL_DAYS = 30;
 const RATE_LIMIT = 20;
 const RATE_WINDOW_MS = 15 * 60 * 1_000;
 
@@ -129,15 +124,13 @@ export async function POST(req: NextRequest) {
     );
 
     setAccessCookie(response, refreshedAccess, 7 * 24 * 60 * 60);
-    setRefreshCookie(response, incomingToken);
+    setRefreshCookie(response, incomingToken, true);
     return response;
   }
 
   const token_hash = hashRefreshToken(incomingToken);
   const newRefreshToken = generateRefreshToken();
   const newHash = hashRefreshToken(newRefreshToken);
-  const expires_at = new Date(Date.now() + REFRESH_TTL_DAYS * 24 * 60 * 60 * 1_000);
-
   const result = await prisma.$transaction(async (tx) => {
     const stored = await tx.refreshToken.findUnique({
       where: { token_hash },
@@ -181,11 +174,15 @@ export async function POST(req: NextRequest) {
       data: { revoked: true },
     });
 
+    const rememberMe = stored.remember_me;
+    const expires_at = new Date(Date.now() + getRefreshTtlDays(rememberMe) * 24 * 60 * 60 * 1_000);
+
     await tx.refreshToken.create({
       data: {
         user_id: stored.user.id,
         organization_id: stored.user.organization_id,
         token_hash: newHash,
+        remember_me: rememberMe,
         expires_at,
       },
     });
@@ -193,6 +190,7 @@ export async function POST(req: NextRequest) {
     return {
       status: "ok" as const,
       user: stored.user,
+      rememberMe,
     };
   });
 
@@ -232,6 +230,6 @@ export async function POST(req: NextRequest) {
   );
 
   setAccessCookie(response, accessToken);
-  setRefreshCookie(response, newRefreshToken);
+  setRefreshCookie(response, newRefreshToken, result.rememberMe);
   return response;
 }

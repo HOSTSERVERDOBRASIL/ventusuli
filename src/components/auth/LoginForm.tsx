@@ -1,22 +1,22 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, EyeOff, Loader2, Shield, User } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Loader2, Mail, LockKeyhole, ShieldCheck } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { z } from "zod";
 import { useAuthToken } from "@/components/auth/AuthTokenProvider";
+import { AuthShell } from "@/components/auth/AuthShell";
 import { Button } from "@/components/ui/button";
-import { AuthCard } from "@/components/ui/auth-card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { loginSchema, type LoginInput } from "@/lib/validations/auth";
 import { UserRole } from "@/types";
 
-interface LoginResponse {
+interface LoginSuccessResponse {
   accessToken: string;
   user: {
     id: string;
@@ -29,6 +29,14 @@ interface LoginResponse {
     status?: string;
     setup_completed_at?: string | null;
   } | null;
+}
+
+interface LoginMfaResponse {
+  mfa_required: true;
+  mfa_token: string;
+  mfa_setup_required?: boolean;
+  available_methods?: string[];
+  masked_email?: string;
 }
 
 type LoginErrorResponse = {
@@ -78,6 +86,30 @@ function resolvePostLoginPath(
   return "/";
 }
 
+function SocialButton({
+  label,
+  brand,
+  onClick,
+}: {
+  label: string;
+  brand: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex h-16 items-center justify-center gap-3 rounded-2xl border border-white/12 bg-white/5 text-base font-semibold text-white transition hover:border-white/30 hover:bg-white/8"
+      aria-label={`Entrar com ${label}`}
+    >
+      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-lg font-bold text-[#0b1324]">
+        {brand}
+      </span>
+      <span className="hidden sm:inline">{label}</span>
+    </button>
+  );
+}
+
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -107,11 +139,16 @@ export function LoginForm() {
     register,
     handleSubmit,
     setValue,
-    formState: { errors, isSubmitting },
-  } = useForm<LoginInput>({
+    formState: { errors, isSubmitting, isValid },
+  } = useForm<z.input<typeof loginSchema>, unknown, LoginInput>({
     resolver: zodResolver(loginSchema),
     mode: "onChange",
     reValidateMode: "onChange",
+    defaultValues: {
+      email: "",
+      password: "",
+      rememberMe: true,
+    },
   });
 
   const fillDemoCredentials = (profile: "admin" | "athlete") => {
@@ -135,9 +172,9 @@ export function LoginForm() {
         body: JSON.stringify(data),
       });
 
-      const payload = (await response.json()) as LoginResponse | LoginErrorResponse;
+      const payload = (await response.json()) as LoginSuccessResponse | LoginMfaResponse | LoginErrorResponse;
 
-      if (!response.ok || !("accessToken" in payload)) {
+      if (!response.ok) {
         const message =
           "error" in payload
             ? (payload.error?.message ?? "Nao foi possivel autenticar. Tente novamente.")
@@ -152,6 +189,27 @@ export function LoginForm() {
           return;
         }
 
+        setError(message);
+        toast.error(message);
+        return;
+      }
+
+      if ("mfa_required" in payload && payload.mfa_required) {
+        const nextPath = searchParams.get("next");
+        const url = new URL("/mfa", window.location.origin);
+        url.searchParams.set("token", payload.mfa_token);
+        if (payload.mfa_setup_required) url.searchParams.set("setup", "1");
+        if (payload.masked_email) url.searchParams.set("email", payload.masked_email);
+        if (payload.available_methods?.length) {
+          url.searchParams.set("methods", payload.available_methods.join(","));
+        }
+        if (nextPath) url.searchParams.set("next", nextPath);
+        router.push(url.pathname + url.search);
+        return;
+      }
+
+      if (!("accessToken" in payload)) {
+        const message = "Nao foi possivel autenticar. Tente novamente.";
         setError(message);
         toast.error(message);
         return;
@@ -185,82 +243,91 @@ export function LoginForm() {
     await handleSubmit(onSubmit)();
   };
 
+  const notifySocialLogin = (provider: string) => {
+    toast.info(`Login com ${provider} preparado para integracao OAuth.`);
+  };
+
   return (
-    <AuthCard title="Entrar" description="Acesse sua conta para continuar no Ventu Suli.">
+    <AuthShell
+      title="Bem-vindo(a) de volta!"
+      description="Faca login para continuar sua jornada com seguranca, consistencia e foco em evolucao."
+    >
       {demoUiEnabled ? (
-        <section className="mb-5 space-y-3">
-          <p className="text-xs uppercase tracking-wide text-slate-400">Modo demonstracao</p>
-          <div className="grid grid-cols-2 gap-3">
+        <section className="mb-6 rounded-[1.6rem] border border-[#f7b529]/20 bg-[#f7b529]/8 p-4">
+          <div className="flex items-center gap-3">
+            <ShieldCheck className="h-5 w-5 text-[#f7b529]" />
+            <div>
+              <p className="text-sm font-semibold text-white">Modo demonstracao</p>
+              <p className="text-sm text-slate-300">Perfis prontos para apresentar a experiencia.</p>
+            </div>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <button
               type="button"
               onClick={() => void quickDemoLogin("admin")}
-              className="cursor-pointer rounded-xl border border-[#F5A623]/30 bg-[#0F2743] p-3 text-left transition hover:border-[#F5A623]/60"
+              className="rounded-2xl border border-white/10 bg-white/6 px-4 py-3 text-left transition hover:border-[#f7b529]/50 hover:bg-white/10"
             >
-              <Shield className="mb-2 h-4 w-4 text-[#F5A623]" />
               <p className="text-sm font-semibold text-white">Assessoria</p>
-              <p className="text-xs text-slate-300">Gestao completa</p>
+              <p className="mt-1 text-sm text-slate-300">Gestao, financeiro e operacao.</p>
             </button>
             <button
               type="button"
               onClick={() => void quickDemoLogin("athlete")}
-              className="cursor-pointer rounded-xl border border-white/10 bg-[#0F2743] p-3 text-left transition hover:border-white/60"
+              className="rounded-2xl border border-white/10 bg-white/6 px-4 py-3 text-left transition hover:border-white/30 hover:bg-white/10"
             >
-              <User className="mb-2 h-4 w-4 text-slate-200" />
               <p className="text-sm font-semibold text-white">Atleta</p>
-              <p className="text-xs text-slate-300">Visao do corredor</p>
+              <p className="mt-1 text-sm text-slate-300">Painel de jornada, progresso e comunidade.</p>
             </button>
-          </div>
-          <div className="relative py-1 text-center">
-            <span className="relative z-10 bg-[#102D4B] px-3 text-xs text-slate-300">
-              ou entre com suas credenciais
-            </span>
-            <div className="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-white/10" />
           </div>
         </section>
       ) : null}
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         {error ? (
-          <div className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+          <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
             {error}
           </div>
         ) : null}
 
         <div className="space-y-2">
-          <Label htmlFor="email" className="text-slate-100">
-            Email
+          <Label htmlFor="email" className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">
+            E-mail
           </Label>
-          <Input
-            id="email"
-            type="email"
-            placeholder="voce@assessoria.com"
-            autoComplete="email"
-            className="border-white/15 bg-[#0F2743] text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]"
-            {...register("email")}
-          />
+          <div className="relative">
+            <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+            <Input
+              id="email"
+              type="email"
+              placeholder="seu@email.com"
+              autoComplete="email"
+              className="h-16 rounded-2xl border-white/12 bg-white/6 pl-12 text-base text-white placeholder:text-slate-400 focus-visible:ring-[#f7b529]"
+              {...register("email")}
+            />
+          </div>
           {errors.email ? <p className="text-xs text-amber-300">{errors.email.message}</p> : null}
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="password" className="text-slate-100">
+          <Label htmlFor="password" className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">
             Senha
           </Label>
           <div className="relative">
+            <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
             <Input
               id="password"
               type={showPassword ? "text" : "password"}
               placeholder="Digite sua senha"
               autoComplete="current-password"
-              className="border-white/15 bg-[#0F2743] pr-11 text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]"
+              className="h-16 rounded-2xl border-white/12 bg-white/6 pl-12 pr-12 text-base text-white placeholder:text-slate-400 focus-visible:ring-[#f7b529]"
               {...register("password")}
             />
             <button
               type="button"
               aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
               onClick={() => setShowPassword((prev) => !prev)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 transition hover:text-white"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 transition hover:text-white"
             >
-              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
             </button>
           </div>
           {errors.password ? (
@@ -268,57 +335,74 @@ export function LoginForm() {
           ) : null}
         </div>
 
-        <p className="text-right text-sm text-slate-300">
-          <Link href="/forgot-password" className="hover:text-[#F5A623] hover:underline">
+        <div className="flex flex-col gap-3 text-sm text-slate-300 sm:flex-row sm:items-center sm:justify-between">
+          <label className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-white/15 bg-transparent text-[#f7b529] focus:ring-[#f7b529]"
+              {...register("rememberMe")}
+            />
+            <span>Lembrar-me</span>
+          </label>
+          <Link href="/forgot-password" className="font-medium text-[#f7b529] transition hover:text-[#ffd27a]">
             Esqueci minha senha
           </Link>
-        </p>
+        </div>
 
         <Button
           type="submit"
-          disabled={isSubmitting}
-          className="h-11 w-full bg-[#F5A623] font-semibold text-[#0A1628] hover:bg-[#e59a1f]"
+          disabled={isSubmitting || !isValid}
+          className="h-16 w-full rounded-2xl bg-[#f7b529] text-lg font-bold text-[#0a1220] shadow-[0_18px_45px_rgba(247,181,41,0.3)] hover:bg-[#ffbf3e]"
         >
           {isSubmitting ? (
             <span className="flex items-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Entrando...
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Validando acesso...
             </span>
           ) : (
-            "Entrar"
+            <span className="flex items-center gap-3">
+              ACESSAR MINHA EVOLUCAO
+              <ArrowRight className="h-5 w-5" />
+            </span>
           )}
         </Button>
 
+        <div className="relative py-2 text-center">
+          <span className="relative z-10 bg-[#091223] px-4 text-sm text-slate-400">ou continue com</span>
+          <div className="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-white/10" />
+        </div>
+
+        <div className="grid grid-cols-3 gap-3">
+          <SocialButton label="Google" brand="G" onClick={() => notifySocialLogin("Google")} />
+          <SocialButton label="Apple" brand="A" onClick={() => notifySocialLogin("Apple")} />
+          <SocialButton label="Facebook" brand="f" onClick={() => notifySocialLogin("Facebook")} />
+        </div>
+
         {publicAdminRegistrationEnabled ? (
-          <p className="text-center text-sm text-slate-200">
+          <p className="text-center text-base text-slate-300">
             Ainda nao tem conta?{" "}
-            <Link
-              href="/register/assessoria"
-              className="font-semibold text-[#F5A623] hover:underline"
-            >
-              Cadastrar assessoria
+            <Link href="/register/assessoria" className="font-semibold text-[#f7b529] hover:text-[#ffd27a]">
+              Comecar agora
             </Link>
           </p>
         ) : (
-          <p className="text-center text-sm text-slate-300">
-            Cadastro de assessoria apenas por convite comercial.
-          </p>
+          <div className="space-y-2 text-center text-sm text-slate-400">
+            <p>Cadastro de assessoria por convite comercial.</p>
+            <p>
+              Sou atleta e tenho convite:{" "}
+              <Link href="/register/atleta" className="font-semibold text-[#f7b529] hover:text-[#ffd27a]">
+                Cadastrar atleta
+              </Link>
+            </p>
+            <p>
+              Recebi convite de admin:{" "}
+              <Link href="/activate-admin" className="font-semibold text-[#f7b529] hover:text-[#ffd27a]">
+                Ativar conta
+              </Link>
+            </p>
+          </div>
         )}
-
-        <p className="text-center text-sm text-slate-300">
-          Sou atleta e tenho convite:{" "}
-          <Link href="/register/atleta" className="font-semibold text-[#F5A623] hover:underline">
-            Cadastrar atleta
-          </Link>
-        </p>
-
-        <p className="text-center text-sm text-slate-300">
-          Recebi convite de admin:{" "}
-          <Link href="/activate-admin" className="font-semibold text-[#F5A623] hover:underline">
-            Ativar conta
-          </Link>
-        </p>
       </form>
-    </AuthCard>
+    </AuthShell>
   );
 }

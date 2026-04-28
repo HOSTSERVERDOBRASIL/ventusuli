@@ -31,6 +31,21 @@ enum AccountStatus {
   @@schema("public")
 }
 
+enum MfaMethod {
+  TOTP
+  EMAIL_OTP
+  RECOVERY_CODE
+
+  @@schema("public")
+}
+
+enum AuthChallengePurpose {
+  LOGIN_MFA
+  MFA_SETUP
+
+  @@schema("public")
+}
+
 enum AthleteStatus {
   PENDING_APPROVAL
   ACTIVE
@@ -158,6 +173,7 @@ enum LedgerSource {
   EARLY_SIGNUP
   EARLY_PAYMENT
   CAMPAIGN_BONUS
+  ACTIVITY_APPROVAL
   REFERRAL
   RECURRENCE
   MANUAL
@@ -207,6 +223,69 @@ enum RankingSnapshotMetric {
   @@schema("public")
 }
 
+enum LoyaltyLevelKey {
+  STARTER
+  MEMBER
+  PLUS
+  PRIME
+  BLACK
+
+  @@schema("public")
+}
+
+enum LoyaltyMissionType {
+  ONBOARDING
+  FREQUENCY
+  SPEND
+  ENGAGEMENT
+  SEASONAL
+  DYNAMIC
+
+  @@schema("public")
+}
+
+enum LoyaltyMissionStatus {
+  ACTIVE
+  PAUSED
+  ARCHIVED
+
+  @@schema("public")
+}
+
+enum UserMissionStatus {
+  IN_PROGRESS
+  COMPLETED
+  CLAIMED
+  EXPIRED
+
+  @@schema("public")
+}
+
+enum LoyaltyBadgeCategory {
+  FIRST_ACTION
+  RECURRENT
+  ELITE
+  REFERRAL
+  SPECIAL
+
+  @@schema("public")
+}
+
+enum PointActivityEntryStatus {
+  PENDING
+  APPROVED
+  REJECTED
+
+  @@schema("public")
+}
+
+enum PointActivityEntrySource {
+  ADMIN
+  USER
+
+  @@schema("public")
+}
+
 model Organization {
   id              String    @id @default(uuid())
   name            String
@@ -238,11 +317,21 @@ model Organization {
   athlete_point_ledger AthletePointLedger[]
   reward_items         RewardItem[]
   reward_redemptions   RewardRedemption[]
+  loyalty_profiles     UserLoyalty[]
+  loyalty_missions     LoyaltyMission[]
+  loyalty_badges       LoyaltyBadge[]
+  loyalty_user_missions UserLoyaltyMission[]
+  loyalty_user_badges  UserLoyaltyBadge[]
+  loyalty_program_events LoyaltyProgramEvent[]
+  point_activities     PointActivity[]
+  point_activity_entries PointActivityEntry[]
   platform_billing_invoices PlatformBillingInvoice[]
   strava_connections   StravaConnection[]
   activities           Activity[]
   strava_sync_logs     StravaSyncLog[]
   ranking_snapshots    RankingSnapshot[]
+  auth_challenges      AuthChallenge[]
+  mfa_settings         UserMfaSettings[]
 
   @@index([slug])
   @@index([status])
@@ -266,6 +355,8 @@ model User {
 
   refresh_tokens             RefreshToken[]
   password_reset_tokens      PasswordResetToken[]
+  auth_challenges            AuthChallenge[]
+  mfa_settings               UserMfaSettings?
   athlete_profile            AthleteProfile?
   created_events             Event[]              @relation("EventCreator")
   registrations              Registration[]
@@ -279,6 +370,11 @@ model User {
   created_notices            Notice[]             @relation("NoticeCreator")
   athlete_point_ledger       AthletePointLedger[]
   reward_redemptions         RewardRedemption[]
+  loyalty_profile            UserLoyalty?
+  loyalty_missions           UserLoyaltyMission[]
+  loyalty_badges             UserLoyaltyBadge[]
+  loyalty_program_events     LoyaltyProgramEvent[]
+  point_activity_entries     PointActivityEntry[]
   strava_connection          StravaConnection?
   activities                 Activity[]
   strava_sync_logs           StravaSyncLog[]
@@ -306,6 +402,56 @@ model PasswordResetToken {
   @@schema("public")
 }
 
+model UserMfaSettings {
+  id                     String       @id @default(uuid())
+  user_id                String       @unique
+  user                   User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  organization_id        String
+  organization           Organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  enabled                Boolean      @default(false)
+  totp_secret            String?
+  email_otp_enabled      Boolean      @default(true)
+  recovery_codes_hashes  String[]     @default([])
+  recovery_codes_version Int          @default(1)
+  last_verified_at       DateTime?
+  created_at             DateTime     @default(now())
+  updated_at             DateTime     @updatedAt
+
+  @@index([organization_id, enabled])
+  @@map("user_mfa_settings")
+  @@schema("public")
+}
+
+model AuthChallenge {
+  id                  String               @id @default(uuid())
+  user_id             String
+  user                User                 @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  organization_id     String
+  organization        Organization         @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  purpose             AuthChallengePurpose
+  token_hash          String               @unique
+  primary_method      MfaMethod           @default(TOTP)
+  available_methods   MfaMethod[]         @default([TOTP])
+  email_otp_code_hash String?
+  temp_totp_secret    String?
+  remember_me         Boolean             @default(false)
+  failed_attempts     Int                 @default(0)
+  max_attempts        Int                 @default(5)
+  expires_at          DateTime
+  email_otp_sent_at   DateTime?
+  verified_at         DateTime?
+  consumed_at         DateTime?
+  metadata            Json?
+  created_at          DateTime            @default(now())
+  updated_at          DateTime            @updatedAt
+
+  @@index([user_id, purpose, expires_at(sort: Desc)])
+  @@index([organization_id, purpose, created_at(sort: Desc)])
+  @@index([expires_at])
+  @@map("auth_challenges")
+  @@schema("public")
+}
+
 model RefreshToken {
   id              String       @id @default(uuid())
   user_id         String
@@ -314,6 +460,7 @@ model RefreshToken {
   organization    Organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
   token_hash      String       @unique
   expires_at      DateTime
+  remember_me     Boolean      @default(true)
   revoked         Boolean      @default(false)
   created_at      DateTime     @default(now())
 
@@ -896,5 +1043,209 @@ model RewardRedemption {
   rewardItem     RewardItem       @relation(fields: [rewardItemId], references: [id], onDelete: Cascade)
 
   @@index([organizationId, userId, status])
+  @@schema("public")
+}
+
+model PointActivity {
+  id              String               @id @default(cuid())
+  organizationId  String
+  name            String
+  description     String?
+  suggestedPoints Int                  @default(0)
+  activityDate    DateTime
+  active          Boolean              @default(true)
+  createdBy       String
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  organization    Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  entries         PointActivityEntry[]
+
+  @@index([organizationId, activityDate(sort: Desc)])
+  @@index([organizationId, active])
+  @@map("point_activities")
+  @@schema("public")
+}
+
+model PointActivityEntry {
+  id             String                   @id @default(cuid())
+  organizationId String
+  activityId     String
+  userId         String
+  points         Int
+  status         PointActivityEntryStatus @default(PENDING)
+  source         PointActivityEntrySource @default(ADMIN)
+  note           String?
+  proofUrl       String?
+  referenceCode  String                   @unique
+  ledgerEntryId  String?
+  createdBy      String
+  approvedBy     String?
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+  approvedAt     DateTime?
+  rejectedAt     DateTime?
+  organization   Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  activity       PointActivity            @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  user           User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([activityId, userId])
+  @@index([organizationId, status, createdAt(sort: Desc)])
+  @@index([organizationId, userId, createdAt(sort: Desc)])
+  @@map("point_activity_entries")
+  @@schema("public")
+}
+
+model UserLoyalty {
+  id                   String          @id @default(cuid())
+  userId               String          @unique
+  organizationId       String
+  currentLevelKey      LoyaltyLevelKey @default(STARTER)
+  availablePoints      Int             @default(0)
+  lifetimePoints       Int             @default(0)
+  lastActivityAt       DateTime?
+  inactivityDowngradeAt DateTime?
+  streakCurrent        Int             @default(0)
+  streakBest           Int             @default(0)
+  lastStreakAt         DateTime?
+  segment              String          @default("novo")
+  metadata             Json?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  user                 User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization         Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, currentLevelKey])
+  @@index([organizationId, segment])
+  @@map("users_loyalty")
+  @@schema("public")
+}
+
+model LoyaltyLevel {
+  id                String          @id @default(cuid())
+  key               LoyaltyLevelKey @unique
+  name              String
+  minLifetimePoints Int
+  multiplier        Decimal         @db.Decimal(5, 2)
+  benefits          Json?
+  active            Boolean         @default(true)
+  sortOrder         Int
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([active, sortOrder])
+  @@map("loyalty_levels")
+  @@schema("public")
+}
+
+model LoyaltyMission {
+  id               String               @id @default(cuid())
+  organizationId   String
+  code             String
+  name             String
+  description      String?
+  type             LoyaltyMissionType
+  targetValue      Int                  @default(1)
+  rewardPoints     Int                  @default(0)
+  rewardBadgeId    String?
+  startAt          DateTime?
+  endAt            DateTime?
+  repeatable       Boolean              @default(false)
+  status           LoyaltyMissionStatus @default(ACTIVE)
+  levelRequirement LoyaltyLevelKey?
+  metadata         Json?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  organization     Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  rewardBadge      LoyaltyBadge?        @relation("MissionRewardBadge", fields: [rewardBadgeId], references: [id], onDelete: SetNull)
+  userMissions     UserLoyaltyMission[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, status, type])
+  @@index([organizationId, startAt, endAt])
+  @@map("missions")
+  @@schema("public")
+}
+
+model UserLoyaltyMission {
+  id             String            @id @default(cuid())
+  missionId      String
+  userId         String
+  organizationId String
+  cycleKey       String            @default("default")
+  progressValue  Int               @default(0)
+  status         UserMissionStatus @default(IN_PROGRESS)
+  completedAt    DateTime?
+  claimedAt      DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  mission        LoyaltyMission    @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([missionId, userId, cycleKey])
+  @@index([organizationId, status, updatedAt(sort: Desc)])
+  @@index([userId, status, updatedAt(sort: Desc)])
+  @@map("user_missions")
+  @@schema("public")
+}
+
+model LoyaltyBadge {
+  id              String               @id @default(cuid())
+  organizationId  String
+  code            String
+  name            String
+  description     String?
+  icon            String?
+  category        LoyaltyBadgeCategory @default(SPECIAL)
+  active          Boolean              @default(true)
+  metadata        Json?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  organization    Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userBadges      UserLoyaltyBadge[]
+  rewardMissions  LoyaltyMission[]     @relation("MissionRewardBadge")
+
+  @@unique([organizationId, code])
+  @@index([organizationId, category, active])
+  @@map("badges")
+  @@schema("public")
+}
+
+model UserLoyaltyBadge {
+  id             String        @id @default(cuid())
+  badgeId        String
+  userId         String
+  organizationId String
+  sourceEventId  String?
+  awardedAt      DateTime      @default(now())
+  createdAt      DateTime      @default(now())
+  badge          LoyaltyBadge  @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([badgeId, userId])
+  @@index([organizationId, awardedAt(sort: Desc)])
+  @@index([userId, awardedAt(sort: Desc)])
+  @@map("user_badges")
+  @@schema("public")
+}
+
+model LoyaltyProgramEvent {
+  id             String       @id @default(cuid())
+  organizationId String
+  userId         String?
+  eventName      String
+  sourceEventId  String
+  idempotencyKey String?
+  payload        Json?
+  processedAt    DateTime?
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, sourceEventId])
+  @@index([organizationId, eventName, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("loyalty_program_events")
   @@schema("public")
 }

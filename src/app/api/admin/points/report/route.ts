@@ -15,6 +15,7 @@ const querySchema = z.object({
       "EARLY_SIGNUP",
       "EARLY_PAYMENT",
       "CAMPAIGN_BONUS",
+      "ACTIVITY_APPROVAL",
       "REFERRAL",
       "RECURRENCE",
       "MANUAL",

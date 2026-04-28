@@ -5,6 +5,17 @@ import { useSearchParams } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { AlertTriangle, Copy, Download, QrCode, RefreshCw } from "lucide-react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  Line,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { toast } from "sonner";
 import { useAuthToken } from "@/components/auth/AuthTokenProvider";
 import { PixQrCode } from "@/components/payment/pix-qrcode";
@@ -63,6 +74,23 @@ const EMPTY_FILTERS: PaymentFilterOptions = {
   athletes: [],
   events: [],
 };
+const EMPTY_FINANCIAL_SUMMARY = {
+  incomeCents: 0,
+  expenseCents: 0,
+  balanceCents: 0,
+  openReceivableCents: 0,
+  openPayableCents: 0,
+};
+const FINANCE_HISTORY_START = "2000-01-01T00:00:00.000Z";
+
+type FinanceWorkspace = "overview" | "charges" | "cashbook" | "ledger";
+
+const WORKSPACE_LABELS: Record<FinanceWorkspace, string> = {
+  overview: "Visao geral",
+  charges: "Cobrancas",
+  cashbook: "Livro-caixa",
+  ledger: "Contas e recebimentos",
+};
 
 function paymentTone(status: PaymentRow["status"]): "positive" | "warning" | "danger" | "neutral" {
   if (status === "PAID") return "positive";
@@ -91,6 +119,30 @@ function formatDateTime(value?: string): string {
   return format(new Date(value), "dd/MM/yyyy HH:mm", { locale: ptBR });
 }
 
+function formatShortDate(value: string): string {
+  return format(new Date(value), "dd/MM", { locale: ptBR });
+}
+
+function formatMonthLabel(value: string): string {
+  return format(new Date(value), "MMM/yy", { locale: ptBR });
+}
+
+function bucketKeyFromIso(value: string, mode: "day" | "month"): string {
+  return mode === "month" ? value.slice(0, 7) : value.slice(0, 10);
+}
+
+function entryKindLabel(kind: FinancialEntryRow["entryKind"]): string {
+  if (kind === "CASH") return "Livro-caixa";
+  if (kind === "RECEIVABLE") return "A receber";
+  return "A pagar";
+}
+
+function entryKindTone(kind: FinancialEntryRow["entryKind"]): "positive" | "warning" | "neutral" {
+  if (kind === "CASH") return "positive";
+  if (kind === "RECEIVABLE") return "warning";
+  return "neutral";
+}
+
 export default function AdminFinanceiroPage() {
   const { accessToken } = useAuthToken();
   const searchParams = useSearchParams();
@@ -117,13 +169,17 @@ export default function AdminFinanceiroPage() {
   const [loadingPaymentDetail, setLoadingPaymentDetail] = useState(false);
   const [runningAction, setRunningAction] = useState(false);
   const [manualEntries, setManualEntries] = useState<FinancialEntryRow[]>([]);
-  const [manualSummary, setManualSummary] = useState({
-    incomeCents: 0,
-    expenseCents: 0,
-    balanceCents: 0,
-    openReceivableCents: 0,
-    openPayableCents: 0,
-  });
+  const [manualSummary, setManualSummary] = useState(EMPTY_FINANCIAL_SUMMARY);
+  const [openingManualSummary, setOpeningManualSummary] = useState(EMPTY_FINANCIAL_SUMMARY);
+  const [periodPayments, setPeriodPayments] = useState<PaymentRow[]>([]);
+  const [periodPaymentSummary, setPeriodPaymentSummary] = useState<PaymentSummary>(EMPTY_SUMMARY);
+  const [openingPaidCents, setOpeningPaidCents] = useState(0);
+  const [cashStatusFilter, setCashStatusFilter] = useState<"ALL" | "OPEN" | "PAID" | "CANCELLED">("ALL");
+  const [cashTypeFilter, setCashTypeFilter] = useState<"ALL" | "INCOME" | "EXPENSE">("ALL");
+  const [cashCostCenterFilter, setCashCostCenterFilter] = useState("ALL");
+  const [ledgerStatusFilter, setLedgerStatusFilter] = useState<"ALL" | "OPEN" | "PAID" | "CANCELLED">("ALL");
+  const [ledgerTypeFilter, setLedgerTypeFilter] = useState<"ALL" | "INCOME" | "EXPENSE">("ALL");
+  const [ledgerCostCenterFilter, setLedgerCostCenterFilter] = useState("ALL");
   const [entryForm, setEntryForm] = useState({
     type: "INCOME" as "INCOME" | "EXPENSE",
     entryKind: "CASH" as "CASH" | "RECEIVABLE" | "PAYABLE",
@@ -190,6 +246,7 @@ export default function AdminFinanceiroPage() {
   const loadPayments = useCallback(async () => {
     setLoading(true);
     try {
+      const openingEndDate = new Date(new Date(filters.startDate).getTime() - 1).toISOString();
       const payload = await getPayments({
         startDate: filters.startDate,
         endDate: filters.endDate,
@@ -201,18 +258,40 @@ export default function AdminFinanceiroPage() {
         sortDir,
         accessToken,
       });
+      const [entriesPayload, periodPaymentsPayload, openingEntriesPayload, openingPaymentsPayload] =
+        await Promise.all([
+          getFinancialEntries({
+            startDate: filters.startDate,
+            endDate: filters.endDate,
+            accessToken,
+          }),
+          getPayments({
+            startDate: filters.startDate,
+            endDate: filters.endDate,
+            accessToken,
+          }),
+          getFinancialEntries({
+            startDate: FINANCE_HISTORY_START,
+            endDate: openingEndDate,
+            accessToken,
+          }),
+          getPayments({
+            startDate: FINANCE_HISTORY_START,
+            endDate: openingEndDate,
+            accessToken,
+          }),
+        ]);
 
       setRows(payload.rows);
       setSummary(payload.summary);
       setQueue(payload.queue);
       setFilterOptions(payload.filters);
-      const entriesPayload = await getFinancialEntries({
-        startDate: filters.startDate,
-        endDate: filters.endDate,
-        accessToken,
-      });
       setManualEntries(entriesPayload.data);
       setManualSummary(entriesPayload.summary);
+      setPeriodPayments(periodPaymentsPayload.rows);
+      setPeriodPaymentSummary(periodPaymentsPayload.summary);
+      setOpeningManualSummary(openingEntriesPayload.summary);
+      setOpeningPaidCents(openingPaymentsPayload.summary.totalPago);
       setErrorMessage(null);
     } catch {
       setRows([]);
@@ -220,7 +299,11 @@ export default function AdminFinanceiroPage() {
       setQueue(EMPTY_QUEUE);
       setFilterOptions(EMPTY_FILTERS);
       setManualEntries([]);
-      setManualSummary({ incomeCents: 0, expenseCents: 0, balanceCents: 0, openReceivableCents: 0, openPayableCents: 0 });
+      setManualSummary(EMPTY_FINANCIAL_SUMMARY);
+      setOpeningManualSummary(EMPTY_FINANCIAL_SUMMARY);
+      setPeriodPayments([]);
+      setPeriodPaymentSummary(EMPTY_SUMMARY);
+      setOpeningPaidCents(0);
       setErrorMessage("Não foi possível carregar os dados financeiros no momento.");
     } finally {
       setLoading(false);
@@ -271,6 +354,160 @@ export default function AdminFinanceiroPage() {
         .slice(0, 8),
     [rows],
   );
+
+  const cashEntries = useMemo(
+    () => manualEntries.filter((entry) => entry.entryKind === "CASH"),
+    [manualEntries],
+  );
+  const receivableEntries = useMemo(
+    () => manualEntries.filter((entry) => entry.entryKind === "RECEIVABLE"),
+    [manualEntries],
+  );
+  const payableEntries = useMemo(
+    () => manualEntries.filter((entry) => entry.entryKind === "PAYABLE"),
+    [manualEntries],
+  );
+  const ledgerEntries = useMemo(
+    () => manualEntries.filter((entry) => entry.entryKind !== "CASH"),
+    [manualEntries],
+  );
+  const paidRows = useMemo(() => rows.filter((row) => row.status === "PAID"), [rows]);
+  const paidPeriodRows = useMemo(() => periodPayments.filter((row) => row.status === "PAID"), [periodPayments]);
+  const pendingRows = useMemo(() => rows.filter((row) => row.status === "PENDING"), [rows]);
+  const cashEntriesOpen = useMemo(
+    () => cashEntries.filter((entry) => entry.status === "OPEN").length,
+    [cashEntries],
+  );
+  const ledgerOpenCount = useMemo(
+    () => ledgerEntries.filter((entry) => entry.status === "OPEN").length,
+    [ledgerEntries],
+  );
+  const paidRowsAmount = useMemo(
+    () => paidRows.reduce((total, row) => total + row.amountCents, 0),
+    [paidRows],
+  );
+  const recentPaidRows = useMemo(() => paidPeriodRows.slice(0, 8), [paidPeriodRows]);
+  const costCenterOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          manualEntries
+            .map((entry) => entry.costCenter?.trim())
+            .filter((value): value is string => Boolean(value)),
+        ),
+      ).sort((left, right) => left.localeCompare(right)),
+    [manualEntries],
+  );
+  const filteredCashEntries = useMemo(
+    () =>
+      cashEntries.filter((entry) => {
+        if (cashStatusFilter !== "ALL" && entry.status !== cashStatusFilter) return false;
+        if (cashTypeFilter !== "ALL" && entry.type !== cashTypeFilter) return false;
+        if (cashCostCenterFilter !== "ALL" && (entry.costCenter ?? "") !== cashCostCenterFilter) return false;
+        return true;
+      }),
+    [cashCostCenterFilter, cashEntries, cashStatusFilter, cashTypeFilter],
+  );
+  const filteredLedgerEntries = useMemo(
+    () =>
+      ledgerEntries.filter((entry) => {
+        if (ledgerStatusFilter !== "ALL" && entry.status !== ledgerStatusFilter) return false;
+        if (ledgerTypeFilter !== "ALL" && entry.type !== ledgerTypeFilter) return false;
+        if (ledgerCostCenterFilter !== "ALL" && (entry.costCenter ?? "") !== ledgerCostCenterFilter) return false;
+        return true;
+      }),
+    [ledgerCostCenterFilter, ledgerEntries, ledgerStatusFilter, ledgerTypeFilter],
+  );
+  const openingCashBalanceCents = useMemo(
+    () => openingManualSummary.balanceCents + openingPaidCents,
+    [openingManualSummary.balanceCents, openingPaidCents],
+  );
+  const currentCashIncomeCents = useMemo(
+    () =>
+      manualEntries
+        .filter((entry) => entry.entryKind === "CASH" && entry.type === "INCOME" && entry.status === "PAID")
+        .reduce((total, entry) => total + entry.amountCents, 0),
+    [manualEntries],
+  );
+  const currentCashExpenseCents = useMemo(
+    () =>
+      manualEntries
+        .filter((entry) => entry.entryKind === "CASH" && entry.type === "EXPENSE" && entry.status === "PAID")
+        .reduce((total, entry) => total + entry.amountCents, 0),
+    [manualEntries],
+  );
+  const closingCashBalanceCents = useMemo(
+    () => openingCashBalanceCents + periodPaymentSummary.totalPago + currentCashIncomeCents - currentCashExpenseCents,
+    [currentCashExpenseCents, currentCashIncomeCents, openingCashBalanceCents, periodPaymentSummary.totalPago],
+  );
+  const ledgerReceivableOpenCount = useMemo(
+    () => filteredLedgerEntries.filter((entry) => entry.entryKind === "RECEIVABLE" && entry.status === "OPEN").length,
+    [filteredLedgerEntries],
+  );
+  const ledgerPayableOpenCount = useMemo(
+    () => filteredLedgerEntries.filter((entry) => entry.entryKind === "PAYABLE" && entry.status === "OPEN").length,
+    [filteredLedgerEntries],
+  );
+  const cashFlowSeries = useMemo(() => {
+    const bucketMode = period === "YEAR" ? "month" : "day";
+    const buckets = new Map<
+      string,
+      {
+        label: string;
+        inflowCents: number;
+        outflowCents: number;
+      }
+    >();
+
+    const ensureBucket = (isoDate: string) => {
+      const key = bucketKeyFromIso(isoDate, bucketMode);
+      if (!buckets.has(key)) {
+        buckets.set(key, {
+          label: bucketMode === "month" ? formatMonthLabel(`${key}-01T00:00:00.000Z`) : formatShortDate(`${key}T00:00:00.000Z`),
+          inflowCents: 0,
+          outflowCents: 0,
+        });
+      }
+      return buckets.get(key)!;
+    };
+
+    periodPayments
+      .filter((row) => row.status === "PAID" && row.paidAt)
+      .forEach((row) => {
+        const bucket = ensureBucket(row.paidAt!);
+        bucket.inflowCents += row.amountCents;
+      });
+
+    manualEntries
+      .filter((entry) => entry.entryKind === "CASH" && entry.status === "PAID")
+      .forEach((entry) => {
+        const bucket = ensureBucket(entry.settledAt ?? entry.occurredAt);
+        if (entry.type === "INCOME") bucket.inflowCents += entry.amountCents;
+        else bucket.outflowCents += entry.amountCents;
+      });
+
+    let runningBalance = openingCashBalanceCents;
+    return Array.from(buckets.entries())
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([, bucket]) => {
+        const netCents = bucket.inflowCents - bucket.outflowCents;
+        runningBalance += netCents;
+        return {
+          label: bucket.label,
+          inflow: Number((bucket.inflowCents / 100).toFixed(2)),
+          outflow: Number((bucket.outflowCents / 100).toFixed(2)),
+          net: Number((netCents / 100).toFixed(2)),
+          balance: Number((runningBalance / 100).toFixed(2)),
+        };
+      });
+  }, [manualEntries, openingCashBalanceCents, period, periodPayments]);
+  const periodLabel = useMemo(() => {
+    if (period === "YEAR") return "Ano atual";
+    if (period === "CUSTOM") {
+      return `${format(new Date(filters.startDate), "dd/MM/yyyy", { locale: ptBR })} a ${format(new Date(filters.endDate), "dd/MM/yyyy", { locale: ptBR })}`;
+    }
+    return format(new Date(filters.startDate), "MMMM 'de' yyyy", { locale: ptBR });
+  }, [filters.endDate, filters.startDate, period]);
 
   const exportCsv = () => {
     const header = [
@@ -546,26 +783,170 @@ export default function AdminFinanceiroPage() {
         }
       />
 
-      <SectionCard title="Resumo financeiro" description="Indicadores consolidados para decisao rapida">
-        <div className="grid gap-3 md:grid-cols-5">
-          <MetricCard label="Total cobrado" value={BRL.format(summary.totalCobrado / 100)} />
-          <MetricCard label="Total pago" value={BRL.format(summary.totalPago / 100)} tone="highlight" />
-          <MetricCard label="Pendente" value={BRL.format(summary.totalPendente / 100)} />
-          <MetricCard label="Expirado" value={BRL.format(summary.totalExpirado / 100)} />
-          <MetricCard label="Cancelado" value={BRL.format(summary.totalCancelado / 100)} />
+      <SectionCard
+        title="Operacao financeira"
+        description="Use atalhos por area sem perder a leitura completa do financeiro."
+      >
+        <div className="flex flex-wrap gap-2">
+          {(Object.keys(WORKSPACE_LABELS) as FinanceWorkspace[]).map((key) => (
+            <a
+              key={key}
+              href={`#finance-${key}`}
+              className="inline-flex h-10 items-center rounded-lg border border-white/10 bg-white/[0.03] px-4 text-sm font-medium text-white/70 transition hover:border-[#1E90FF]/60 hover:bg-[#1E90FF]/10 hover:text-white"
+            >
+              {WORKSPACE_LABELS[key]}
+            </a>
+          ))}
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <MetricCard label="Recebido no periodo" value={BRL.format(periodPaymentSummary.totalPago / 100)} tone="highlight" />
+          <MetricCard label="Titulos pendentes" value={queue.totalOpenCount} />
+          <MetricCard label="Lancamentos no caixa" value={cashEntries.length} />
+          <MetricCard label="Contas em aberto" value={ledgerOpenCount + cashEntriesOpen} />
         </div>
       </SectionCard>
 
-      <SectionCard
-        title="Gestao financeira da associacao"
-        description="Mensalidades, contas a pagar/receber, plano de contas e livro-caixa do Ventu Suli"
-      >
+      <div id="finance-overview" className="space-y-6">
+          <SectionCard title="Resumo financeiro" description="Indicadores consolidados para decisao rapida">
+            <div className="grid gap-3 md:grid-cols-5">
+              <MetricCard label="Total cobrado" value={BRL.format(periodPaymentSummary.totalCobrado / 100)} />
+              <MetricCard label="Total pago" value={BRL.format(periodPaymentSummary.totalPago / 100)} tone="highlight" />
+              <MetricCard label="Pendente" value={BRL.format(periodPaymentSummary.totalPendente / 100)} />
+              <MetricCard label="Expirado" value={BRL.format(periodPaymentSummary.totalExpirado / 100)} />
+              <MetricCard label="Cancelado" value={BRL.format(periodPaymentSummary.totalCancelado / 100)} />
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title="Visao contábil da associacao"
+            description="Leitura rápida de caixa, contas em aberto e movimento manual."
+          >
+            <div className="grid gap-3 md:grid-cols-5">
+              <MetricCard label="Entradas realizadas" value={BRL.format(manualSummary.incomeCents / 100)} tone="highlight" />
+              <MetricCard label="Saidas realizadas" value={BRL.format(manualSummary.expenseCents / 100)} />
+              <MetricCard label="Saldo caixa" value={BRL.format(manualSummary.balanceCents / 100)} />
+              <MetricCard label="A receber" value={BRL.format(manualSummary.openReceivableCents / 100)} />
+              <MetricCard label="A pagar" value={BRL.format(manualSummary.openPayableCents / 100)} />
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title="Fechamento do periodo"
+            description={`Saldo inicial, movimentacao e fechamento para ${periodLabel}.`}
+          >
+            <div className="grid gap-3 md:grid-cols-5">
+              <MetricCard label="Saldo inicial" value={BRL.format(openingCashBalanceCents / 100)} />
+              <MetricCard label="Entradas do periodo" value={BRL.format((periodPaymentSummary.totalPago + currentCashIncomeCents) / 100)} tone="highlight" />
+              <MetricCard label="Saidas do periodo" value={BRL.format(currentCashExpenseCents / 100)} />
+              <MetricCard label="Saldo final" value={BRL.format(closingCashBalanceCents / 100)} />
+              <MetricCard label="Variacao liquida" value={BRL.format((closingCashBalanceCents - openingCashBalanceCents) / 100)} />
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title="Fluxo de caixa"
+            description="Entradas, saidas e saldo acumulado ao longo do periodo."
+          >
+            {cashFlowSeries.length === 0 ? (
+              <EmptyState title="Sem movimento de caixa no periodo" description="Os recebimentos e saidas aparecerao aqui assim que houver baixa financeira." />
+            ) : (
+              <div className="h-[320px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={cashFlowSeries} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                    <CartesianGrid stroke="rgba(255,255,255,0.08)" vertical={false} />
+                    <XAxis dataKey="label" stroke="rgba(255,255,255,0.45)" tickLine={false} axisLine={false} />
+                    <YAxis stroke="rgba(255,255,255,0.45)" tickLine={false} axisLine={false} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "#10233b",
+                        border: "1px solid rgba(255,255,255,0.1)",
+                        borderRadius: "12px",
+                        color: "#fff",
+                      }}
+                      formatter={(value) => BRL.format(Number(value ?? 0))}
+                    />
+                    <Legend />
+                    <Bar dataKey="inflow" name="Entradas" fill="#22c55e" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="outflow" name="Saidas" fill="#f97316" radius={[6, 6, 0, 0]} />
+                    <Line type="monotone" dataKey="balance" name="Saldo" stroke="#38bdf8" strokeWidth={3} dot={false} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </SectionCard>
+
+          <SectionCard title="Fila de trabalho" description="Priorize cobrancas em risco de perda de receita">
+            <div className="grid gap-3 md:grid-cols-4 xl:grid-cols-8">
+              <MetricCard label="Abertas" value={queue.totalOpenCount} />
+              <MetricCard label="Aberto (R$)" value={BRL.format(queue.totalOpenAmount / 100)} />
+              <MetricCard label="Atrasadas" value={queue.overdueCount} tone="highlight" />
+              <MetricCard label="Atraso (R$)" value={BRL.format(queue.overdueAmount / 100)} tone="highlight" />
+              <MetricCard label="Vence hoje" value={queue.dueTodayCount} />
+              <MetricCard label="Prox. 7 dias" value={queue.dueSoonCount} />
+              <MetricCard label="Sem vencimento" value={queue.noDueDateCount} />
+              <MetricCard label="Baixas 24h" value={queue.recentSettlementsCount} tone="highlight" />
+            </div>
+
+            <div className="mt-4">
+              {loading ? (
+                <LoadingState lines={3} />
+              ) : queueRows.length === 0 ? (
+                <EmptyState title="Sem cobrancas pendentes na fila" description="Nao ha cobrancas abertas para acao imediata." />
+              ) : (
+                <DataTable columns={queueColumns} data={queueRows} getRowKey={(row) => row.id} />
+              )}
+            </div>
+          </SectionCard>
+      </div>
+
+      <div id="finance-cashbook">
+        <SectionCard
+          title="Livro-caixa"
+          description="Entradas e saídas avulsas com plano de contas, centro de custo e baixa manual."
+        >
         <div className="grid gap-3 md:grid-cols-5">
-          <MetricCard label="Entradas realizadas" value={BRL.format(manualSummary.incomeCents / 100)} tone="highlight" />
-          <MetricCard label="Saidas realizadas" value={BRL.format(manualSummary.expenseCents / 100)} />
-          <MetricCard label="Saldo caixa" value={BRL.format(manualSummary.balanceCents / 100)} />
-          <MetricCard label="A receber" value={BRL.format(manualSummary.openReceivableCents / 100)} />
-          <MetricCard label="A pagar" value={BRL.format(manualSummary.openPayableCents / 100)} />
+          <MetricCard label="Saldo inicial" value={BRL.format(openingCashBalanceCents / 100)} />
+          <MetricCard label="Entradas caixa" value={BRL.format((periodPaymentSummary.totalPago + currentCashIncomeCents) / 100)} tone="highlight" />
+          <MetricCard label="Saidas caixa" value={BRL.format(currentCashExpenseCents / 100)} />
+          <MetricCard label="Saldo final" value={BRL.format(closingCashBalanceCents / 100)} />
+          <MetricCard label="Lancamentos caixa" value={filteredCashEntries.length} />
+        </div>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <Select
+            value={cashStatusFilter}
+            onChange={(event) => setCashStatusFilter(event.target.value as "ALL" | "OPEN" | "PAID" | "CANCELLED")}
+            className="border-white/[0.1] bg-white/[0.05] text-white"
+          >
+            <option value="ALL">Status do caixa</option>
+            <option value="PAID">Baixado</option>
+            <option value="OPEN">Em aberto</option>
+            <option value="CANCELLED">Cancelado</option>
+          </Select>
+          <Select
+            value={cashTypeFilter}
+            onChange={(event) => setCashTypeFilter(event.target.value as "ALL" | "INCOME" | "EXPENSE")}
+            className="border-white/[0.1] bg-white/[0.05] text-white"
+          >
+            <option value="ALL">Tipo de movimento</option>
+            <option value="INCOME">Entradas</option>
+            <option value="EXPENSE">Saidas</option>
+          </Select>
+          <Select
+            value={cashCostCenterFilter}
+            onChange={(event) => setCashCostCenterFilter(event.target.value)}
+            className="border-white/[0.1] bg-white/[0.05] text-white"
+          >
+            <option value="ALL">Centro de custo</option>
+            {costCenterOptions.map((center) => (
+              <option key={center} value={center}>
+                {center}
+              </option>
+            ))}
+          </Select>
+          <div className="rounded-xl border border-white/[0.07] bg-white/[0.03] px-3 py-2 text-sm text-white/65">
+            Fechamento do periodo: <span className="font-semibold text-white">{periodLabel}</span>
+          </div>
         </div>
 
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
@@ -676,8 +1057,8 @@ export default function AdminFinanceiroPage() {
         </div>
 
         <div className="mt-4">
-          {manualEntries.length === 0 ? (
-            <EmptyState title="Sem lancamentos manuais" description="Entradas e saidas avulsas aparecerao aqui." />
+          {filteredCashEntries.length === 0 ? (
+            <EmptyState title="Sem movimentos no livro-caixa" description="Entradas e saidas avulsas aparecerao aqui." />
           ) : (
             <div className="overflow-x-auto rounded-xl border border-white/[0.07]">
               <table className="min-w-full text-sm">
@@ -694,7 +1075,7 @@ export default function AdminFinanceiroPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {manualEntries.map((entry) => (
+                  {filteredCashEntries.map((entry) => (
                     <tr key={entry.id} className="border-t border-white/[0.07]">
                       <td className="px-3 py-2 text-white/60">{format(new Date(entry.occurredAt), "dd/MM/yyyy", { locale: ptBR })}</td>
                       <td className="px-3 py-2">
@@ -752,29 +1133,9 @@ export default function AdminFinanceiroPage() {
           )}
         </div>
       </SectionCard>
-      <SectionCard title="Fila de trabalho" description="Priorize cobrancas em risco de perda de receita">
-        <div className="grid gap-3 md:grid-cols-4 xl:grid-cols-8">
-          <MetricCard label="Abertas" value={queue.totalOpenCount} />
-          <MetricCard label="Aberto (R$)" value={BRL.format(queue.totalOpenAmount / 100)} />
-          <MetricCard label="Atrasadas" value={queue.overdueCount} tone="highlight" />
-          <MetricCard label="Atraso (R$)" value={BRL.format(queue.overdueAmount / 100)} tone="highlight" />
-          <MetricCard label="Vence hoje" value={queue.dueTodayCount} />
-          <MetricCard label="Prox. 7 dias" value={queue.dueSoonCount} />
-          <MetricCard label="Sem vencimento" value={queue.noDueDateCount} />
-          <MetricCard label="Baixas 24h" value={queue.recentSettlementsCount} tone="highlight" />
-        </div>
+      </div>
 
-        <div className="mt-4">
-          {loading ? (
-            <LoadingState lines={3} />
-          ) : queueRows.length === 0 ? (
-            <EmptyState title="Sem cobrancas pendentes na fila" description="Nao ha cobrancas abertas para acao imediata." />
-          ) : (
-            <DataTable columns={queueColumns} data={queueRows} getRowKey={(row) => row.id} />
-          )}
-        </div>
-      </SectionCard>
-
+      <div id="finance-charges" className="space-y-6">
       <SectionCard title="Filtros operacionais" description="Periodo, status, atleta, prova e vencimento">
         {errorMessage ? (
           <p className="mb-3 rounded-lg border border-amber-300/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">
@@ -889,6 +1250,147 @@ export default function AdminFinanceiroPage() {
           <DataTable columns={columns} data={rows} getRowKey={(row) => row.id} />
         )}
       </SectionCard>
+      </div>
+
+      <div id="finance-ledger" className="space-y-6">
+          <SectionCard
+            title="Contas a pagar e receber"
+            description="Controle gerencial de titulos, baixas e obrigações fora do caixa imediato."
+          >
+            <div className="grid gap-3 md:grid-cols-4">
+              <MetricCard label="A receber" value={BRL.format(manualSummary.openReceivableCents / 100)} tone="highlight" />
+              <MetricCard label="A pagar" value={BRL.format(manualSummary.openPayableCents / 100)} />
+              <MetricCard label="Titulos a receber" value={ledgerReceivableOpenCount} />
+              <MetricCard label="Titulos a pagar" value={ledgerPayableOpenCount} />
+            </div>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <Select
+                value={ledgerStatusFilter}
+                onChange={(event) => setLedgerStatusFilter(event.target.value as "ALL" | "OPEN" | "PAID" | "CANCELLED")}
+                className="border-white/[0.1] bg-white/[0.05] text-white"
+              >
+                <option value="ALL">Status das contas</option>
+                <option value="OPEN">Em aberto</option>
+                <option value="PAID">Baixadas</option>
+                <option value="CANCELLED">Canceladas</option>
+              </Select>
+              <Select
+                value={ledgerTypeFilter}
+                onChange={(event) => setLedgerTypeFilter(event.target.value as "ALL" | "INCOME" | "EXPENSE")}
+                className="border-white/[0.1] bg-white/[0.05] text-white"
+              >
+                <option value="ALL">Receber e pagar</option>
+                <option value="INCOME">Somente a receber</option>
+                <option value="EXPENSE">Somente a pagar</option>
+              </Select>
+              <Select
+                value={ledgerCostCenterFilter}
+                onChange={(event) => setLedgerCostCenterFilter(event.target.value)}
+                className="border-white/[0.1] bg-white/[0.05] text-white"
+              >
+                <option value="ALL">Centro de custo</option>
+                {costCenterOptions.map((center) => (
+                  <option key={center} value={center}>
+                    {center}
+                  </option>
+                ))}
+              </Select>
+              <div className="rounded-xl border border-white/[0.07] bg-white/[0.03] px-3 py-2 text-sm text-white/65">
+                Titulos filtrados: <span className="font-semibold text-white">{filteredLedgerEntries.length}</span>
+              </div>
+            </div>
+
+            <div className="mt-4 overflow-x-auto rounded-xl border border-white/[0.07]">
+              <table className="min-w-full text-sm">
+                <thead className="bg-white/[0.04] text-xs uppercase tracking-wide text-white/40">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Data</th>
+                    <th className="px-3 py-2 text-left">Natureza</th>
+                    <th className="px-3 py-2 text-left">Status</th>
+                    <th className="px-3 py-2 text-left">Categoria</th>
+                    <th className="px-3 py-2 text-left">Contraparte</th>
+                    <th className="px-3 py-2 text-left">Vencimento</th>
+                    <th className="px-3 py-2 text-left">Valor</th>
+                    <th className="px-3 py-2 text-left">Acoes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredLedgerEntries.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="px-3 py-8">
+                        <EmptyState title="Sem contas abertas no periodo" description="Titulos a pagar e a receber aparecerao aqui." />
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredLedgerEntries.map((entry) => (
+                      <tr key={entry.id} className="border-t border-white/[0.07]">
+                        <td className="px-3 py-2 text-white/60">{format(new Date(entry.occurredAt), "dd/MM/yyyy", { locale: ptBR })}</td>
+                        <td className="px-3 py-2">
+                          <StatusBadge tone={entryKindTone(entry.entryKind)} label={entryKindLabel(entry.entryKind)} />
+                        </td>
+                        <td className="px-3 py-2">
+                          <StatusBadge
+                            tone={entry.status === "PAID" ? "positive" : entry.status === "OPEN" ? "warning" : "neutral"}
+                            label={entry.status === "PAID" ? "Baixado" : entry.status === "OPEN" ? "Aberto" : "Cancelado"}
+                          />
+                        </td>
+                        <td className="px-3 py-2 text-white">{entry.category}</td>
+                        <td className="px-3 py-2 text-white/60">{entry.counterparty ?? "-"}</td>
+                        <td className="px-3 py-2 text-white/60">{entry.dueAt ? format(new Date(entry.dueAt), "dd/MM/yyyy", { locale: ptBR }) : "-"}</td>
+                        <td className="px-3 py-2 font-semibold text-white">{BRL.format(entry.amountCents / 100)}</td>
+                        <td className="px-3 py-2">
+                          <div className="flex flex-wrap gap-1.5">
+                            {entry.status !== "PAID" ? (
+                              <button
+                                type="button"
+                                className="rounded-lg border border-emerald-400/30 px-2 py-1 text-xs text-emerald-200"
+                                onClick={() => void runEntryAction(entry.id, "MARK_PAID")}
+                              >
+                                Baixar
+                              </button>
+                            ) : null}
+                            {entry.status !== "OPEN" ? (
+                              <button
+                                type="button"
+                                className="rounded-lg border border-white/10 px-2 py-1 text-xs text-white/70"
+                                onClick={() => void runEntryAction(entry.id, "REOPEN")}
+                              >
+                                Reabrir
+                              </button>
+                            ) : null}
+                            {entry.status !== "CANCELLED" ? (
+                              <button
+                                type="button"
+                                className="rounded-lg border border-red-400/30 px-2 py-1 text-xs text-red-200"
+                                onClick={() => void runEntryAction(entry.id, "CANCEL")}
+                              >
+                                Cancelar
+                              </button>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title="Recebimentos conciliados"
+            description="Pagamentos baixados no periodo para conferencia de entrada real."
+          >
+            {loading ? (
+              <LoadingState lines={3} />
+            ) : recentPaidRows.length === 0 ? (
+              <EmptyState title="Sem recebimentos no periodo" description="Pagamentos confirmados aparecerao aqui." />
+            ) : (
+              <DataTable columns={columns} data={recentPaidRows} getRowKey={(row) => row.id} />
+            )}
+          </SectionCard>
+      </div>
 
       <Modal
         open={Boolean(selectedPaymentId)}

@@ -38,6 +38,7 @@ function labelSource(sourceType: string): string {
     EARLY_SIGNUP: "Bonus por inscricao antecipada",
     EARLY_PAYMENT: "Bonus por pagamento antecipado",
     CAMPAIGN_BONUS: "Bonus de campanha",
+    ACTIVITY_APPROVAL: "Atividade aprovada",
     REFERRAL: "Indicacao",
     RECURRENCE: "Recorrencia",
     MANUAL: "Ajuste manual",

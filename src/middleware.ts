@@ -27,6 +27,7 @@ const AUTH_PAGES = [
   "/aguardando-aprovacao",
   "/forgot-password",
   "/reset-password",
+  "/mfa",
 ];
 
 function startsWithAny(pathname: string, prefixes: string[]): boolean {
@@ -267,8 +268,11 @@ export const config = {
     "/onboarding",
     "/onboarding/:path*",
     "/login",
+    "/mfa",
     "/aguardando-aprovacao",
     "/activate-admin",
+    "/forgot-password",
+    "/reset-password",
     "/register/:path*",
   ],
 };

@@ -5,12 +5,11 @@ import { useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Loader2, LockKeyhole } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { resetPasswordSchema } from "@/lib/validations/auth";
-import { AuthCard } from "@/components/ui/auth-card";
-import { Label } from "@/components/ui/label";
+import { AuthShell } from "@/components/auth/AuthShell";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
@@ -77,35 +76,45 @@ export function ResetPasswordForm() {
 
   if (!token) {
     return (
-      <AuthCard title="Redefinir senha" description="Token ausente ou invalido.">
+      <AuthShell
+        title="Redefinir senha"
+        description="O link de recuperacao precisa de um token valido para continuar."
+      >
         <div className="space-y-4">
-          <div className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+          <div className="rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
             Link de recuperacao invalido.
           </div>
-          <Button asChild className="h-10 w-full bg-[#F5A623] text-[#0A1628] hover:bg-[#e59a1f]">
+          <Button asChild className="h-14 w-full rounded-2xl bg-[#f7b529] text-[#091223] hover:bg-[#ffbf3e]">
             <Link href="/forgot-password">Solicitar novo link</Link>
           </Button>
         </div>
-      </AuthCard>
+      </AuthShell>
     );
   }
 
   return (
-    <AuthCard title="Redefinir senha" description="Defina uma nova senha para acessar sua conta.">
+    <AuthShell
+      title="Defina sua nova senha"
+      description="Crie uma nova credencial forte para voltar ao Ventu Suli com seguranca."
+    >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         <input type="hidden" {...register("token")} />
 
         <div className="space-y-2">
-          <Label htmlFor="password" className="text-slate-100">
+          <label
+            htmlFor="password"
+            className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300"
+          >
             Nova senha
-          </Label>
+          </label>
           <div className="relative">
+            <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
             <Input
               id="password"
               type={showPassword ? "text" : "password"}
               placeholder="Nova senha"
               autoComplete="new-password"
-              className="border-white/15 bg-[#0F2743] pr-11 text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]"
+              className="h-16 rounded-2xl border-white/12 bg-white/6 pl-12 pr-11 text-white placeholder:text-slate-400 focus-visible:ring-[#f7b529]"
               {...register("password")}
             />
             <button
@@ -121,16 +130,20 @@ export function ResetPasswordForm() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="confirmPassword" className="text-slate-100">
+          <label
+            htmlFor="confirmPassword"
+            className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300"
+          >
             Confirmar nova senha
-          </Label>
+          </label>
           <div className="relative">
+            <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
             <Input
               id="confirmPassword"
               type={showConfirmPassword ? "text" : "password"}
               placeholder="Confirme a nova senha"
               autoComplete="new-password"
-              className="border-white/15 bg-[#0F2743] pr-11 text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]"
+              className="h-16 rounded-2xl border-white/12 bg-white/6 pl-12 pr-11 text-white placeholder:text-slate-400 focus-visible:ring-[#f7b529]"
               {...register("confirmPassword")}
             />
             <button
@@ -150,18 +163,25 @@ export function ResetPasswordForm() {
         <Button
           type="submit"
           disabled={isSubmitting}
-          className="h-11 w-full bg-[#F5A623] font-semibold text-[#0A1628] hover:bg-[#e59a1f]"
+          className="h-16 w-full rounded-2xl bg-[#f7b529] text-base font-bold text-[#091223] hover:bg-[#ffbf3e]"
         >
           {isSubmitting ? (
             <span className="flex items-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="h-5 w-5 animate-spin" />
               Redefinindo...
             </span>
           ) : (
             "Redefinir senha"
           )}
         </Button>
+
+        <p className="text-center text-sm text-slate-300">
+          <Link href="/login" className="inline-flex items-center gap-2 font-semibold text-[#f7b529] hover:text-[#ffd27a]">
+            <ArrowLeft className="h-4 w-4" />
+            Voltar para login
+          </Link>
+        </p>
       </form>
-    </AuthCard>
+    </AuthShell>
   );
 }
