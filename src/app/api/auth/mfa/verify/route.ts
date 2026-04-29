@@ -9,6 +9,7 @@ import { getChallengeByToken, challengeHasExpired, registerChallengeFailure } fr
 import { setAccessCookie, setRefreshCookie } from "@/lib/cookies";
 import { logWarn, withRequestContext } from "@/lib/logger";
 import { UserRole } from "@/types";
+import { buildEffectiveRoles } from "@/lib/access-profiles";
 
 async function resolveHasCpf(userId: string, role: PrismaUserRole): Promise<boolean> {
   if (role !== PrismaUserRole.ATHLETE) return true;
@@ -82,6 +83,9 @@ export async function POST(req: NextRequest) {
       email: true,
       role: true,
       organization_id: true,
+      athlete_profile: {
+        select: { id: true },
+      },
       organization: {
         select: {
           status: true,
@@ -96,6 +100,10 @@ export async function POST(req: NextRequest) {
   }
 
   let recoveryCodes: string[] | undefined;
+  const roles = buildEffectiveRoles({
+    primaryRole: role,
+    hasAthleteProfile: Boolean(userRecord.athlete_profile),
+  });
 
   if (challenge.purpose === "MFA_SETUP" && challenge.temp_totp_secret) {
     const { generateRecoveryCodes, hashRecoveryCodes } = await import("@/lib/auth-mfa");
@@ -159,6 +167,7 @@ export async function POST(req: NextRequest) {
   const { accessToken, refreshToken } = await createSessionTokens({
     userId: userRecord.id,
     role,
+    roles,
     organizationId: userRecord.organization_id,
     rememberMe: challenge.remember_me,
   });
@@ -175,6 +184,7 @@ export async function POST(req: NextRequest) {
         name: userRecord.name,
         email: userRecord.email,
         role,
+        roles,
       },
       profile: { hasCpf },
       organization: userRecord.organization

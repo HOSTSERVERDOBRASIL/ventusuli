@@ -21,7 +21,7 @@ import { UserRole } from "@/types";
  */
 export default function DashboardDispatcher() {
   const router = useRouter();
-  const { hydrated, userRole, hasCpf } = useAuthToken();
+  const { hydrated, userRole, userRoles, hasCpf } = useAuthToken();
 
   useEffect(() => {
     if (!hydrated) return;
@@ -31,22 +31,22 @@ export default function DashboardDispatcher() {
       return;
     }
 
-    if (userRole === UserRole.SUPER_ADMIN) {
+    if (userRoles.includes(UserRole.SUPER_ADMIN)) {
       router.replace("/super-admin");
       return;
     }
 
-    if (userRole === UserRole.ADMIN) {
+    if (userRoles.includes(UserRole.ADMIN)) {
       router.replace("/admin");
       return;
     }
 
-    if (userRole === UserRole.FINANCE) {
+    if (userRoles.includes(UserRole.FINANCE)) {
       router.replace("/admin/financeiro");
       return;
     }
 
-    if (userRole === UserRole.COACH) {
+    if (userRoles.includes(UserRole.COACH)) {
       router.replace("/coach");
       return;
     }
@@ -58,7 +58,7 @@ export default function DashboardDispatcher() {
     }
 
     router.replace("/");
-  }, [hydrated, hasCpf, router, userRole]);
+  }, [hydrated, hasCpf, router, userRole, userRoles]);
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#0A1628] px-4 text-slate-100">

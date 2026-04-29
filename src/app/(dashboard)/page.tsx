@@ -7,10 +7,13 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   Award,
+  BellRing,
   CalendarDays,
+  Camera,
   ChevronLeft,
   ChevronRight,
   Flag,
+  Gift,
   MapPin,
   Medal,
   Minus,
@@ -319,6 +322,42 @@ export default function DashboardPage() {
   const nextEvents = useMemo(
     () => calendarEntries.filter((item) => new Date(item.event_date) >= new Date()).slice(0, 8),
     [calendarEntries],
+  );
+
+  const benefitShortcuts = useMemo(
+    () => [
+      {
+        href: "/recompensas",
+        title: "Pontos",
+        value: experience?.groupRanking.user.points
+          ? `${experience.groupRanking.user.points} pts`
+          : "Ver saldo",
+        description: "Extrato, origem dos pontos e resgates disponiveis.",
+        icon: Medal,
+      },
+      {
+        href: "/fotos",
+        title: "Fotos",
+        value: "Galerias",
+        description: "Fotos por prova, compras e desbloqueios com pontos.",
+        icon: Camera,
+      },
+      {
+        href: "/recompensas",
+        title: "Recompensas",
+        value: "Catalogo",
+        description: "Itens, beneficios e historico de resgates.",
+        icon: Gift,
+      },
+      {
+        href: "/avisos",
+        title: "Avisos",
+        value: warnings.length > 0 ? `${warnings.length} alerta` : "Atualizado",
+        description: "Comunicados importantes da assessoria.",
+        icon: BellRing,
+      },
+    ],
+    [experience, warnings.length],
   );
 
   const highlights = useMemo(() => experience?.highlights ?? [], [experience]);
@@ -671,6 +710,31 @@ export default function DashboardPage() {
                   )}
                 </div>
               </Card>
+            </div>
+
+            <div>
+              <SectionHeader title="Pontos, fotos e beneficios" />
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {benefitShortcuts.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.title}
+                      href={item.href}
+                      className="rounded-xl border border-white/[0.07] bg-[#112240] p-4 shadow-[0_4px_24px_rgba(0,0,0,0.22)] transition hover:-translate-y-0.5 hover:border-white/15"
+                    >
+                      <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-[#1E90FF]/10">
+                        <Icon className="h-4 w-4 text-[#1E90FF]" />
+                      </div>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.09em] text-white/40">
+                        {item.title}
+                      </p>
+                      <p className="mt-1 text-lg font-bold text-white">{item.value}</p>
+                      <p className="mt-2 text-[12px] leading-5 text-white/45">{item.description}</p>
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Minha Evolução */}

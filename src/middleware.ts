@@ -3,9 +3,11 @@ import { verifyAccessTokenEdge } from "@/lib/auth-edge";
 import {
   API_ROUTE_POLICY_RULES,
   PAGE_ROUTE_POLICY_RULES,
-  canAccessPolicy,
+  canAccessPolicyAny,
   getRoutePolicy,
+  resolveRoleForPolicy,
 } from "@/lib/authorization";
+import { normalizeRoles, primaryRoleFromRoles } from "@/lib/access-profiles";
 import { ACCESS_TOKEN_COOKIE } from "@/lib/cookies";
 import { createRequestId, getRequestIdFromHeaders } from "@/lib/logger";
 import { getAccessTokenFromRequest } from "@/lib/request-auth";
@@ -85,18 +87,23 @@ function parseRole(role: string): UserRole | null {
   return Object.values(UserRole).includes(normalized) ? normalized : null;
 }
 
-function fallbackPathByRole(role: UserRole): string {
-  if (role === UserRole.SUPER_ADMIN) return "/super-admin";
-  if (role === UserRole.ADMIN) return "/admin";
-  if (role === UserRole.FINANCE) return "/admin/financeiro";
-  if (role === UserRole.COACH) return "/coach";
+function parseRoles(primaryRole: string, roles?: unknown): UserRole[] {
+  const parsedRoles = Array.isArray(roles) ? roles : [];
+  return normalizeRoles([primaryRole, ...parsedRoles]);
+}
+
+function fallbackPathByRoles(roles: readonly UserRole[]): string {
+  if (roles.includes(UserRole.SUPER_ADMIN)) return "/super-admin";
+  if (roles.includes(UserRole.ADMIN)) return "/admin";
+  if (roles.includes(UserRole.FINANCE)) return "/admin/financeiro";
+  if (roles.includes(UserRole.COACH)) return "/coach";
   return "/";
 }
 
-function resolveLegacyAthletesPath(role: UserRole): string {
-  if (role === UserRole.ADMIN) return "/admin/atletas";
-  if (role === UserRole.COACH) return "/coach/atletas";
-  return fallbackPathByRole(role);
+function resolveLegacyAthletesPath(roles: readonly UserRole[]): string {
+  if (roles.includes(UserRole.ADMIN)) return "/admin/atletas";
+  if (roles.includes(UserRole.COACH)) return "/coach/atletas";
+  return fallbackPathByRoles(roles);
 }
 
 export async function middleware(req: NextRequest): Promise<NextResponse> {
@@ -157,6 +164,8 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
       requestId,
     );
   }
+  const roles = parseRoles(role, payload.roles);
+  const primaryRole = primaryRoleFromRoles(roles) ?? role;
 
   const accountStatus = payload.status ?? "ACTIVE";
   if (accountStatus !== "ACTIVE") {
@@ -187,21 +196,21 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
 
   if (pathname === "/atletas") {
     const redirectUrl = req.nextUrl.clone();
-    redirectUrl.pathname = resolveLegacyAthletesPath(role);
+    redirectUrl.pathname = resolveLegacyAthletesPath(roles);
     return withRequestId(NextResponse.redirect(redirectUrl), requestId);
   }
 
   if (pathname === "/dashboard") {
     const redirectUrl = req.nextUrl.clone();
-    redirectUrl.pathname = fallbackPathByRole(role);
+    redirectUrl.pathname = fallbackPathByRoles(roles);
     redirectUrl.search = "";
     return withRequestId(NextResponse.redirect(redirectUrl), requestId);
   }
 
   const pagePolicy = protectedPage ? getRoutePolicy(pathname, PAGE_ROUTE_POLICY_RULES) : null;
-  if (pagePolicy && !canAccessPolicy(role, pagePolicy)) {
+  if (pagePolicy && !canAccessPolicyAny(roles, pagePolicy)) {
     const blockedUrl = req.nextUrl.clone();
-    blockedUrl.pathname = fallbackPathByRole(role);
+    blockedUrl.pathname = fallbackPathByRoles(roles);
     blockedUrl.search = "";
     return withRequestId(NextResponse.redirect(blockedUrl), requestId);
   }
@@ -209,7 +218,7 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
   const apiPolicy = protectedApi
     ? getRoutePolicy(pathname, API_ROUTE_POLICY_RULES, req.method)
     : null;
-  if (apiPolicy && !canAccessPolicy(role, apiPolicy)) {
+  if (apiPolicy && !canAccessPolicyAny(roles, apiPolicy)) {
     return withRequestId(
       NextResponse.json(
         {
@@ -223,10 +232,17 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
       requestId,
     );
   }
+  const activeRole = apiPolicy
+    ? (resolveRoleForPolicy(roles, apiPolicy) ?? primaryRole)
+    : pagePolicy
+      ? (resolveRoleForPolicy(roles, pagePolicy) ?? primaryRole)
+      : primaryRole;
 
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set("x-user-id", payload.sub);
-  requestHeaders.set("x-user-role", role);
+  requestHeaders.set("x-user-role", activeRole);
+  requestHeaders.set("x-user-primary-role", primaryRole);
+  requestHeaders.set("x-user-roles", roles.join(","));
   requestHeaders.set("x-org-id", payload.org);
   requestHeaders.set("x-request-id", requestId);
 
@@ -263,8 +279,12 @@ export const config = {
     "/comunidade/:path*",
     "/avisos",
     "/avisos/:path*",
+    "/fotos",
+    "/fotos/:path*",
     "/evolucao",
     "/evolucao/:path*",
+    "/patrocinadores",
+    "/patrocinadores/:path*",
     "/onboarding",
     "/onboarding/:path*",
     "/login",

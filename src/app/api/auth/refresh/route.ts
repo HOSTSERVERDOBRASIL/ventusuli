@@ -15,6 +15,7 @@ import { checkRateLimit, getClientIp, isRateLimiterUnavailableError } from "@/li
 import { getAccessTokenFromRequest } from "@/lib/request-auth";
 import { logError, logWarn, toErrorContext, withRequestContext } from "@/lib/logger";
 import { UserRole } from "@/types";
+import { buildEffectiveRoles } from "@/lib/access-profiles";
 
 const RATE_LIMIT = 20;
 const RATE_WINDOW_MS = 15 * 60 * 1_000;
@@ -143,7 +144,7 @@ export async function POST(req: NextRequest) {
             role: true,
             organization_id: true,
             account_status: true,
-            athlete_profile: { select: { athlete_status: true } },
+            athlete_profile: { select: { id: true, athlete_status: true } },
           },
         },
       },
@@ -214,10 +215,14 @@ export async function POST(req: NextRequest) {
   }
 
   const role = result.user.role as UserRole;
-  const accessToken = generateAccessToken(result.user.id, role, result.user.organization_id, "ACTIVE");
+  const roles = buildEffectiveRoles({
+    primaryRole: role,
+    hasAthleteProfile: Boolean(result.user.athlete_profile),
+  });
+  const accessToken = generateAccessToken(result.user.id, role, result.user.organization_id, "ACTIVE", "15m", roles);
 
   const response = NextResponse.json(
-    { user: { id: result.user.id, name: result.user.name, email: result.user.email, role }, accessToken },
+    { user: { id: result.user.id, name: result.user.name, email: result.user.email, role, roles }, accessToken },
     {
       status: 200,
       headers: {

@@ -31,6 +31,7 @@ interface MfaVerifyResponse {
     name: string;
     email: string;
     role: string;
+    roles?: string[];
   };
   profile?: { hasCpf: boolean };
   organization?: {
@@ -181,6 +182,7 @@ export function MfaChallengeForm() {
       setAuthSession({
         token: payload.access_token,
         role: (payload.user.role as UserRole) ?? null,
+        roles: payload.user.roles?.map((role) => role as UserRole),
       });
 
       if (payload.recovery_codes?.length) {

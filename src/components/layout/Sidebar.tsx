@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { DoorOpen, UserCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { roleLabel } from "@/lib/role-labels";
+import { rolesLabel } from "@/lib/role-labels";
 import { useAuthToken } from "@/components/auth/AuthTokenProvider";
 import { isNavItemActive, splitNavBySection, type NavItem } from "@/components/layout/nav-items";
 import { UserRole } from "@/types";
@@ -66,8 +66,8 @@ function NavGroup({
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { userRole, clearAccessToken, currentUser, organization } = useAuthToken();
-  const groups = splitNavBySection(userRole);
+  const { userRoles, clearAccessToken, currentUser, organization } = useAuthToken();
+  const groups = splitNavBySection(userRoles);
   const navGroups = [
     { title: "Inicio", items: groups.home },
     { title: "Provas e agenda", items: groups.events },
@@ -81,8 +81,8 @@ export function Sidebar() {
   ];
 
   const organizationLogo = resolveOrganizationLogo(organization?.logo_url);
-  const profileHref = userRole === UserRole.SUPER_ADMIN ? "/super-admin" : "/perfil";
-  const profileLabel = userRole === UserRole.SUPER_ADMIN ? "Plataforma" : "Perfil";
+  const profileHref = userRoles.includes(UserRole.SUPER_ADMIN) && !userRoles.includes(UserRole.ATHLETE) ? "/super-admin" : "/perfil";
+  const profileLabel = userRoles.includes(UserRole.SUPER_ADMIN) && !userRoles.includes(UserRole.ATHLETE) ? "Plataforma" : "Perfil";
 
   const handleLogout = async () => {
     clearAccessToken();
@@ -145,7 +145,7 @@ export function Sidebar() {
             <p className="truncate text-[12px] font-semibold text-white">
               {currentUser?.name ?? "Usuario"}
             </p>
-            <p className="text-[10px] text-white/35">{roleLabel(userRole)}</p>
+            <p className="text-[10px] text-white/35">{rolesLabel(userRoles)}</p>
           </div>
         </div>
         <div className="mt-2 flex gap-2 px-1">

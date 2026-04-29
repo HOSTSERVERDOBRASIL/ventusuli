@@ -51,8 +51,8 @@ function MobileGroup({
 
 export function MobileNav({ isOpen, onClose }: MobileNavProps) {
   const pathname = usePathname();
-  const { userRole, organization } = useAuthToken();
-  const groups = splitNavBySection(userRole);
+  const { userRoles, organization } = useAuthToken();
+  const groups = splitNavBySection(userRoles);
   const navGroups = [
     { title: "Inicio", items: groups.home },
     { title: "Provas e agenda", items: groups.events },

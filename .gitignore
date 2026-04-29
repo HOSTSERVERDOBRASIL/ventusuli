@@ -19,6 +19,7 @@
 *.pem
 .claude/
 public/uploads/
+public.zip
 
 # debug
 npm-debug.log*

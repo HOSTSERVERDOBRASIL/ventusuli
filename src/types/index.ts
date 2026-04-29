@@ -97,6 +97,7 @@ export interface JwtPayload {
   sub: string;            // user_id
   org: string;            // organization_id
   role: UserRole;
+  roles?: UserRole[];
   email: string;
   iat?: number;
   exp?: number;

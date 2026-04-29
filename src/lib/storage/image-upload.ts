@@ -3,7 +3,7 @@ import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import { getOptionalIntegrationEnv } from "@/lib/env";
 
-export type UploadScope = "events" | "avatars" | "rewards" | "branding";
+export type UploadScope = "events" | "avatars" | "rewards" | "branding" | "photos";
 
 const IMAGE_MIME_MAP: Record<string, string> = {
   "image/jpeg": "jpg",

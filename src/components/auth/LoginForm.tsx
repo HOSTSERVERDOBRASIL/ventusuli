@@ -36,6 +36,7 @@ interface LoginSuccessResponse {
     name: string;
     email: string;
     role: string;
+    roles?: string[];
   };
   profile?: { hasCpf: boolean };
   organization?: {
@@ -379,6 +380,7 @@ export function LoginForm() {
       setAuthSession({
         token: payload.accessToken,
         role: (payload.user.role as UserRole) ?? null,
+        roles: payload.user.roles?.map((role) => role as UserRole),
       });
 
       toast.success("Login realizado com sucesso.");

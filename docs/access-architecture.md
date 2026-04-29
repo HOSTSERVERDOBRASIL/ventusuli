@@ -31,7 +31,7 @@ Bloqueado por padrao:
 
 - `/admin/*`
 - `/coach/*`
-- rotas da jornada de atleta (`/`, `/provas`, `/minhas-inscricoes`, `/financeiro`, `/calendario`, `/evolucao`, `/comunidade`, `/recompensas`, `/meus-resgates`)
+- rotas da jornada de atleta (`/`, `/provas`, `/minhas-inscricoes`, `/financeiro`, `/calendario`, `/evolucao`, `/comunidade`, `/avisos`, `/fotos`, `/recompensas`, `/meus-resgates`, `/patrocinadores`)
 
 Regra de produto:
 
@@ -48,6 +48,8 @@ Permitido:
 - `/admin/recompensas`
 - `/admin/resgates`
 - `/admin/pontos`
+- `/admin/fotos`
+- `/admin/patrocinadores`
 - `/admin/avisos`
 - `/admin/configuracoes`
 
@@ -95,9 +97,11 @@ Permitido:
 - `/calendario`
 - `/evolucao`
 - `/comunidade`
+- `/avisos`
+- `/fotos`
 - `/recompensas`
 - `/meus-resgates`
-- `/avisos`
+- `/patrocinadores`
 - `/perfil`
 - `/configuracoes/conta`
 

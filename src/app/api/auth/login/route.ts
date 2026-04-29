@@ -20,6 +20,7 @@ import { checkRateLimit, getClientIp, isRateLimiterUnavailableError } from "@/li
 import { getAuthConfigError, isDemoRuntimeEnabled, isProductionRuntime } from "@/lib/auth-config";
 import { logError, logWarn, toErrorContext, withRequestContext } from "@/lib/logger";
 import { UserRole } from "@/types";
+import { buildEffectiveRoles } from "@/lib/access-profiles";
 
 const RATE_LIMIT = 5;
 const RATE_WINDOW_MS = 15 * 60 * 1_000;
@@ -206,6 +207,9 @@ export async function POST(req: NextRequest) {
         email: true,
         role: true,
         organization_id: true,
+        athlete_profile: {
+          select: { id: true },
+        },
       },
     });
 
@@ -222,6 +226,10 @@ export async function POST(req: NextRequest) {
       demoUser.organization_id,
       "ACTIVE",
       "7d",
+      buildEffectiveRoles({
+        primaryRole: demoUser.role as UserRole,
+        hasAthleteProfile: Boolean(demoUser.athlete_profile),
+      }),
     );
     const hasCpf = await resolveHasCpf(demoUser.id, demoUser.role as UserRole);
 
@@ -232,6 +240,10 @@ export async function POST(req: NextRequest) {
           name: demoUser.name,
           email: demoUser.email,
           role: demoUser.role,
+          roles: buildEffectiveRoles({
+            primaryRole: demoUser.role as UserRole,
+            hasAthleteProfile: Boolean(demoUser.athlete_profile),
+          }),
         },
         profile: { hasCpf },
         accessToken,
@@ -263,7 +275,7 @@ export async function POST(req: NextRequest) {
       organization_id: true,
       account_status: true,
       athlete_profile: {
-        select: { athlete_status: true },
+        select: { id: true, athlete_status: true },
       },
       organization: {
         select: {
@@ -304,6 +316,10 @@ export async function POST(req: NextRequest) {
   }
 
   const role = user.role as UserRole;
+  const roles = buildEffectiveRoles({
+    primaryRole: role,
+    hasAthleteProfile: Boolean(user.athlete_profile),
+  });
   const mfaEnabled = Boolean(user.mfa_settings?.enabled && user.mfa_settings?.totp_secret);
   const mfaRequired = mfaEnabled || isMfaMandatoryForRole(role);
 
@@ -335,6 +351,7 @@ export async function POST(req: NextRequest) {
     role,
     organizationId: user.organization_id,
     rememberMe,
+    roles,
   });
 
   await prisma.user.update({
@@ -343,7 +360,7 @@ export async function POST(req: NextRequest) {
   });
 
   const responseBody = {
-    user: { id: user.id, name: user.name, email: user.email, role },
+    user: { id: user.id, name: user.name, email: user.email, role, roles },
     profile: { hasCpf },
     organization: user.organization
       ? {

@@ -4,12 +4,14 @@ import {
   BarChart3,
   BellRing,
   CalendarDays,
+  Camera,
   ClipboardList,
   Coins,
   CreditCard,
   Dumbbell,
   FileSearch,
   Gift,
+  Handshake,
   Heart,
   IdCard,
   LayoutDashboard,
@@ -21,7 +23,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { ComponentType } from "react";
-import { AccessPolicy, ROLE_GROUPS, canAccessPolicy } from "@/lib/authorization";
+import { AccessPolicy, ROLE_GROUPS, canAccessPolicyAny } from "@/lib/authorization";
 import { UserRole } from "@/types";
 
 export type NavSection =
@@ -128,6 +130,15 @@ export const navItems: NavItem[] = [
     quickSearch: true,
   },
   {
+    href: "/fotos",
+    label: "Fotos",
+    icon: Camera,
+    roles: [...ROLE_GROUPS.athlete],
+    policy: "ATHLETE_AREA",
+    section: "points",
+    quickSearch: true,
+  },
+  {
     href: "/recompensas",
     label: "Recompensas",
     icon: Gift,
@@ -143,6 +154,15 @@ export const navItems: NavItem[] = [
     roles: [...ROLE_GROUPS.athlete],
     policy: "ATHLETE_AREA",
     section: "points",
+    quickSearch: true,
+  },
+  {
+    href: "/patrocinadores",
+    label: "Patrocinadores",
+    icon: Handshake,
+    roles: [...ROLE_GROUPS.athlete],
+    policy: "ATHLETE_AREA",
+    section: "communication",
     quickSearch: true,
   },
 
@@ -247,6 +267,24 @@ export const navItems: NavItem[] = [
     quickSearch: true,
   },
   {
+    href: "/admin/fotos",
+    label: "Fotos",
+    icon: Camera,
+    roles: [...ROLE_GROUPS.tenantAdmin],
+    policy: "ADMIN_ONLY",
+    section: "points",
+    quickSearch: true,
+  },
+  {
+    href: "/admin/patrocinadores",
+    label: "Patrocinadores",
+    icon: Handshake,
+    roles: [...ROLE_GROUPS.tenantAdmin],
+    policy: "ADMIN_ONLY",
+    section: "finance",
+    quickSearch: true,
+  },
+  {
     href: "/coach/calendario",
     label: "Calendario Tecnico",
     icon: CalendarDays,
@@ -340,21 +378,27 @@ export const navItems: NavItem[] = [
   },
 ];
 
-export function getVisibleNavItems(role: UserRole | null): NavItem[] {
-  if (!role) {
+export function getVisibleNavItems(roles: UserRole | UserRole[] | null): NavItem[] {
+  const normalizedRoles = Array.isArray(roles) ? roles : roles ? [roles] : [];
+
+  if (!normalizedRoles.length) {
     return navItems.filter((item) => item.roles.includes(UserRole.ATHLETE));
   }
 
-  return navItems.filter((item) => item.roles.includes(role) && canAccessPolicy(role, item.policy));
+  return navItems.filter(
+    (item) =>
+      item.roles.some((role) => normalizedRoles.includes(role)) &&
+      canAccessPolicyAny(normalizedRoles, item.policy),
+  );
 }
 
-export function getQuickSearchLinks(role: UserRole | null): Array<{ href: string; label: string }> {
-  return getVisibleNavItems(role)
+export function getQuickSearchLinks(roles: UserRole | UserRole[] | null): Array<{ href: string; label: string }> {
+  return getVisibleNavItems(roles)
     .filter((item) => item.quickSearch !== false)
     .map((item) => ({ href: item.href, label: item.label }));
 }
 
-export function splitNavBySection(role: UserRole | null): {
+export function splitNavBySection(roles: UserRole | UserRole[] | null): {
   home: NavItem[];
   events: NavItem[];
   finance: NavItem[];
@@ -365,7 +409,7 @@ export function splitNavBySection(role: UserRole | null): {
   platform: NavItem[];
   account: NavItem[];
 } {
-  const visible = getVisibleNavItems(role);
+  const visible = getVisibleNavItems(roles);
   return {
     home: visible.filter((item) => item.section === "home"),
     events: visible.filter((item) => item.section === "events"),

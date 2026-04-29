@@ -7,6 +7,8 @@ const ROLE_VALUES: readonly UserRole[] = ["SUPER_ADMIN", "ADMIN", "FINANCE", "CO
 export interface AuthContext {
   userId: string;
   role: UserRole;
+  roles: UserRole[];
+  primaryRole: UserRole;
   organizationId: string;
   orgId: string;
 }
@@ -17,6 +19,16 @@ function parseRole(raw: string | null): UserRole | null {
   if (!raw) return null;
   const role = raw.toUpperCase() as UserRole;
   return ROLE_VALUES.includes(role) ? role : null;
+}
+
+function parseRoles(raw: string | null, fallback: UserRole): UserRole[] {
+  if (!raw) return [fallback];
+  const roles = raw
+    .split(",")
+    .map((item) => parseRole(item.trim()))
+    .filter((role): role is UserRole => Boolean(role));
+
+  return roles.length ? roles : [fallback];
 }
 
 export function getAccessTokenFromRequest(
@@ -35,13 +47,17 @@ export function getAccessTokenFromRequest(
 export function getAuthContext(req: NextRequest): AuthContext | null {
   const userId = req.headers.get("x-user-id");
   const role = parseRole(req.headers.get("x-user-role"));
+  const primaryRole = parseRole(req.headers.get("x-user-primary-role"));
   const organizationId = req.headers.get("x-org-id");
 
   if (!userId || !role || !organizationId) return null;
+  const roles = parseRoles(req.headers.get("x-user-roles"), role);
 
   return {
     userId,
     role,
+    roles,
+    primaryRole: primaryRole ?? role,
     organizationId,
     orgId: organizationId,
   };

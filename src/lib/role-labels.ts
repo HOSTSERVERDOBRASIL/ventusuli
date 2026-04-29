@@ -9,6 +9,11 @@ export function roleLabel(role: UserRole | string | null | undefined): string {
   return "Usuario";
 }
 
+export function rolesLabel(roles: Array<UserRole | string> | null | undefined): string {
+  if (!roles?.length) return "Usuario";
+  return roles.map(roleLabel).join(" + ");
+}
+
 export function managedAthleteLabel(): string {
   return "Atleta Associado";
 }

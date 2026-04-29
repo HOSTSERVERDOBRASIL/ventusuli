@@ -36,6 +36,7 @@ export async function verifyPassword(plain: string, hash: string): Promise<boole
 export interface AccessTokenPayload {
   sub: string;   // userId
   role: UserRole;
+  roles?: UserRole[];
   org: string;   // orgId
   status?: "ACTIVE" | "PENDING_INVITE" | "PENDING_APPROVAL" | "SUSPENDED";
   iat: number;
@@ -48,10 +49,11 @@ export function generateAccessToken(
   orgId: string,
   accountStatus: AccessTokenPayload["status"] = "ACTIVE",
   expiresIn: jwt.SignOptions["expiresIn"] = "15m",
+  roles: UserRole[] = [role],
 ): string {
   const secret = requireEnv("JWT_SECRET");
   return jwt.sign(
-    { sub: userId, role, org: orgId, status: accountStatus },
+    { sub: userId, role, roles, org: orgId, status: accountStatus },
     secret,
     { expiresIn, algorithm: "HS256" },
   );

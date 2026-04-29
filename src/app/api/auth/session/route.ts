@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { clearAccessCookie, clearRefreshCookie } from "@/lib/cookies";
 import { getAccessTokenFromRequest } from "@/lib/request-auth";
 import { logWarn, withRequestContext } from "@/lib/logger";
+import { buildEffectiveRoles } from "@/lib/access-profiles";
 
 function sessionErrorResponse(
   code: "UNAUTHORIZED" | "TOKEN_INVALID" | "FORBIDDEN",
@@ -43,6 +44,9 @@ export async function GET(req: NextRequest) {
         role: true,
         account_status: true,
         organization_id: true,
+        athlete_profile: {
+          select: { cpf: true, athlete_status: true },
+        },
         organization: {
           select: {
             id: true,
@@ -67,22 +71,19 @@ export async function GET(req: NextRequest) {
       return sessionErrorResponse("FORBIDDEN", "Conta pendente de ativacao ou aprovacao.", 403);
     }
 
-    let hasCpf = true;
-    let athleteStatus: "PENDING_APPROVAL" | "ACTIVE" | "REJECTED" | "BLOCKED" | null = null;
-    if (user.role === "ATHLETE") {
-      const athleteProfile = await prisma.athleteProfile.findUnique({
-        where: { user_id: user.id },
-        select: { cpf: true, athlete_status: true },
-      });
-      hasCpf = Boolean(athleteProfile?.cpf);
-      athleteStatus = athleteProfile?.athlete_status ?? null;
-    }
+    const roles = buildEffectiveRoles({
+      primaryRole: user.role,
+      hasAthleteProfile: Boolean(user.athlete_profile),
+    });
+    const hasCpf = user.athlete_profile ? Boolean(user.athlete_profile.cpf) : true;
+    const athleteStatus = user.athlete_profile?.athlete_status ?? null;
 
     return NextResponse.json(
       {
         user: {
           id: user.id,
           role: user.role,
+          roles,
           organization_id: user.organization_id,
           name: user.name,
           email: user.email,

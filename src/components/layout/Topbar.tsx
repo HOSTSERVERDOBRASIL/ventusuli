@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { Bell, LogOut, Menu, Search } from "lucide-react";
 import { useAuthToken } from "@/components/auth/AuthTokenProvider";
 import { getQuickSearchLinks, getVisibleNavItems } from "@/components/layout/nav-items";
-import { roleLabel } from "@/lib/role-labels";
+import { rolesLabel } from "@/lib/role-labels";
 import { UserRole } from "@/types";
 
 interface TopbarProps {
@@ -21,27 +21,28 @@ interface TopbarProps {
 }
 
 export function Topbar({ user, onMobileMenuOpen }: TopbarProps) {
-  const { clearAccessToken, userRole, organization, currentUser } = useAuthToken();
+  const { clearAccessToken, userRoles, organization, currentUser } = useAuthToken();
   const router = useRouter();
   const pathname = usePathname();
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
 
-  const quickLinks = useMemo(() => getQuickSearchLinks(userRole), [userRole]);
+  const quickLinks = useMemo(() => getQuickSearchLinks(userRoles), [userRoles]);
   const currentPageLabel = useMemo(() => {
-    const items = getVisibleNavItems(userRole);
+    const items = getVisibleNavItems(userRoles);
     const active = items
       .filter((item) => pathname === item.href || (item.href !== "/" && pathname.startsWith(`${item.href}/`)))
       .sort((a, b) => b.href.length - a.href.length)[0];
     return active?.label ?? "Dashboard";
-  }, [pathname, userRole]);
+  }, [pathname, userRoles]);
   const filteredLinks = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return quickLinks;
     return quickLinks.filter((item) => item.label.toLowerCase().includes(q));
   }, [quickLinks, query]);
-  const profileHref = userRole === UserRole.SUPER_ADMIN ? "/super-admin" : "/perfil";
-  const profileLabel = userRole === UserRole.SUPER_ADMIN ? "Plataforma" : "Meu perfil";
+  const onlyPlatform = userRoles.includes(UserRole.SUPER_ADMIN) && !userRoles.includes(UserRole.ATHLETE);
+  const profileHref = onlyPlatform ? "/super-admin" : "/perfil";
+  const profileLabel = onlyPlatform ? "Plataforma" : "Meu perfil";
   const displayName = currentUser?.name ?? user?.name ?? "Usuario";
   const displayInitial = displayName[0]?.toUpperCase() ?? "U";
 
@@ -164,7 +165,7 @@ export function Topbar({ user, onMobileMenuOpen }: TopbarProps) {
           <span className="hidden min-w-0 sm:block">
             <span className="block max-w-[140px] truncate font-medium leading-tight">{displayName}</span>
             <span className="block max-w-[140px] truncate text-[10px] leading-tight text-white/35">
-              {roleLabel(userRole)}
+              {rolesLabel(userRoles)}
             </span>
           </span>
         </Link>

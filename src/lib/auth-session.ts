@@ -12,6 +12,7 @@ export function getRefreshTtlDays(rememberMe: boolean): number {
 export async function createSessionTokens(params: {
   userId: string;
   role: UserRole;
+  roles?: UserRole[];
   organizationId: string;
   rememberMe: boolean;
   accountStatus?: "ACTIVE" | "PENDING_INVITE" | "PENDING_APPROVAL" | "SUSPENDED";
@@ -24,9 +25,10 @@ export async function createSessionTokens(params: {
     rememberMe,
     accountStatus = "ACTIVE",
     accessExpiresIn = "15m",
+    roles = [role],
   } = params;
 
-  const accessToken = generateAccessToken(userId, role, organizationId, accountStatus, accessExpiresIn);
+  const accessToken = generateAccessToken(userId, role, organizationId, accountStatus, accessExpiresIn, roles);
   const refreshToken = generateRefreshToken();
   const expiresAt = new Date(Date.now() + getRefreshTtlDays(rememberMe) * 24 * 60 * 60 * 1000);
 

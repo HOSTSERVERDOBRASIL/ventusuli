@@ -15,9 +15,9 @@ export function RoleGate({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const { hydrated, userRole } = useAuthToken();
+  const { hydrated, userRoles } = useAuthToken();
 
-  const canAccess = userRole ? allowedRoles.includes(userRole) : false;
+  const canAccess = userRoles.some((role) => allowedRoles.includes(role));
 
   useEffect(() => {
     if (!hydrated) return;
@@ -34,4 +34,3 @@ export function RoleGate({
 
   return <>{children}</>;
 }
-

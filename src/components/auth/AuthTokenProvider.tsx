@@ -6,6 +6,7 @@ import { OrgPlan, OrgStatus, UserRole } from "@/types";
 interface SessionUser {
   id: string;
   role: UserRole;
+  roles?: UserRole[];
   organization_id: string;
   name?: string | null;
   email?: string | null;
@@ -29,6 +30,7 @@ interface SessionUser {
 interface AuthTokenContextValue {
   accessToken: string | null;
   userRole: UserRole | null;
+  userRoles: UserRole[];
   currentUser: SessionUser | null;
   organization: SessionUser["organization"] | null;
   /** null = nÃ£o determinado ainda; true/false = resultado da sessÃ£o */
@@ -36,7 +38,7 @@ interface AuthTokenContextValue {
   hydrated: boolean;
   setAccessToken: (token: string | null) => void;
   setUserRole: (role: UserRole | null) => void;
-  setAuthSession: (session: { token: string | null; role: UserRole | null }) => void;
+  setAuthSession: (session: { token: string | null; role: UserRole | null; roles?: UserRole[] }) => void;
   clearAccessToken: () => void;
   refreshSession: () => Promise<boolean>;
 }
@@ -70,10 +72,14 @@ function isOrganizationSetupExempt(pathname: string): boolean {
 }
 
 function shouldRedirectToOrganizationSetup(user: SessionUser): boolean {
-  if (user.role !== UserRole.ADMIN) return false;
+  if (!getUserRoles(user).includes(UserRole.ADMIN)) return false;
   const status = user.organization?.status;
   const setupCompletedAt = user.organization?.setup_completed_at ?? null;
   return status === OrgStatus.PENDING_SETUP || !setupCompletedAt;
+}
+
+function getUserRoles(user: SessionUser): UserRole[] {
+  return user.roles?.length ? user.roles : [user.role];
 }
 
 async function fetchSession(): Promise<SessionUser | null> {
@@ -100,6 +106,7 @@ async function refreshAccessToken(): Promise<boolean> {
 export function AuthTokenProvider({ children }: { children: React.ReactNode }) {
   const [accessToken, setAccessTokenState] = useState<string | null>(null);
   const [userRole, setUserRoleState] = useState<UserRole | null>(null);
+  const [userRoles, setUserRolesState] = useState<UserRole[]>([]);
   const [currentUser, setCurrentUser] = useState<SessionUser | null>(null);
   const [organization, setOrganization] = useState<SessionUser["organization"] | null>(null);
   const [hasCpf, setHasCpf] = useState<boolean | null>(null);
@@ -109,6 +116,7 @@ export function AuthTokenProvider({ children }: { children: React.ReactNode }) {
     const user = await fetchSession();
     if (user) {
       setUserRoleState(user.role);
+      setUserRolesState(getUserRoles(user));
       setCurrentUser(user);
       setOrganization(user.organization ?? null);
       setHasCpf(user.profile?.hasCpf ?? true);
@@ -121,6 +129,7 @@ export function AuthTokenProvider({ children }: { children: React.ReactNode }) {
     const refreshedUser = await fetchSession();
     if (!refreshedUser) return false;
     setUserRoleState(refreshedUser.role);
+    setUserRolesState(getUserRoles(refreshedUser));
     setCurrentUser(refreshedUser);
     setOrganization(refreshedUser.organization ?? null);
     setHasCpf(refreshedUser.profile?.hasCpf ?? true);
@@ -137,6 +146,7 @@ export function AuthTokenProvider({ children }: { children: React.ReactNode }) {
         if (user) {
           if (!cancelled) {
             setUserRoleState(user.role);
+            setUserRolesState(getUserRoles(user));
             setCurrentUser(user);
             setOrganization(user.organization ?? null);
             setHasCpf(user.profile?.hasCpf ?? true);
@@ -146,6 +156,7 @@ export function AuthTokenProvider({ children }: { children: React.ReactNode }) {
           if (
             !cancelled &&
             user.role === UserRole.ATHLETE &&
+            getUserRoles(user).includes(UserRole.ATHLETE) &&
             user.profile?.hasCpf === false &&
             !isOnboardingExempt(window.location.pathname)
           ) {
@@ -171,6 +182,7 @@ export function AuthTokenProvider({ children }: { children: React.ReactNode }) {
           if (!cancelled) {
             setAccessTokenState(null);
             setUserRoleState(null);
+            setUserRolesState([]);
             setCurrentUser(null);
             setOrganization(null);
             setHasCpf(null);
@@ -199,6 +211,7 @@ export function AuthTokenProvider({ children }: { children: React.ReactNode }) {
 
         if (!cancelled) {
           setUserRoleState(refreshedUser.role);
+          setUserRolesState(getUserRoles(refreshedUser));
           setCurrentUser(refreshedUser);
           setOrganization(refreshedUser.organization ?? null);
           setHasCpf(refreshedUser.profile?.hasCpf ?? true);
@@ -207,6 +220,7 @@ export function AuthTokenProvider({ children }: { children: React.ReactNode }) {
         if (
           !cancelled &&
           refreshedUser.role === UserRole.ATHLETE &&
+          getUserRoles(refreshedUser).includes(UserRole.ATHLETE) &&
           refreshedUser.profile?.hasCpf === false &&
           !isOnboardingExempt(window.location.pathname)
         ) {
@@ -237,19 +251,22 @@ export function AuthTokenProvider({ children }: { children: React.ReactNode }) {
     () => ({
       accessToken,
       userRole,
+      userRoles,
       currentUser,
       organization,
       hasCpf,
       hydrated,
       setAccessToken: (token) => setAccessTokenState(token),
       setUserRole: (role) => setUserRoleState(role),
-      setAuthSession: ({ token, role }) => {
+      setAuthSession: ({ token, role, roles }) => {
         setAccessTokenState(token);
         setUserRoleState(role);
+        setUserRolesState(roles?.length ? roles : role ? [role] : []);
       },
       clearAccessToken: () => {
         setAccessTokenState(null);
         setUserRoleState(null);
+        setUserRolesState([]);
         setCurrentUser(null);
         setOrganization(null);
         setHasCpf(null);
@@ -257,7 +274,7 @@ export function AuthTokenProvider({ children }: { children: React.ReactNode }) {
       refreshSession,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [accessToken, currentUser, hasCpf, hydrated, organization, userRole],
+    [accessToken, currentUser, hasCpf, hydrated, organization, userRole, userRoles],
   );
 
   return <AuthTokenContext.Provider value={value}>{children}</AuthTokenContext.Provider>;

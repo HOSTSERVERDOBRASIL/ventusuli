@@ -10,13 +10,27 @@ const EMAIL_OTP_DIGITS = 6;
 export const MFA_LOGIN_TTL_MS = 10 * 60 * 1000;
 export const MFA_EMAIL_OTP_TTL_MS = 5 * 60 * 1000;
 export const MFA_MAX_ATTEMPTS = 5;
+const DEFAULT_MFA_REQUIRED_ROLES: UserRole[] = [
+  UserRole.SUPER_ADMIN,
+  UserRole.ADMIN,
+  UserRole.FINANCE,
+  UserRole.COACH,
+  UserRole.ATHLETE,
+];
 
 export function isPrivilegedRole(role: UserRole): boolean {
   return role === "SUPER_ADMIN" || role === "ADMIN" || role === "FINANCE";
 }
 
 export function isMfaMandatoryForRole(role: UserRole): boolean {
-  return isPrivilegedRole(role);
+  const configuredRoles = process.env.MFA_REQUIRED_ROLES;
+  const requiredRoles = (configuredRoles?.trim() ? configuredRoles : DEFAULT_MFA_REQUIRED_ROLES.join(","))
+    .split(",")
+    .map((item) => item.trim().toUpperCase())
+    .filter(Boolean);
+
+  if (requiredRoles.includes("ALL")) return true;
+  return requiredRoles.includes(role);
 }
 
 export function maskEmail(email: string): string {

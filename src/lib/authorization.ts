@@ -41,6 +41,22 @@ export function canAccessPolicy(role: UserRole | null | undefined, policy: Acces
   return POLICY_ROLES[policy].includes(role);
 }
 
+export function canAccessPolicyAny(
+  roles: readonly UserRole[] | null | undefined,
+  policy: AccessPolicy,
+): boolean {
+  if (!roles?.length) return false;
+  return roles.some((role) => canAccessPolicy(role, policy));
+}
+
+export function resolveRoleForPolicy(
+  roles: readonly UserRole[] | null | undefined,
+  policy: AccessPolicy,
+): UserRole | null {
+  if (!roles?.length) return null;
+  return roles.find((role) => canAccessPolicy(role, policy)) ?? null;
+}
+
 export function hasAnyRole(
   role: UserRole | null | undefined,
   allowedRoles: readonly UserRole[],
@@ -71,8 +87,10 @@ export const PAGE_ROUTE_POLICY_RULES: RoutePolicyRule[] = [
   { prefix: "/evolucao", policy: "ATHLETE_AREA" },
   { prefix: "/comunidade", policy: "ATHLETE_AREA" },
   { prefix: "/avisos", policy: "ATHLETE_AREA" },
+  { prefix: "/fotos", policy: "ATHLETE_AREA" },
   { prefix: "/recompensas", policy: "ATHLETE_AREA" },
   { prefix: "/meus-resgates", policy: "ATHLETE_AREA" },
+  { prefix: "/patrocinadores", policy: "ATHLETE_AREA" },
   { prefix: "/perfil", policy: "TENANT_AUTHENTICATED" },
   { prefix: "/configuracoes", policy: "TENANT_AUTHENTICATED" },
   { prefix: "/dashboard", policy: "TENANT_AUTHENTICATED" },
@@ -102,6 +120,9 @@ export const API_ROUTE_POLICY_RULES: RoutePolicyRule[] = [
   { prefix: "/api/community", policy: "TENANT_AUTHENTICATED" },
   { prefix: "/api/events", policy: "TENANT_AUTHENTICATED" },
   { prefix: "/api/rewards", policy: "TENANT_AUTHENTICATED" },
+  { prefix: "/api/photos", policy: "TENANT_AUTHENTICATED" },
+  { prefix: "/api/sponsors", policy: "TENANT_AUTHENTICATED" },
+  { prefix: "/api/points", policy: "TENANT_AUTHENTICATED" },
   { prefix: "/api/registrations", policy: "TENANT_AUTHENTICATED" },
   { prefix: "/api/me", policy: "TENANT_AUTHENTICATED" },
 ];

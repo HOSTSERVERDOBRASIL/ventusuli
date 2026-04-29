@@ -136,16 +136,6 @@ interface LoyaltySnapshot {
   badges: LoyaltyBadge[];
 }
 
-interface PointActivity {
-  id: string;
-  organizationId: string;
-  name: string;
-  description: string | null;
-  suggestedPoints: number;
-  activityDate: string;
-  active: boolean;
-}
-
 interface UserPointActivityEntry {
   id: string;
   activityId: string;
@@ -176,24 +166,16 @@ export default function RecompensasPage() {
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [pointSummary, setPointSummary] = useState<PointSummary>({ pointsExpiringIn30Days: 0 });
   const [loyalty, setLoyalty] = useState<LoyaltySnapshot | null>(null);
-  const [activities, setActivities] = useState<PointActivity[]>([]);
   const [activityEntries, setActivityEntries] = useState<UserPointActivityEntry[]>([]);
   const [pointsInput, setPointsInput] = useState<Record<string, string>>({});
   const [calculations, setCalculations] = useState<Record<string, CalculationResult>>({});
   const [processingId, setProcessingId] = useState<string | null>(null);
-  const [submittingActivity, setSubmittingActivity] = useState(false);
-  const [activityForm, setActivityForm] = useState({
-    activityId: "",
-    points: "",
-    note: "",
-    proofUrl: "",
-  });
 
   const loadRewards = async () => {
     setLoading(true);
     setError(null);
     try {
-      const [response, ledgerResponse, summaryResponse, loyaltyResponse, activitiesResponse, activityEntriesResponse] = await Promise.all([
+      const [response, ledgerResponse, summaryResponse, loyaltyResponse, activityEntriesResponse] = await Promise.all([
         fetch("/api/rewards", {
           cache: "no-store",
           headers: buildAuthHeaders(accessToken),
@@ -210,10 +192,6 @@ export default function RecompensasPage() {
           cache: "no-store",
           headers: buildAuthHeaders(accessToken),
         }),
-        fetch("/api/points/activity-entries", {
-          cache: "no-store",
-          headers: buildAuthHeaders(accessToken),
-        }),
         fetch("/api/points/activity-entries/me?page=1&limit=8", {
           cache: "no-store",
           headers: buildAuthHeaders(accessToken),
@@ -224,7 +202,6 @@ export default function RecompensasPage() {
       const ledgerPayload = (await ledgerResponse.json()) as { data?: LedgerEntry[] };
       const summaryPayload = (await summaryResponse.json()) as { data?: PointSummary };
       const loyaltyPayload = (await loyaltyResponse.json()) as { data?: LoyaltySnapshot };
-      const activitiesPayload = (await activitiesResponse.json()) as { data?: PointActivity[] };
       const activityEntriesPayload = (await activityEntriesResponse.json()) as { data?: UserPointActivityEntry[] };
       setItems(payload.data ?? []);
       setBalance(payload.currentBalance ?? 0);
@@ -232,24 +209,12 @@ export default function RecompensasPage() {
       setLedger(ledgerResponse.ok ? ledgerPayload.data ?? [] : []);
       setPointSummary(summaryResponse.ok ? summaryPayload.data ?? { pointsExpiringIn30Days: 0 } : { pointsExpiringIn30Days: 0 });
       setLoyalty(loyaltyResponse.ok ? loyaltyPayload.data ?? null : null);
-      const nextActivities = activitiesResponse.ok ? activitiesPayload.data ?? [] : [];
-      setActivities(nextActivities);
       setActivityEntries(activityEntriesResponse.ok ? activityEntriesPayload.data ?? [] : []);
-      setActivityForm((prev) => {
-        const activityId = prev.activityId || nextActivities[0]?.id || "";
-        const selectedActivity = nextActivities.find((item) => item.id === activityId) ?? nextActivities[0];
-        return {
-          ...prev,
-          activityId,
-          points: prev.points || String(selectedActivity?.suggestedPoints ?? ""),
-        };
-      });
     } catch (error) {
       setItems([]);
       setLedger([]);
       setPointSummary({ pointsExpiringIn30Days: 0 });
       setLoyalty(null);
-      setActivities([]);
       setActivityEntries([]);
       setError(
         error instanceof Error
@@ -337,47 +302,6 @@ export default function RecompensasPage() {
       toast.error(error instanceof Error ? error.message : "Falha ao concluir resgate.");
     } finally {
       setProcessingId(null);
-    }
-  };
-
-  const submitActivityRequest = async () => {
-    if (!activityForm.activityId || Number(activityForm.points) <= 0) {
-      toast.error("Selecione a atividade e informe os pontos.");
-      return;
-    }
-
-    setSubmittingActivity(true);
-    try {
-      const response = await fetch("/api/points/activity-entries", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...buildAuthHeaders(accessToken),
-        },
-        body: JSON.stringify({
-          activityId: activityForm.activityId,
-          points: Number(activityForm.points),
-          note: activityForm.note.trim() || null,
-          proofUrl: activityForm.proofUrl.trim() || null,
-        }),
-      });
-      const payload = (await response.json()) as { error?: { message?: string } };
-      if (!response.ok) {
-        throw new Error(payload.error?.message ?? "activity_request_error");
-      }
-      toast.success("Solicitacao enviada para aprovacao.");
-      const activity = activities.find((item) => item.id === activityForm.activityId);
-      setActivityForm((prev) => ({
-        ...prev,
-        points: String(activity?.suggestedPoints ?? prev.points),
-        note: "",
-        proofUrl: "",
-      }));
-      await loadRewards();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Nao foi possivel enviar a solicitacao.");
-    } finally {
-      setSubmittingActivity(false);
     }
   };
 
@@ -525,63 +449,32 @@ export default function RecompensasPage() {
       ) : null}
 
       <SectionCard
-        title="Pontos por atividade"
-        description="Solicite creditos por participacao em atividades e acompanhe a aprovacao antes de entrar no seu saldo."
+        title="Origem dos pontos"
+        description="Pontos sao gerados automaticamente por eventos internos e ficam auditaveis no extrato."
       >
-        <div className="grid gap-4 xl:grid-cols-[1.05fr_1.35fr]">
+        <div className="grid gap-4 xl:grid-cols-[0.9fr_1.35fr]">
           <div className="rounded-2xl border border-white/10 bg-[#102640] p-4">
-            <p className="text-sm font-semibold text-white">Nova solicitacao</p>
-            <p className="mt-1 text-xs text-slate-400">Os pontos so entram no ranking e no saldo depois da aprovacao administrativa.</p>
-            <div className="mt-4 grid gap-3">
-              <select
-                value={activityForm.activityId}
-                onChange={(event) => {
-                  const activityId = event.target.value;
-                  const activity = activities.find((item) => item.id === activityId);
-                  setActivityForm((prev) => ({
-                    ...prev,
-                    activityId,
-                    points: String(activity?.suggestedPoints ?? prev.points),
-                  }));
-                }}
-                className="rounded-lg border border-white/15 bg-[#0b1f35] px-3 py-2 text-sm text-white outline-none"
-              >
-                <option value="">Selecione a atividade</option>
-                {activities.map((activity) => (
-                  <option key={activity.id} value={activity.id}>
-                    {activity.name}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="number"
-                min={1}
-                value={activityForm.points}
-                onChange={(event) => setActivityForm((prev) => ({ ...prev, points: event.target.value }))}
-                className="rounded-lg border border-white/15 bg-[#0b1f35] px-3 py-2 text-sm text-white outline-none"
-                placeholder="Quantidade de pontos"
-              />
-              <textarea
-                value={activityForm.note}
-                onChange={(event) => setActivityForm((prev) => ({ ...prev, note: event.target.value }))}
-                className="min-h-[84px] rounded-lg border border-white/15 bg-[#0b1f35] px-3 py-2 text-sm text-white outline-none"
-                placeholder="Descreva sua participacao ou anexe contexto"
-              />
-              <input
-                value={activityForm.proofUrl}
-                onChange={(event) => setActivityForm((prev) => ({ ...prev, proofUrl: event.target.value }))}
-                className="rounded-lg border border-white/15 bg-[#0b1f35] px-3 py-2 text-sm text-white outline-none"
-                placeholder="URL do comprovante (opcional)"
-              />
-              <ActionButton disabled={submittingActivity || activities.length === 0} onClick={() => void submitActivityRequest()}>
-                {submittingActivity ? "Enviando..." : "Solicitar pontos"}
-              </ActionButton>
+            <p className="text-sm font-semibold text-white">Regras automaticas</p>
+            <div className="mt-4 space-y-2 text-sm text-slate-300">
+              {[
+                "Inscricao confirmada",
+                "Participacao validada em prova",
+                "Treino ou desafio concluido",
+                "Compra de foto ou recompensa elegivel",
+              ].map((label) => (
+                <div key={label} className="rounded-xl border border-white/10 bg-[#0b1f35] px-3 py-2">
+                  {label}
+                </div>
+              ))}
             </div>
           </div>
 
           <div className="space-y-3">
             {activityEntries.length === 0 ? (
-              <EmptyState title="Sem solicitacoes" description="Seus pedidos e lancamentos aprovados por atividade aparecerao aqui." />
+              <EmptyState
+                title="Sem lancamentos por atividade"
+                description="Lancamentos aprovados pela administracao aparecerao aqui."
+              />
             ) : (
               activityEntries.map((entry) => (
                 <article key={entry.id} className="rounded-2xl border border-white/10 bg-[#102640] p-4">
@@ -589,7 +482,7 @@ export default function RecompensasPage() {
                     <div>
                       <p className="text-lg font-semibold text-white">{entry.activityName ?? "Atividade"}</p>
                       <p className="text-xs text-slate-400">
-                        {new Date(entry.createdAt).toLocaleDateString("pt-BR")} | {entry.source === "USER" ? "Solicitado por voce" : "Lancado pela assessoria"}
+                        {new Date(entry.createdAt).toLocaleDateString("pt-BR")} | {entry.source === "USER" ? "Registro anterior do atleta" : "Lancado pela assessoria"}
                       </p>
                     </div>
                     <span className={`rounded-full border px-3 py-1 text-xs ${activityStatusTone(entry.status)}`}>

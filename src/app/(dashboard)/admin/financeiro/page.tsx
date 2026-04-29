@@ -98,6 +98,16 @@ const WORKSPACE_LABELS: Record<FinanceWorkspace, string> = {
   ledger: "Contas e recebimentos",
 };
 
+const ENTERPRISE_FINANCE_AREAS = [
+  { label: "Receitas", href: "#finance-cashbook" },
+  { label: "Despesas", href: "#finance-cashbook" },
+  { label: "Inscricoes", href: "#finance-charges" },
+  { label: "Fotos", href: "/admin/fotos" },
+  { label: "Patrocinadores", href: "/admin/patrocinadores" },
+  { label: "Repasses", href: "#finance-ledger" },
+  { label: "Relatorios", href: "#finance-overview" },
+];
+
 function paymentTone(status: PaymentRow["status"]): "positive" | "warning" | "danger" | "neutral" {
   if (status === "PAID") return "positive";
   if (status === "PENDING") return "warning";
@@ -1203,6 +1213,17 @@ export default function AdminFinanceiroPage() {
               className="inline-flex h-10 items-center rounded-lg border border-white/10 bg-white/[0.03] px-4 text-sm font-medium text-white/70 transition hover:border-[#1E90FF]/60 hover:bg-[#1E90FF]/10 hover:text-white"
             >
               {WORKSPACE_LABELS[key]}
+            </a>
+          ))}
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {ENTERPRISE_FINANCE_AREAS.map((area) => (
+            <a
+              key={area.label}
+              href={area.href}
+              className="inline-flex h-8 items-center rounded-full border border-white/10 bg-[#0b1d33] px-3 text-xs font-medium text-white/55 transition hover:border-[#F5A623]/50 hover:text-white"
+            >
+              {area.label}
             </a>
           ))}
         </div>

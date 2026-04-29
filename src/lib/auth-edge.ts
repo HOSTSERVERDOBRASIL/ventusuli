@@ -4,6 +4,7 @@ import { UserRole } from "@/types";
 export interface EdgeAccessTokenPayload {
   sub: string;
   role: UserRole;
+  roles?: UserRole[];
   org: string;
   status?: "ACTIVE" | "PENDING_INVITE" | "PENDING_APPROVAL" | "SUSPENDED";
   iat: number;
