@@ -100,6 +100,14 @@ enum RegistrationStatus {
   @@schema("public")
 }
 
+enum AttendanceStatus {
+  PENDING
+  PRESENT
+  ABSENT
+
+  @@schema("public")
+}
+
 enum PaymentStatus {
   PENDING
   PAID
@@ -286,6 +294,41 @@ enum PointActivityEntrySource {
   @@schema("public")
 }
 
+enum SportLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  ELITE
+
+  @@schema("public")
+}
+
+enum TrainingPlanStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+
+  @@schema("public")
+}
+
+enum WorkoutSessionStatus {
+  PENDING
+  COMPLETED
+  PARTIAL
+  MISSED
+
+  @@schema("public")
+}
+
+enum AIRecommendationStatus {
+  PENDING
+  APPLIED
+  DISMISSED
+
+  @@schema("public")
+}
+
 model Organization {
   id              String    @id @default(uuid())
   name            String
@@ -332,6 +375,11 @@ model Organization {
   ranking_snapshots    RankingSnapshot[]
   auth_challenges      AuthChallenge[]
   mfa_settings         UserMfaSettings[]
+  exercises            Exercise[]
+  training_plans       TrainingPlan[]
+  training_sessions    WorkoutSession[]
+  training_feedbacks   AthleteFeedback[]
+  ai_recommendations   AIRecommendation[]
 
   @@index([slug])
   @@index([status])
@@ -362,6 +410,7 @@ model User {
   registrations              Registration[]
   payments                   Payment[]
   financial_entries_created  FinancialEntry[]     @relation("FinancialEntryCreator")
+  financial_entries_subject  FinancialEntry[]     @relation("FinancialEntrySubject")
   created_collective_signups CollectiveSignup[]   @relation("CollectiveSignupCreator")
   collective_memberships     CollectiveMember[]
   community_posts            CommunityPost[]
@@ -379,6 +428,15 @@ model User {
   activities                 Activity[]
   strava_sync_logs           StravaSyncLog[]
   generated_rankings         RankingSnapshot[]    @relation("RankingSnapshotGenerator")
+  assigned_training_plans    TrainingPlan[]       @relation("TrainingPlanAthlete")
+  coached_training_plans     TrainingPlan[]       @relation("TrainingPlanCoach")
+  workout_sessions           WorkoutSession[]     @relation("WorkoutSessionAthlete")
+  coached_workout_sessions   WorkoutSession[]     @relation("WorkoutSessionCoach")
+  athlete_feedbacks          AthleteFeedback[]    @relation("AthleteFeedbackAthlete")
+  ai_recommendations         AIRecommendation[]   @relation("AIRecommendationAthlete")
+  coach_ai_recommendations   AIRecommendation[]   @relation("AIRecommendationCoach")
+  created_exercises          Exercise[]           @relation("ExerciseCreator")
+  training_plan_reviews      AIRecommendation[]   @relation("AIRecommendationReviewer")
 
   @@index([organization_id])
   @@index([email])
@@ -494,7 +552,22 @@ model AthleteProfile {
   member_sequence   Int?
   member_number     String?
   member_since      DateTime?
+  primary_modality  String?
+  sport_level       SportLevel?
+  sport_goal        String?
+  injury_history    String?
+  weekly_availability Json?
+  available_equipment String[]   @default([])
+  resting_heart_rate Int?
+  threshold_pace    String?
+  max_load_notes    String?
+  next_competition_date DateTime?
+  medical_restrictions String?
+  coach_notes       String?
   created_at        DateTime     @default(now())
+
+  training_plans    TrainingPlan[]
+  workout_sessions  WorkoutSession[]
 
   @@index([organization_id])
   @@index([organization_id, athlete_status])
@@ -671,6 +744,9 @@ model Registration {
   organization_id String
   organization    Organization       @relation(fields: [organization_id], references: [id], onDelete: Cascade)
   status          RegistrationStatus @default(INTERESTED)
+  attendance_status AttendanceStatus @default(PENDING)
+  attendance_checked_at DateTime?
+  attendance_checked_by String?
   notes           String?
   registered_at   DateTime           @default(now())
 
@@ -679,6 +755,7 @@ model Registration {
   @@unique([user_id, event_id, distance_id])
   @@index([organization_id])
   @@index([user_id])
+  @@index([organization_id, event_id, attendance_status])
   @@map("registrations")
   @@schema("public")
 }
@@ -717,6 +794,8 @@ model FinancialEntry {
   id              String       @id @default(uuid())
   organization_id String
   organization    Organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  subject_user_id String?
+  subject_user    User?        @relation("FinancialEntrySubject", fields: [subject_user_id], references: [id], onDelete: SetNull)
   type            String
   amount_cents    Int
   category        String
@@ -731,6 +810,7 @@ model FinancialEntry {
   counterparty    String?
   payment_method  String?
   document_url    String?
+  reference_code  String?
   created_by      String
   creator         User         @relation("FinancialEntryCreator", fields: [created_by], references: [id], onDelete: Restrict)
   created_at      DateTime     @default(now())
@@ -739,7 +819,230 @@ model FinancialEntry {
   @@index([organization_id, type])
   @@index([organization_id, status])
   @@index([organization_id, entry_kind])
+  @@index([organization_id, subject_user_id])
+  @@unique([organization_id, reference_code])
   @@map("financial_entries")
+  @@schema("public")
+}
+
+model Exercise {
+  id                String       @id @default(cuid())
+  organization_id   String
+  organization      Organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  created_by        String?
+  creator           User?        @relation("ExerciseCreator", fields: [created_by], references: [id], onDelete: SetNull)
+  name              String
+  modality          String
+  stimulus_type     String?
+  intensity_label   String?
+  duration_minutes  Int?
+  series            Int?
+  repetitions       String?
+  load_description  String?
+  distance_meters   Int?
+  video_url         String?
+  image_url         String?
+  instructions      String?
+  contraindications String?
+  level_recommended SportLevel?
+  active            Boolean      @default(true)
+  created_at        DateTime     @default(now())
+  updated_at        DateTime     @updatedAt
+
+  training_day_items TrainingDayItem[]
+
+  @@index([organization_id, modality, active])
+  @@map("exercises")
+  @@schema("public")
+}
+
+model TrainingPlan {
+  id                String             @id @default(cuid())
+  organization_id   String
+  organization      Organization       @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  athlete_id        String
+  athlete           User               @relation("TrainingPlanAthlete", fields: [athlete_id], references: [id], onDelete: Cascade)
+  athlete_profile_id String?
+  athlete_profile   AthleteProfile?    @relation(fields: [athlete_profile_id], references: [id], onDelete: SetNull)
+  coach_id          String
+  coach             User               @relation("TrainingPlanCoach", fields: [coach_id], references: [id], onDelete: Cascade)
+  name              String
+  cycle_goal        String
+  objective         String?
+  focus_modality    String?
+  start_date        DateTime
+  end_date          DateTime
+  status            TrainingPlanStatus @default(DRAFT)
+  ai_generated      Boolean            @default(false)
+  version           Int                @default(1)
+  notes             String?
+  created_at        DateTime           @default(now())
+  updated_at        DateTime           @updatedAt
+
+  weeks             TrainingWeek[]
+  sessions          WorkoutSession[]
+  ai_recommendations AIRecommendation[]
+
+  @@index([organization_id, athlete_id, status])
+  @@index([organization_id, coach_id, status])
+  @@map("training_plans")
+  @@schema("public")
+}
+
+model TrainingWeek {
+  id                String       @id @default(cuid())
+  training_plan_id  String
+  training_plan     TrainingPlan @relation(fields: [training_plan_id], references: [id], onDelete: Cascade)
+  week_number       Int
+  focus             String?
+  notes             String?
+  created_at        DateTime     @default(now())
+
+  days              TrainingDay[]
+
+  @@unique([training_plan_id, week_number])
+  @@map("training_weeks")
+  @@schema("public")
+}
+
+model TrainingDay {
+  id                String       @id @default(cuid())
+  training_week_id  String
+  training_week     TrainingWeek @relation(fields: [training_week_id], references: [id], onDelete: Cascade)
+  scheduled_date    DateTime
+  day_label         String?
+  title             String
+  objective         String?
+  is_rest_day       Boolean      @default(false)
+  coach_notes       String?
+  created_at        DateTime     @default(now())
+
+  items             TrainingDayItem[]
+  sessions          WorkoutSession[]
+
+  @@index([scheduled_date])
+  @@unique([training_week_id, scheduled_date])
+  @@map("training_days")
+  @@schema("public")
+}
+
+model TrainingDayItem {
+  id                String       @id @default(cuid())
+  training_day_id   String
+  training_day      TrainingDay  @relation(fields: [training_day_id], references: [id], onDelete: Cascade)
+  exercise_id       String?
+  exercise          Exercise?    @relation(fields: [exercise_id], references: [id], onDelete: SetNull)
+  sort_order        Int          @default(0)
+  exercise_name     String
+  instructions      String?
+  intensity_label   String?
+  duration_minutes  Int?
+  series            Int?
+  repetitions       String?
+  load_description  String?
+  distance_meters   Int?
+  pace_target       String?
+  heart_rate_target String?
+  target_rpe        Int?
+  notes             String?
+  created_at        DateTime     @default(now())
+
+  @@index([training_day_id, sort_order])
+  @@map("training_day_items")
+  @@schema("public")
+}
+
+model WorkoutSession {
+  id                String               @id @default(cuid())
+  organization_id   String
+  organization      Organization         @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  training_plan_id  String
+  training_plan     TrainingPlan         @relation(fields: [training_plan_id], references: [id], onDelete: Cascade)
+  training_day_id   String
+  training_day      TrainingDay          @relation(fields: [training_day_id], references: [id], onDelete: Cascade)
+  athlete_id        String
+  athlete           User                 @relation("WorkoutSessionAthlete", fields: [athlete_id], references: [id], onDelete: Cascade)
+  athlete_profile_id String?
+  athlete_profile   AthleteProfile?      @relation(fields: [athlete_profile_id], references: [id], onDelete: SetNull)
+  coach_id          String
+  coach             User                 @relation("WorkoutSessionCoach", fields: [coach_id], references: [id], onDelete: Cascade)
+  status            WorkoutSessionStatus @default(PENDING)
+  started_at        DateTime?
+  completed_at      DateTime?
+  perceived_effort  Int?
+  actual_duration_minutes Int?
+  actual_load       String?
+  actual_distance_m Int?
+  actual_pace       String?
+  actual_heart_rate Int?
+  athlete_notes     String?
+  coach_notes       String?
+  created_at        DateTime             @default(now())
+  updated_at        DateTime             @updatedAt
+
+  feedback          AthleteFeedback?
+  ai_recommendations AIRecommendation[]
+
+  @@unique([training_day_id, athlete_id])
+  @@index([organization_id, athlete_id, status])
+  @@index([organization_id, coach_id, status])
+  @@map("workout_sessions")
+  @@schema("public")
+}
+
+model AthleteFeedback {
+  id                String         @id @default(cuid())
+  organization_id   String
+  organization      Organization   @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  workout_session_id String        @unique
+  workout_session   WorkoutSession @relation(fields: [workout_session_id], references: [id], onDelete: Cascade)
+  athlete_id        String
+  athlete           User           @relation("AthleteFeedbackAthlete", fields: [athlete_id], references: [id], onDelete: Cascade)
+  completed_flag    String
+  perceived_effort  Int?
+  pain_level        Int?
+  pain_area         String?
+  discomfort_notes  String?
+  observation       String?
+  actual_duration_minutes Int?
+  actual_load       String?
+  actual_distance_m Int?
+  actual_pace       String?
+  actual_heart_rate Int?
+  submitted_at      DateTime       @default(now())
+  created_at        DateTime       @default(now())
+
+  @@index([organization_id, athlete_id, submitted_at(sort: Desc)])
+  @@map("athlete_feedbacks")
+  @@schema("public")
+}
+
+model AIRecommendation {
+  id                String                 @id @default(cuid())
+  organization_id   String
+  organization      Organization           @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  athlete_id        String?
+  athlete           User?                  @relation("AIRecommendationAthlete", fields: [athlete_id], references: [id], onDelete: SetNull)
+  coach_id          String
+  coach             User                   @relation("AIRecommendationCoach", fields: [coach_id], references: [id], onDelete: Cascade)
+  training_plan_id  String?
+  training_plan     TrainingPlan?          @relation(fields: [training_plan_id], references: [id], onDelete: Cascade)
+  workout_session_id String?
+  workout_session   WorkoutSession?        @relation(fields: [workout_session_id], references: [id], onDelete: Cascade)
+  reviewer_id       String?
+  reviewer          User?                  @relation("AIRecommendationReviewer", fields: [reviewer_id], references: [id], onDelete: SetNull)
+  recommendation_type String
+  summary           String
+  rationale         String?
+  input_snapshot    Json?
+  output_snapshot   Json?
+  status            AIRecommendationStatus @default(PENDING)
+  created_at        DateTime               @default(now())
+  reviewed_at       DateTime?
+
+  @@index([organization_id, coach_id, status, created_at(sort: Desc)])
+  @@index([organization_id, athlete_id, created_at(sort: Desc)])
+  @@map("ai_recommendations")
   @@schema("public")
 }
 

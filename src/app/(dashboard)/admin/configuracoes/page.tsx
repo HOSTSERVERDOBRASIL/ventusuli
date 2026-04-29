@@ -11,7 +11,10 @@ import { PageHeader } from "@/components/system/page-header";
 import { SectionCard } from "@/components/system/section-card";
 import { StatusBadge } from "@/components/system/status-badge";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import {
+  FinanceProfileSettings,
   createInvite,
   deleteInvite,
   getOrganizationSettings,
@@ -39,6 +42,21 @@ function formatExpiry(expiresAt: string | null): string {
     month: "2-digit",
     year: "numeric",
   });
+}
+
+function joinLines(values: string[]): string {
+  return values.join("\n");
+}
+
+function splitLines(value: string): string[] {
+  return Array.from(
+    new Set(
+      value
+        .split(/\r?\n|,/)
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  );
 }
 
 function Toggle({
@@ -100,6 +118,23 @@ export default function AdminConfiguracoesPage() {
     logoUrl: "",
     allowAthleteSelfSignup: true,
     requireAthleteApproval: false,
+    financeBusinessModel: "ASSESSORIA" as FinanceProfileSettings["businessModel"],
+    financeRevenueMode: "MISTO" as FinanceProfileSettings["revenueMode"],
+    financeBillingDay: "5",
+    financeRecurringMonthlyFee: "0",
+    financeRecurringChargeEnabled: false,
+    financeRecurringGraceDays: "3",
+    financeRecurringDescription: "Mensalidade recorrente do associado",
+    financeDefaultEntryKind: "RECEIVABLE" as FinanceProfileSettings["defaultEntryKind"],
+    financeDefaultAccountCode: "MENSALIDADE",
+    financeDefaultCostCenter: "Operacao",
+    financeDefaultPaymentMethod: "PIX",
+    financeRequireDueDateForOpenEntries: true,
+    financeAllowManualCashbook: true,
+    financeCategories: "",
+    financeCostCenters: "",
+    financePaymentMethods: "",
+    financeQuickNotes: "",
   });
 
   const canEdit = userRole ? ADMIN_ROLES.has(userRole) : false;
@@ -127,6 +162,24 @@ export default function AdminConfiguracoesPage() {
             logoUrl: payload.logoUrl ?? "",
             allowAthleteSelfSignup: payload.allowAthleteSelfSignup,
             requireAthleteApproval: payload.requireAthleteApproval,
+            financeBusinessModel: payload.financeProfile.businessModel,
+            financeRevenueMode: payload.financeProfile.revenueMode,
+            financeBillingDay: payload.financeProfile.billingDay?.toString() ?? "",
+            financeRecurringMonthlyFee: String(payload.financeProfile.recurringMonthlyFeeCents ?? 0),
+            financeRecurringChargeEnabled: payload.financeProfile.recurringChargeEnabled,
+            financeRecurringGraceDays: String(payload.financeProfile.recurringGraceDays ?? 3),
+            financeRecurringDescription: payload.financeProfile.recurringDescription,
+            financeDefaultEntryKind: payload.financeProfile.defaultEntryKind,
+            financeDefaultAccountCode: payload.financeProfile.defaultAccountCode,
+            financeDefaultCostCenter: payload.financeProfile.defaultCostCenter,
+            financeDefaultPaymentMethod: payload.financeProfile.defaultPaymentMethod,
+            financeRequireDueDateForOpenEntries:
+              payload.financeProfile.requireDueDateForOpenEntries,
+            financeAllowManualCashbook: payload.financeProfile.allowManualCashbook,
+            financeCategories: joinLines(payload.financeProfile.categories),
+            financeCostCenters: joinLines(payload.financeProfile.costCenters),
+            financePaymentMethods: joinLines(payload.financeProfile.paymentMethods),
+            financeQuickNotes: joinLines(payload.financeProfile.quickNotes),
           });
           setInvites(inviteList);
         }
@@ -163,6 +216,29 @@ export default function AdminConfiguracoesPage() {
           logoUrl: form.logoUrl.trim() ? form.logoUrl.trim() : null,
           allowAthleteSelfSignup: form.allowAthleteSelfSignup,
           requireAthleteApproval: form.requireAthleteApproval,
+          financeProfile: {
+            businessModel: form.financeBusinessModel,
+            revenueMode: form.financeRevenueMode,
+            billingDay: form.financeBillingDay.trim() ? Number(form.financeBillingDay) : null,
+            recurringMonthlyFeeCents: form.financeRecurringMonthlyFee.trim()
+              ? Number(form.financeRecurringMonthlyFee)
+              : 0,
+            recurringChargeEnabled: form.financeRecurringChargeEnabled,
+            recurringGraceDays: form.financeRecurringGraceDays.trim()
+              ? Number(form.financeRecurringGraceDays)
+              : 3,
+            recurringDescription: form.financeRecurringDescription,
+            defaultEntryKind: form.financeDefaultEntryKind,
+            defaultAccountCode: form.financeDefaultAccountCode,
+            defaultCostCenter: form.financeDefaultCostCenter,
+            defaultPaymentMethod: form.financeDefaultPaymentMethod,
+            requireDueDateForOpenEntries: form.financeRequireDueDateForOpenEntries,
+            allowManualCashbook: form.financeAllowManualCashbook,
+            categories: splitLines(form.financeCategories),
+            costCenters: splitLines(form.financeCostCenters),
+            paymentMethods: splitLines(form.financePaymentMethods),
+            quickNotes: splitLines(form.financeQuickNotes),
+          },
         },
         accessToken,
       );
@@ -423,6 +499,227 @@ export default function AdminConfiguracoesPage() {
               <div className="mt-4">
                 <ActionButton onClick={() => void onSave()} disabled={saving}>
                   {saving ? "Salvando..." : "Salvar regras de acesso"}
+                </ActionButton>
+              </div>
+            ) : null}
+          </SectionCard>
+
+          <SectionCard
+            title="Modelo financeiro da operacao"
+            description="Defina como a assessoria cobra, classifica e controla receitas e despesas."
+          >
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <Select
+                value={form.financeBusinessModel}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    financeBusinessModel: event.target.value as FinanceProfileSettings["businessModel"],
+                  }))
+                }
+                className="border-white/15 bg-[#0F2743] text-white"
+                disabled={!canEdit}
+              >
+                <option value="ASSESSORIA">Assessoria esportiva</option>
+                <option value="GRUPO_CORRIDA">Grupo de corrida</option>
+                <option value="ASSOCIACAO">Associacao</option>
+                <option value="CLUBE">Clube</option>
+              </Select>
+
+              <Select
+                value={form.financeRevenueMode}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    financeRevenueMode: event.target.value as FinanceProfileSettings["revenueMode"],
+                  }))
+                }
+                className="border-white/15 bg-[#0F2743] text-white"
+                disabled={!canEdit}
+              >
+                <option value="MENSALIDADES">Receita por mensalidades</option>
+                <option value="EVENTOS">Receita por eventos</option>
+                <option value="MISTO">Receita mista</option>
+                <option value="PATROCINIOS">Receita por patrocinios</option>
+              </Select>
+
+              <Input
+                type="number"
+                min={1}
+                max={31}
+                value={form.financeBillingDay}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, financeBillingDay: event.target.value }))
+                }
+                placeholder="Dia padrao da cobranca"
+                className="border-white/15 bg-[#0F2743] text-white"
+                disabled={!canEdit}
+              />
+
+              <Input
+                type="number"
+                min={0}
+                value={form.financeRecurringMonthlyFee}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, financeRecurringMonthlyFee: event.target.value }))
+                }
+                placeholder="Mensalidade em centavos"
+                className="border-white/15 bg-[#0F2743] text-white"
+                disabled={!canEdit}
+              />
+
+              <Input
+                type="number"
+                min={0}
+                max={31}
+                value={form.financeRecurringGraceDays}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, financeRecurringGraceDays: event.target.value }))
+                }
+                placeholder="Dias extras apos vencimento"
+                className="border-white/15 bg-[#0F2743] text-white"
+                disabled={!canEdit}
+              />
+
+              <Select
+                value={form.financeDefaultEntryKind}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    financeDefaultEntryKind: event.target.value as FinanceProfileSettings["defaultEntryKind"],
+                  }))
+                }
+                className="border-white/15 bg-[#0F2743] text-white"
+                disabled={!canEdit}
+              >
+                <option value="RECEIVABLE">Conta a receber padrao</option>
+                <option value="PAYABLE">Conta a pagar padrao</option>
+                <option value="CASH">Livro-caixa padrao</option>
+              </Select>
+
+              <Input
+                value={form.financeRecurringDescription}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, financeRecurringDescription: event.target.value }))
+                }
+                placeholder="Descricao da mensalidade"
+                className="border-white/15 bg-[#0F2743] text-white"
+                disabled={!canEdit}
+              />
+
+              <Input
+                value={form.financeDefaultAccountCode}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, financeDefaultAccountCode: event.target.value }))
+                }
+                placeholder="Plano de contas padrao"
+                className="border-white/15 bg-[#0F2743] text-white"
+                disabled={!canEdit}
+              />
+
+              <Input
+                value={form.financeDefaultCostCenter}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, financeDefaultCostCenter: event.target.value }))
+                }
+                placeholder="Centro de custo padrao"
+                className="border-white/15 bg-[#0F2743] text-white"
+                disabled={!canEdit}
+              />
+
+              <Input
+                value={form.financeDefaultPaymentMethod}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, financeDefaultPaymentMethod: event.target.value }))
+                }
+                placeholder="Forma de pagamento padrao"
+                className="border-white/15 bg-[#0F2743] text-white"
+                disabled={!canEdit}
+              />
+            </div>
+
+            <div className="mt-4 space-y-4">
+              <Toggle
+                label="Exigir vencimento para titulos em aberto"
+                description="Padroniza a cobranca e facilita o controle de inadimplencia."
+                checked={form.financeRequireDueDateForOpenEntries}
+                onChange={(value) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    financeRequireDueDateForOpenEntries: value,
+                  }))
+                }
+                disabled={!canEdit}
+              />
+              <div className="h-px bg-white/10" />
+              <Toggle
+                label="Ativar mensalidade recorrente"
+                description="Permite gerar automaticamente a carteira mensal dos associados ativos."
+                checked={form.financeRecurringChargeEnabled}
+                onChange={(value) =>
+                  setForm((prev) => ({ ...prev, financeRecurringChargeEnabled: value }))
+                }
+                disabled={!canEdit}
+              />
+              <div className="h-px bg-white/10" />
+              <Toggle
+                label="Permitir livro-caixa manual"
+                description="Desative para forcar o time a operar em contas a pagar/receber com baixa."
+                checked={form.financeAllowManualCashbook}
+                onChange={(value) =>
+                  setForm((prev) => ({ ...prev, financeAllowManualCashbook: value }))
+                }
+                disabled={!canEdit}
+              />
+            </div>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <Textarea
+                value={form.financeCategories}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, financeCategories: event.target.value }))
+                }
+                placeholder={"Categorias sugeridas\nMensalidades\nInscricoes\nPatrocinios"}
+                className="min-h-[140px] border-white/15 bg-[#0F2743] text-white"
+                disabled={!canEdit}
+              />
+              <Textarea
+                value={form.financeCostCenters}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, financeCostCenters: event.target.value }))
+                }
+                placeholder={"Centros de custo\nOperacao\nEventos\nEquipe"}
+                className="min-h-[140px] border-white/15 bg-[#0F2743] text-white"
+                disabled={!canEdit}
+              />
+              <Textarea
+                value={form.financePaymentMethods}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, financePaymentMethods: event.target.value }))
+                }
+                placeholder={"Formas de pagamento\nPIX\nCartao\nBoleto"}
+                className="min-h-[140px] border-white/15 bg-[#0F2743] text-white"
+                disabled={!canEdit}
+              />
+              <Textarea
+                value={form.financeQuickNotes}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, financeQuickNotes: event.target.value }))
+                }
+                placeholder={"Anotacoes operacionais\nMensalidade recorrente do associado\nRateio da equipe"}
+                className="min-h-[140px] border-white/15 bg-[#0F2743] text-white"
+                disabled={!canEdit}
+              />
+            </div>
+
+            <p className="mt-3 text-xs text-slate-300">
+              Cada linha vira uma sugestao pratica dentro do financeiro administrativo.
+            </p>
+
+            {canEdit ? (
+              <div className="mt-4">
+                <ActionButton onClick={() => void onSave()} disabled={saving}>
+                  {saving ? "Salvando..." : "Salvar modelo financeiro"}
                 </ActionButton>
               </div>
             ) : null}

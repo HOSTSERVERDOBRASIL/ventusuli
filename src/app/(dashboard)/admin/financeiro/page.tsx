@@ -31,6 +31,11 @@ import { StatusBadge } from "@/components/system/status-badge";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import {
+  getOrganizationSettings,
+  type FinanceProfileSettings,
+  type OrganizationSettings,
+} from "@/services/organization-service";
+import {
   cancelPayment,
   createFinancialEntry,
   FinancialEntryRow,
@@ -43,6 +48,7 @@ import {
   PaymentQueueSummary,
   PaymentRow,
   patchFinancialEntry,
+  processRecurringCharges,
   reopenPayment,
   simulatePayment,
 } from "@/services/payment-service";
@@ -143,9 +149,24 @@ function entryKindTone(kind: FinancialEntryRow["entryKind"]): "positive" | "warn
   return "neutral";
 }
 
+function businessModelLabel(model: FinanceProfileSettings["businessModel"]): string {
+  if (model === "GRUPO_CORRIDA") return "Grupo de corrida";
+  if (model === "ASSOCIACAO") return "Associacao";
+  if (model === "CLUBE") return "Clube";
+  return "Assessoria";
+}
+
+function revenueModeLabel(mode: FinanceProfileSettings["revenueMode"]): string {
+  if (mode === "MENSALIDADES") return "Mensalidades";
+  if (mode === "EVENTOS") return "Eventos";
+  if (mode === "PATROCINIOS") return "Patrocinios";
+  return "Receita mista";
+}
+
 export default function AdminFinanceiroPage() {
   const { accessToken } = useAuthToken();
   const searchParams = useSearchParams();
+  const [organizationSettings, setOrganizationSettings] = useState<OrganizationSettings | null>(null);
 
   const [period, setPeriod] = useState<"MONTH" | "YEAR" | "CUSTOM">("MONTH");
   const [status, setStatus] = useState<"ALL" | "PENDING" | "PAID" | "EXPIRED" | "CANCELLED">("ALL");
@@ -195,6 +216,35 @@ export default function AdminFinanceiroPage() {
     dueAt: todayIso,
   });
   const [savingEntry, setSavingEntry] = useState(false);
+  const [runningRecurring, setRunningRecurring] = useState(false);
+  const [recurringMonthKey, setRecurringMonthKey] = useState(todayIso.slice(0, 7));
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadSettings = async () => {
+      try {
+        const payload = await getOrganizationSettings(accessToken);
+        if (cancelled) return;
+
+        setOrganizationSettings(payload);
+        setEntryForm((current) => ({
+          ...current,
+          entryKind: payload.financeProfile.defaultEntryKind,
+          accountCode: payload.financeProfile.defaultAccountCode,
+          costCenter: payload.financeProfile.defaultCostCenter,
+          paymentMethod: payload.financeProfile.defaultPaymentMethod,
+        }));
+      } catch {
+        if (!cancelled) setOrganizationSettings(null);
+      }
+    };
+
+    void loadSettings();
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken]);
 
   useEffect(() => {
     const statusParam = searchParams.get("status");
@@ -528,6 +578,224 @@ export default function AdminFinanceiroPage() {
     }
     return format(new Date(filters.startDate), "MMMM 'de' yyyy", { locale: ptBR });
   }, [filters.endDate, filters.startDate, period]);
+  const financeProfile = organizationSettings?.financeProfile ?? null;
+  const financeCategoryOptions = financeProfile?.categories ?? [];
+  const financeCostCenterOptions = financeProfile?.costCenters ?? [];
+  const financePaymentMethodOptions = financeProfile?.paymentMethods ?? [];
+  const financeQuickNotes = financeProfile?.quickNotes ?? [];
+
+  const applyQuickTemplate = (
+    template: Partial<{
+      type: "INCOME" | "EXPENSE";
+      entryKind: "CASH" | "RECEIVABLE" | "PAYABLE";
+      category: string;
+      accountCode: string;
+      costCenter: string;
+      paymentMethod: string;
+      description: string;
+      status: "OPEN" | "PAID" | "CANCELLED";
+    }>,
+  ) => {
+    setEntryForm((current) => ({
+      ...current,
+      ...template,
+    }));
+  };
+  const dreSummary = useMemo(() => {
+    const registrationRevenueCents = periodPaymentSummary.totalPago;
+    const otherRevenueCents = manualSummary.incomeCents;
+    const totalRevenueCents = registrationRevenueCents + otherRevenueCents;
+    const totalExpenseCents = manualSummary.expenseCents;
+    const operatingResultCents = totalRevenueCents - totalExpenseCents;
+    const projectedRevenueCents =
+      periodPaymentSummary.totalPendente + manualSummary.openReceivableCents;
+    const projectedExpenseCents = manualSummary.openPayableCents;
+
+    return {
+      registrationRevenueCents,
+      otherRevenueCents,
+      totalRevenueCents,
+      totalExpenseCents,
+      operatingResultCents,
+      projectedRevenueCents,
+      projectedExpenseCents,
+      marginPercent:
+        totalRevenueCents > 0
+          ? Number(((operatingResultCents / totalRevenueCents) * 100).toFixed(1))
+          : 0,
+    };
+  }, [
+    manualSummary.expenseCents,
+    manualSummary.incomeCents,
+    manualSummary.openPayableCents,
+    manualSummary.openReceivableCents,
+    periodPaymentSummary.totalPago,
+    periodPaymentSummary.totalPendente,
+  ]);
+  const delinquencyRows = useMemo(() => {
+    const grouped = new Map<
+      string,
+      {
+        athleteName: string;
+        athleteEmail: string;
+        openAmountCents: number;
+        overdueAmountCents: number;
+        chargesCount: number;
+        expiredCount: number;
+        nextDueAt: string | null;
+        latestEventName: string | null;
+      }
+    >();
+
+    periodPayments
+      .filter((payment) => payment.status === "PENDING" || payment.status === "EXPIRED")
+      .forEach((payment) => {
+        const key = payment.athleteEmail;
+        const current = grouped.get(key) ?? {
+          athleteName: payment.athleteName,
+          athleteEmail: payment.athleteEmail,
+          openAmountCents: 0,
+          overdueAmountCents: 0,
+          chargesCount: 0,
+          expiredCount: 0,
+          nextDueAt: payment.expiresAt ?? null,
+          latestEventName: payment.eventName,
+        };
+
+        current.openAmountCents += payment.amountCents;
+        current.chargesCount += 1;
+        if (payment.status === "EXPIRED" || payment.dueState === "OVERDUE") {
+          current.overdueAmountCents += payment.amountCents;
+        }
+        if (payment.status === "EXPIRED") current.expiredCount += 1;
+        if (payment.expiresAt) {
+          current.nextDueAt =
+            !current.nextDueAt || new Date(payment.expiresAt) < new Date(current.nextDueAt)
+              ? payment.expiresAt
+              : current.nextDueAt;
+        }
+        current.latestEventName = payment.eventName;
+        grouped.set(key, current);
+      });
+
+    manualEntries
+      .filter(
+        (entry) =>
+          entry.entryKind === "RECEIVABLE" &&
+          entry.status === "OPEN" &&
+          Boolean(entry.subjectUserId || entry.counterparty),
+      )
+      .forEach((entry) => {
+        const counterparty = entry.counterparty ?? "Associado";
+        const match = counterparty.match(/^(.*?)(?:\s<(.+?)>)?$/);
+        const athleteName = match?.[1]?.trim() || counterparty;
+        const athleteEmail = match?.[2]?.trim() || `${entry.subjectUserId ?? entry.id}@recorrencia.local`;
+        const key = athleteEmail;
+        const current = grouped.get(key) ?? {
+          athleteName,
+          athleteEmail,
+          openAmountCents: 0,
+          overdueAmountCents: 0,
+          chargesCount: 0,
+          expiredCount: 0,
+          nextDueAt: entry.dueAt,
+          latestEventName: entry.category,
+        };
+
+        current.openAmountCents += entry.amountCents;
+        current.chargesCount += 1;
+        if (entry.dueAt && new Date(entry.dueAt).getTime() < Date.now()) {
+          current.overdueAmountCents += entry.amountCents;
+        }
+        if (entry.dueAt) {
+          current.nextDueAt =
+            !current.nextDueAt || new Date(entry.dueAt) < new Date(current.nextDueAt)
+              ? entry.dueAt
+              : current.nextDueAt;
+        }
+        current.latestEventName = entry.category;
+        grouped.set(key, current);
+      });
+
+    return Array.from(grouped.values())
+      .map((row) => ({
+        ...row,
+        riskLabel:
+          row.overdueAmountCents > 0 || row.expiredCount > 0
+            ? "CRITICO"
+            : row.chargesCount >= 2
+              ? "ATENCAO"
+              : "MONITORAR",
+      }))
+      .sort((left, right) => {
+        if (right.overdueAmountCents !== left.overdueAmountCents) {
+          return right.overdueAmountCents - left.overdueAmountCents;
+        }
+        return right.openAmountCents - left.openAmountCents;
+      });
+  }, [periodPayments]);
+  const delinquencySummary = useMemo(
+    () => ({
+      athletes: delinquencyRows.length,
+      openAmountCents: delinquencyRows.reduce((sum, row) => sum + row.openAmountCents, 0),
+      overdueAmountCents: delinquencyRows.reduce((sum, row) => sum + row.overdueAmountCents, 0),
+      criticalCount: delinquencyRows.filter((row) => row.riskLabel === "CRITICO").length,
+    }),
+    [delinquencyRows],
+  );
+  const costCenterPerformanceRows = useMemo(() => {
+    const grouped = new Map<
+      string,
+      {
+        costCenter: string;
+        incomeCents: number;
+        expenseCents: number;
+        openReceivableCents: number;
+        openPayableCents: number;
+      }
+    >();
+
+    const ensure = (name: string) => {
+      const key = name.trim() || "Sem centro";
+      const current =
+        grouped.get(key) ??
+        {
+          costCenter: key,
+          incomeCents: 0,
+          expenseCents: 0,
+          openReceivableCents: 0,
+          openPayableCents: 0,
+        };
+      grouped.set(key, current);
+      return current;
+    };
+
+    manualEntries.forEach((entry) => {
+      const bucket = ensure(entry.costCenter ?? financeProfile?.defaultCostCenter ?? "Sem centro");
+      if (entry.status === "PAID") {
+        if (entry.type === "INCOME") bucket.incomeCents += entry.amountCents;
+        if (entry.type === "EXPENSE") bucket.expenseCents += entry.amountCents;
+      }
+      if (entry.status === "OPEN" && entry.entryKind === "RECEIVABLE") {
+        bucket.openReceivableCents += entry.amountCents;
+      }
+      if (entry.status === "OPEN" && entry.entryKind === "PAYABLE") {
+        bucket.openPayableCents += entry.amountCents;
+      }
+    });
+
+    if (periodPaymentSummary.totalPago > 0) {
+      const bucket = ensure(financeProfile?.defaultCostCenter ?? "Receita principal");
+      bucket.incomeCents += periodPaymentSummary.totalPago;
+    }
+
+    return Array.from(grouped.values())
+      .map((row) => ({
+        ...row,
+        resultCents: row.incomeCents - row.expenseCents,
+      }))
+      .sort((left, right) => right.resultCents - left.resultCents);
+  }, [financeProfile?.defaultCostCenter, manualEntries, periodPaymentSummary.totalPago]);
 
   const exportCsv = () => {
     const header = [
@@ -582,6 +850,18 @@ export default function AdminFinanceiroPage() {
       toast.error("Informe uma categoria.");
       return;
     }
+    if (
+      financeProfile?.requireDueDateForOpenEntries &&
+      entryForm.status === "OPEN" &&
+      !entryForm.dueAt
+    ) {
+      toast.error("Essa assessoria exige vencimento para titulos em aberto.");
+      return;
+    }
+    if (!financeProfile?.allowManualCashbook && entryForm.entryKind === "CASH") {
+      toast.error("O livro-caixa manual esta desabilitado para esta assessoria.");
+      return;
+    }
 
     setSavingEntry(true);
     try {
@@ -606,15 +886,15 @@ export default function AdminFinanceiroPage() {
       toast.success("Lancamento financeiro criado.");
       setEntryForm({
         type: "INCOME",
-        entryKind: "CASH",
+        entryKind: financeProfile?.defaultEntryKind ?? "CASH",
         status: "PAID",
         amount: "",
         category: "",
         description: "",
-        accountCode: "MENSALIDADE",
-        costCenter: "Associacao",
+        accountCode: financeProfile?.defaultAccountCode ?? "MENSALIDADE",
+        costCenter: financeProfile?.defaultCostCenter ?? "Associacao",
         counterparty: "",
-        paymentMethod: "PIX",
+        paymentMethod: financeProfile?.defaultPaymentMethod ?? "PIX",
         documentUrl: "",
         occurredAt: todayIso,
         dueAt: todayIso,
@@ -759,6 +1039,67 @@ export default function AdminFinanceiroPage() {
       ),
     },
   ];
+  const delinquencyColumns: DataTableColumn<(typeof delinquencyRows)[number]>[] = [
+    {
+      key: "athlete",
+      header: "Associado",
+      className: "min-w-[180px]",
+      cell: (row) => (
+        <div>
+          <p className="font-semibold text-white">{row.athleteName}</p>
+          <p className="text-[11px] text-white/40">{row.athleteEmail}</p>
+        </div>
+      ),
+    },
+    {
+      key: "risk",
+      header: "Risco",
+      className: "min-w-[100px]",
+      cell: (row) => (
+        <StatusBadge
+          tone={
+            row.riskLabel === "CRITICO"
+              ? "danger"
+              : row.riskLabel === "ATENCAO"
+                ? "warning"
+                : "neutral"
+          }
+          label={row.riskLabel}
+        />
+      ),
+    },
+    {
+      key: "openAmount",
+      header: "Em aberto",
+      className: "min-w-[110px]",
+      cell: (row) => <span className="font-semibold text-white">{BRL.format(row.openAmountCents / 100)}</span>,
+    },
+    {
+      key: "overdueAmount",
+      header: "Em atraso",
+      className: "min-w-[110px]",
+      cell: (row) => <span className="font-semibold text-white">{BRL.format(row.overdueAmountCents / 100)}</span>,
+    },
+    {
+      key: "charges",
+      header: "Titulos",
+      className: "min-w-[80px]",
+      cell: (row) => row.chargesCount,
+    },
+    {
+      key: "dueDate",
+      header: "Prox. vencimento",
+      className: "min-w-[120px]",
+      cell: (row) =>
+        row.nextDueAt ? format(new Date(row.nextDueAt), "dd/MM/yyyy", { locale: ptBR }) : "-",
+    },
+    {
+      key: "latestEvent",
+      header: "Ultimo contexto",
+      className: "min-w-[180px]",
+      cell: (row) => row.latestEventName ?? "-",
+    },
+  ];
 
   const runModalAction = async (
     action: "pay" | "cancel" | "expire" | "reopen",
@@ -786,6 +1127,26 @@ export default function AdminFinanceiroPage() {
     }
   };
 
+  const runRecurringGeneration = async () => {
+    setRunningRecurring(true);
+    try {
+      const result = await processRecurringCharges({
+        monthKey: recurringMonthKey,
+        accessToken,
+      });
+      toast.success(
+        `${result.generatedCount} mensalidade(s) gerada(s) e ${result.skippedCount} ja existente(s).`,
+      );
+      await loadPayments();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Falha ao processar mensalidades recorrentes.",
+      );
+    } finally {
+      setRunningRecurring(false);
+    }
+  };
+
   return (
     <div className="space-y-6 text-white">
       <PageHeader
@@ -807,6 +1168,33 @@ export default function AdminFinanceiroPage() {
         title="Operacao financeira"
         description="Use atalhos por area sem perder a leitura completa do financeiro."
       >
+        {financeProfile?.recurringChargeEnabled ? (
+          <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-white/[0.07] bg-white/[0.03] p-4">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-white/40">Competencia</p>
+              <Input
+                type="month"
+                value={recurringMonthKey}
+                onChange={(event) => setRecurringMonthKey(event.target.value)}
+                className="mt-2 w-[200px] border-white/[0.1] bg-white/[0.05] text-white"
+              />
+            </div>
+            <div className="text-sm text-white/65">
+              <p>
+                Mensalidade configurada:{" "}
+                <span className="font-semibold text-white">
+                  {BRL.format((financeProfile.recurringMonthlyFeeCents ?? 0) / 100)}
+                </span>
+              </p>
+              <p className="mt-1">
+                Vencimento base no dia {financeProfile.billingDay ?? 5} com {financeProfile.recurringGraceDays} dia(s) extras.
+              </p>
+            </div>
+            <ActionButton disabled={runningRecurring} onClick={() => void runRecurringGeneration()}>
+              {runningRecurring ? "Processando mensalidades..." : "Gerar mensalidades do mes"}
+            </ActionButton>
+          </div>
+        ) : null}
         <div className="flex flex-wrap gap-2">
           {(Object.keys(WORKSPACE_LABELS) as FinanceWorkspace[]).map((key) => (
             <a
@@ -827,6 +1215,41 @@ export default function AdminFinanceiroPage() {
       </SectionCard>
 
       <div id="finance-overview" className="space-y-6">
+          {financeProfile ? (
+            <SectionCard
+              title="Regra financeira da assessoria"
+              description="Configuracao base para operar como um financeiro de grupo, assessoria ou associacao."
+            >
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <MetricCard label="Modelo" value={businessModelLabel(financeProfile.businessModel)} />
+                <MetricCard label="Receita principal" value={revenueModeLabel(financeProfile.revenueMode)} />
+                <MetricCard
+                  label="Dia de cobranca"
+                  value={financeProfile.billingDay ? `Dia ${financeProfile.billingDay}` : "Nao definido"}
+                />
+                <MetricCard label="Centro padrao" value={financeProfile.defaultCostCenter} />
+              </div>
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                <div className="rounded-xl border border-white/[0.07] bg-white/[0.03] p-3">
+                  <p className="text-xs uppercase tracking-wide text-white/40">Categorias padrao</p>
+                  <p className="mt-2 text-sm text-white/75">{financeProfile.categories.join(", ")}</p>
+                </div>
+                <div className="rounded-xl border border-white/[0.07] bg-white/[0.03] p-3">
+                  <p className="text-xs uppercase tracking-wide text-white/40">Formas de pagamento</p>
+                  <p className="mt-2 text-sm text-white/75">{financeProfile.paymentMethods.join(", ")}</p>
+                </div>
+                <div className="rounded-xl border border-white/[0.07] bg-white/[0.03] p-3">
+                  <p className="text-xs uppercase tracking-wide text-white/40">Regras operacionais</p>
+                  <p className="mt-2 text-sm text-white/75">
+                    {financeProfile.requireDueDateForOpenEntries ? "Titulos abertos exigem vencimento" : "Vencimento opcional"}
+                    {" · "}
+                    {financeProfile.allowManualCashbook ? "Livro-caixa liberado" : "Livro-caixa manual bloqueado"}
+                  </p>
+                </div>
+              </div>
+            </SectionCard>
+          ) : null}
+
           <SectionCard title="Resumo financeiro" description="Indicadores consolidados para decisao rapida">
             <div className="grid gap-3 md:grid-cols-5">
               <MetricCard label="Total cobrado" value={BRL.format(periodPaymentSummary.totalCobrado / 100)} />
@@ -895,6 +1318,140 @@ export default function AdminFinanceiroPage() {
             )}
           </SectionCard>
 
+          <SectionCard
+            title="DRE simplificada"
+            description={`Leitura gerencial do resultado de ${periodLabel}.`}
+          >
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+              <MetricCard
+                label="Receita com inscricoes"
+                value={BRL.format(dreSummary.registrationRevenueCents / 100)}
+                tone="highlight"
+              />
+              <MetricCard
+                label="Outras receitas"
+                value={BRL.format(dreSummary.otherRevenueCents / 100)}
+              />
+              <MetricCard
+                label="Despesa operacional"
+                value={BRL.format(dreSummary.totalExpenseCents / 100)}
+              />
+              <MetricCard
+                label="Resultado operacional"
+                value={BRL.format(dreSummary.operatingResultCents / 100)}
+                tone={dreSummary.operatingResultCents >= 0 ? "highlight" : "default"}
+              />
+              <MetricCard label="Margem" value={`${dreSummary.marginPercent}%`} />
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <div className="rounded-xl border border-white/[0.07] bg-white/[0.03] p-3">
+                <p className="text-xs uppercase tracking-wide text-white/40">Receita prevista</p>
+                <p className="mt-2 text-lg font-semibold text-white">
+                  {BRL.format(dreSummary.projectedRevenueCents / 100)}
+                </p>
+                <p className="mt-1 text-xs text-white/50">
+                  Soma de cobrancas pendentes e contas a receber abertas.
+                </p>
+              </div>
+              <div className="rounded-xl border border-white/[0.07] bg-white/[0.03] p-3">
+                <p className="text-xs uppercase tracking-wide text-white/40">Despesa comprometida</p>
+                <p className="mt-2 text-lg font-semibold text-white">
+                  {BRL.format(dreSummary.projectedExpenseCents / 100)}
+                </p>
+                <p className="mt-1 text-xs text-white/50">
+                  Contas a pagar abertas aguardando baixa.
+                </p>
+              </div>
+              <div className="rounded-xl border border-white/[0.07] bg-white/[0.03] p-3">
+                <p className="text-xs uppercase tracking-wide text-white/40">Leitura rapida</p>
+                <p className="mt-2 text-sm text-white/75">
+                  {dreSummary.operatingResultCents >= 0
+                    ? "O periodo esta positivo, com espaco para reinvestimento ou reserva."
+                    : "O periodo esta negativo e pede ajuste de despesas ou aceleracao de cobranca."}
+                </p>
+              </div>
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title="Resultado por centro de custo"
+            description="Visao consolidada por frente da operacao para decidir onde investir ou cortar."
+          >
+            {costCenterPerformanceRows.length === 0 ? (
+              <EmptyState
+                title="Sem centros de custo no periodo"
+                description="Os resultados aparecem aqui conforme os lancamentos ganham centro de custo."
+              />
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-white/[0.07]">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-white/[0.04] text-xs uppercase tracking-wide text-white/40">
+                    <tr>
+                      <th className="px-3 py-2 text-left">Centro</th>
+                      <th className="px-3 py-2 text-left">Receitas</th>
+                      <th className="px-3 py-2 text-left">Despesas</th>
+                      <th className="px-3 py-2 text-left">Resultado</th>
+                      <th className="px-3 py-2 text-left">A receber</th>
+                      <th className="px-3 py-2 text-left">A pagar</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {costCenterPerformanceRows.map((row) => (
+                      <tr key={row.costCenter} className="border-t border-white/[0.07]">
+                        <td className="px-3 py-2 font-semibold text-white">{row.costCenter}</td>
+                        <td className="px-3 py-2 text-white/70">{BRL.format(row.incomeCents / 100)}</td>
+                        <td className="px-3 py-2 text-white/70">{BRL.format(row.expenseCents / 100)}</td>
+                        <td className="px-3 py-2">
+                          <StatusBadge
+                            tone={row.resultCents >= 0 ? "positive" : "danger"}
+                            label={BRL.format(row.resultCents / 100)}
+                          />
+                        </td>
+                        <td className="px-3 py-2 text-white/70">{BRL.format(row.openReceivableCents / 100)}</td>
+                        <td className="px-3 py-2 text-white/70">{BRL.format(row.openPayableCents / 100)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </SectionCard>
+
+          <SectionCard
+            title="Inadimplencia por associado"
+            description="Quem esta segurando caixa e onde o financeiro deve agir primeiro."
+          >
+            <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <MetricCard label="Associados em aberto" value={delinquencySummary.athletes} />
+              <MetricCard
+                label="Carteira em aberto"
+                value={BRL.format(delinquencySummary.openAmountCents / 100)}
+              />
+              <MetricCard
+                label="Em atraso"
+                value={BRL.format(delinquencySummary.overdueAmountCents / 100)}
+                tone="highlight"
+              />
+              <MetricCard
+                label="Casos criticos"
+                value={delinquencySummary.criticalCount}
+                tone="highlight"
+              />
+            </div>
+            {delinquencyRows.length === 0 ? (
+              <EmptyState
+                title="Sem inadimplencia no periodo"
+                description="Nenhum associado com titulo pendente ou expirado neste recorte."
+              />
+            ) : (
+              <DataTable
+                columns={delinquencyColumns}
+                data={delinquencyRows.slice(0, 12)}
+                getRowKey={(row) => row.athleteEmail}
+              />
+            )}
+          </SectionCard>
+
           <SectionCard title="Fila de trabalho" description="Priorize cobrancas em risco de perda de receita">
             <div className="grid gap-3 md:grid-cols-4 xl:grid-cols-8">
               <MetricCard label="Abertas" value={queue.totalOpenCount} />
@@ -924,6 +1481,83 @@ export default function AdminFinanceiroPage() {
           title="Livro-caixa"
           description="Entradas e saídas avulsas com plano de contas, centro de custo e baixa manual."
         >
+        {financeProfile ? (
+          <div className="mb-4 space-y-3 rounded-xl border border-white/[0.07] bg-white/[0.03] p-4">
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/75"
+                onClick={() =>
+                  applyQuickTemplate({
+                    type: "INCOME",
+                    entryKind: "RECEIVABLE",
+                    status: "OPEN",
+                    category: financeCategoryOptions[0] ?? "Mensalidades",
+                    accountCode: financeProfile.defaultAccountCode,
+                    costCenter: financeProfile.defaultCostCenter,
+                    paymentMethod: financeProfile.defaultPaymentMethod,
+                    description: financeQuickNotes[0] ?? "Mensalidade recorrente do associado",
+                  })
+                }
+              >
+                Mensalidade / recorrencia
+              </button>
+              <button
+                type="button"
+                className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/75"
+                onClick={() =>
+                  applyQuickTemplate({
+                    type: "INCOME",
+                    entryKind: "RECEIVABLE",
+                    status: "OPEN",
+                    category: financeCategoryOptions[1] ?? "Inscricoes",
+                    accountCode: "INSCRICAO_EVENTO",
+                    costCenter: financeCostCenterOptions[1] ?? financeProfile.defaultCostCenter,
+                    description: financeQuickNotes[1] ?? "Inscricao ou reembolso de prova",
+                  })
+                }
+              >
+                Evento / inscricao
+              </button>
+              <button
+                type="button"
+                className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/75"
+                onClick={() =>
+                  applyQuickTemplate({
+                    type: "INCOME",
+                    entryKind: "RECEIVABLE",
+                    status: "OPEN",
+                    category: financeCategoryOptions[2] ?? "Patrocinios",
+                    accountCode: "PATROCINIO",
+                    description: financeQuickNotes[2] ?? "Patrocinio ou parceria comercial",
+                  })
+                }
+              >
+                Patrocinio
+              </button>
+              <button
+                type="button"
+                className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/75"
+                onClick={() =>
+                  applyQuickTemplate({
+                    type: "EXPENSE",
+                    entryKind: "PAYABLE",
+                    status: "OPEN",
+                    category: financeCategoryOptions[3] ?? "Equipe tecnica",
+                    accountCode: "EQUIPE_TECNICA",
+                    costCenter: financeCostCenterOptions[2] ?? financeProfile.defaultCostCenter,
+                    description: "Pagamento de equipe, staff ou fornecedor",
+                  })
+                }
+              >
+                Equipe / fornecedor
+              </button>
+            </div>
+            <p className="text-xs text-white/50">
+              O formulario abaixo usa as regras definidas em Configuracoes da assessoria.
+            </p>
+          </div>
+        ) : null}
         <div className="grid gap-3 md:grid-cols-5">
           <MetricCard label="Saldo inicial" value={BRL.format(openingCashBalanceCents / 100)} />
           <MetricCard label="Entradas caixa" value={BRL.format((periodPaymentSummary.totalPago + currentCashIncomeCents) / 100)} tone="highlight" />
@@ -983,7 +1617,7 @@ export default function AdminFinanceiroPage() {
             onChange={(event) => setEntryForm((current) => ({ ...current, entryKind: event.target.value as "CASH" | "RECEIVABLE" | "PAYABLE" }))}
             className="border-white/[0.1] bg-white/[0.05] text-white"
           >
-            <option value="CASH">Livro-caixa</option>
+            {financeProfile?.allowManualCashbook ? <option value="CASH">Livro-caixa</option> : null}
             <option value="RECEIVABLE">Conta a receber</option>
             <option value="PAYABLE">Conta a pagar</option>
           </Select>
@@ -1010,16 +1644,22 @@ export default function AdminFinanceiroPage() {
             list="finance-categories"
           />
           <datalist id="finance-categories">
-            <option value="Mensalidade de associado" />
-            <option value="Inscricao em prova" />
-            <option value="Brindes e produtos" />
-            <option value="Patrocinio" />
-            <option value="Doacao" />
-            <option value="Fornecedor" />
-            <option value="Uniformes" />
-            <option value="Eventos" />
-            <option value="Taxas bancarias" />
-            <option value="Administrativo" />
+            {financeCategoryOptions.length > 0 ? (
+              financeCategoryOptions.map((item) => <option key={item} value={item} />)
+            ) : (
+              <>
+                <option value="Mensalidade de associado" />
+                <option value="Inscricao em prova" />
+                <option value="Brindes e produtos" />
+                <option value="Patrocinio" />
+                <option value="Doacao" />
+                <option value="Fornecedor" />
+                <option value="Uniformes" />
+                <option value="Eventos" />
+                <option value="Taxas bancarias" />
+                <option value="Administrativo" />
+              </>
+            )}
           </datalist>
           <Input
             type="date"
@@ -1050,7 +1690,13 @@ export default function AdminFinanceiroPage() {
             onChange={(event) => setEntryForm((current) => ({ ...current, costCenter: event.target.value }))}
             placeholder="Centro de custo"
             className="border-white/[0.1] bg-white/[0.05] text-white placeholder:text-white/30"
+            list="finance-cost-centers"
           />
+          <datalist id="finance-cost-centers">
+            {financeCostCenterOptions.map((item) => (
+              <option key={item} value={item} />
+            ))}
+          </datalist>
           <Input
             value={entryForm.counterparty}
             onChange={(event) => setEntryForm((current) => ({ ...current, counterparty: event.target.value }))}
@@ -1062,7 +1708,13 @@ export default function AdminFinanceiroPage() {
             onChange={(event) => setEntryForm((current) => ({ ...current, paymentMethod: event.target.value }))}
             placeholder="Forma de pagamento"
             className="border-white/[0.1] bg-white/[0.05] text-white placeholder:text-white/30"
+            list="finance-payment-methods"
           />
+          <datalist id="finance-payment-methods">
+            {financePaymentMethodOptions.map((item) => (
+              <option key={item} value={item} />
+            ))}
+          </datalist>
           <Input
             value={entryForm.documentUrl}
             onChange={(event) => setEntryForm((current) => ({ ...current, documentUrl: event.target.value }))}

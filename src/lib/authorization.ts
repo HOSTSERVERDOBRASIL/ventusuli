@@ -66,6 +66,7 @@ export const PAGE_ROUTE_POLICY_RULES: RoutePolicyRule[] = [
   { prefix: "/provas", policy: "ATHLETE_AREA" },
   { prefix: "/minhas-inscricoes", policy: "ATHLETE_AREA" },
   { prefix: "/financeiro", policy: "ATHLETE_AREA" },
+  { prefix: "/treinos", policy: "ATHLETE_AREA" },
   { prefix: "/calendario", policy: "ATHLETE_AREA" },
   { prefix: "/evolucao", policy: "ATHLETE_AREA" },
   { prefix: "/comunidade", policy: "ATHLETE_AREA" },

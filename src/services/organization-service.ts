@@ -2,6 +2,26 @@
 
 export { ACCEPTED_IMAGE_FILE_INPUT_ACCEPT } from "@/services/upload-service";
 
+export interface FinanceProfileSettings {
+  businessModel: "ASSESSORIA" | "GRUPO_CORRIDA" | "ASSOCIACAO" | "CLUBE";
+  revenueMode: "MENSALIDADES" | "EVENTOS" | "MISTO" | "PATROCINIOS";
+  billingDay: number | null;
+  recurringMonthlyFeeCents: number;
+  recurringChargeEnabled: boolean;
+  recurringGraceDays: number;
+  recurringDescription: string;
+  defaultEntryKind: "CASH" | "RECEIVABLE" | "PAYABLE";
+  defaultAccountCode: string;
+  defaultCostCenter: string;
+  defaultPaymentMethod: string;
+  requireDueDateForOpenEntries: boolean;
+  allowManualCashbook: boolean;
+  categories: string[];
+  costCenters: string[];
+  paymentMethods: string[];
+  quickNotes: string[];
+}
+
 export interface OrganizationSettings {
   id: string;
   name: string;
@@ -13,6 +33,7 @@ export interface OrganizationSettings {
   allowAthleteSelfSignup: boolean;
   requireAthleteApproval: boolean;
   createdAt: string;
+  financeProfile: FinanceProfileSettings;
 }
 
 interface OrganizationResponse {
@@ -27,6 +48,7 @@ export interface UpdateOrganizationInput {
   logoUrl?: string | null;
   allowAthleteSelfSignup?: boolean;
   requireAthleteApproval?: boolean;
+  financeProfile?: Partial<FinanceProfileSettings>;
 }
 
 async function parseApiError(response: Response, fallback: string): Promise<Error> {

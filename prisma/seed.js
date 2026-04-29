@@ -7,6 +7,7 @@ const {
   PaymentStatus,
   UserRole,
   OrgPlan,
+  SportLevel,
 } = require("@prisma/client");
 
 const prisma = new PrismaClient();
@@ -40,9 +41,32 @@ const USERS = [
 ];
 
 const ATHLETE_PROFILES = [
-  { email: "atleta@ventu.demo", city: "Florianopolis", state: "SC", cpf: "12345678901" },
-  { email: "lucas@ventu.demo", city: "Curitiba", state: "PR", cpf: "32165498700" },
-  { email: "ana@ventu.demo", city: "Porto Alegre", state: "RS", cpf: "98765432100" },
+  {
+    email: "atleta@ventu.demo",
+    city: "Florianopolis",
+    state: "SC",
+    cpf: "12345678901",
+    sportLevel: SportLevel.ADVANCED,
+    sportGoal: "Maratona com progressao segura de volume",
+    thresholdPace: "4:45/km",
+    nextCompetitionDate: new Date("2026-11-15T05:30:00.000Z"),
+  },
+  {
+    email: "lucas@ventu.demo",
+    city: "Curitiba",
+    state: "PR",
+    cpf: "32165498700",
+    sportLevel: SportLevel.INTERMEDIATE,
+    sportGoal: "Melhorar 10K mantendo rotina de forca",
+  },
+  {
+    email: "ana@ventu.demo",
+    city: "Porto Alegre",
+    state: "RS",
+    cpf: "98765432100",
+    sportLevel: SportLevel.INTERMEDIATE,
+    sportGoal: "Condicionamento e consistencia semanal",
+  },
   { email: "thiago@ventu.demo", city: "Joinville", state: "SC", cpf: "45512233001" },
   { email: "paula@ventu.demo", city: "Balneario Camboriu", state: "SC", cpf: "45512233002" },
   { email: "bruno@ventu.demo", city: "Curitiba", state: "PR", cpf: "45512233003" },
@@ -52,6 +76,72 @@ const ATHLETE_PROFILES = [
   { email: "danilo@ventu.demo", city: "Caxias do Sul", state: "RS", cpf: "45512233007" },
   { email: "fernanda@ventu.demo", city: "Florianopolis", state: "SC", cpf: "45512233008" },
   { email: "patricia@ventu.demo", city: "Curitiba", state: "PR", cpf: "45512233009" },
+];
+
+const EXERCISE_LIBRARY = [
+  {
+    name: "Rodagem leve",
+    modality: "Corrida",
+    stimulus_type: "Base aerobica",
+    intensity_label: "Leve",
+    duration_minutes: 45,
+    instructions: "Ritmo confortavel, respiracao controlada e tecnica solta.",
+    contraindications: "Evitar se houver dor aguda ou fadiga elevada.",
+    level_recommended: SportLevel.BEGINNER,
+  },
+  {
+    name: "Intervalos progressivos",
+    modality: "Corrida",
+    stimulus_type: "Ritmo",
+    intensity_label: "Moderada/Alta",
+    duration_minutes: 50,
+    instructions: "Alternar blocos moderados com recuperacao curta.",
+    contraindications: "Nao aplicar em retorno de lesao sem revisao tecnica.",
+    level_recommended: SportLevel.INTERMEDIATE,
+  },
+  {
+    name: "Longo controlado",
+    modality: "Corrida",
+    stimulus_type: "Volume",
+    intensity_label: "Moderada",
+    duration_minutes: 75,
+    instructions: "Manter esforco sustentavel, hidratacao e regularidade.",
+    contraindications: "Reduzir volume em caso de dor persistente.",
+    level_recommended: SportLevel.INTERMEDIATE,
+  },
+  {
+    name: "Agachamento",
+    modality: "Forca",
+    stimulus_type: "Membros inferiores",
+    intensity_label: "Forca",
+    series: 3,
+    repetitions: "8-10",
+    load_description: "Carga moderada com tecnica estavel.",
+    instructions: "Controlar descida, joelhos alinhados e tronco firme.",
+    contraindications: "Ajustar amplitude em desconforto no joelho ou quadril.",
+    level_recommended: SportLevel.BEGINNER,
+  },
+  {
+    name: "Core e prancha",
+    modality: "Forca",
+    stimulus_type: "Estabilidade",
+    intensity_label: "Controle",
+    series: 3,
+    repetitions: "30-45 segundos",
+    instructions: "Manter alinhamento sem prender a respiracao.",
+    contraindications: "Interromper se houver dor lombar.",
+    level_recommended: SportLevel.BEGINNER,
+  },
+  {
+    name: "Mobilidade regenerativa",
+    modality: "Recuperacao",
+    stimulus_type: "Mobilidade",
+    intensity_label: "Leve",
+    duration_minutes: 20,
+    instructions: "Sequencia leve para quadril, tornozelo, posterior e coluna toracica.",
+    contraindications: "Nao forcar amplitude com dor.",
+    level_recommended: SportLevel.BEGINNER,
+  },
 ];
 
 async function upsertOrganization() {
@@ -195,25 +285,95 @@ async function upsertUsers(organizationId) {
   return usersByEmail;
 }
 
-async function upsertAthleteProfile(organizationId, athlete, city, state, cpf) {
+async function upsertAthleteProfile(organizationId, athlete, profile) {
   await prisma.athleteProfile.upsert({
     where: { user_id: athlete.id },
     update: {
       organization_id: organizationId,
-      cpf,
-      city,
-      state,
+      cpf: profile.cpf,
+      city: profile.city,
+      state: profile.state,
       phone: "48999990000",
+      primary_modality: profile.primaryModality ?? "Corrida",
+      sport_level: profile.sportLevel ?? SportLevel.INTERMEDIATE,
+      sport_goal: profile.sportGoal ?? "Condicionamento e evolucao gradual",
+      injury_history: profile.injuryHistory ?? null,
+      weekly_availability: profile.weeklyAvailability ?? {
+        monday: true,
+        tuesday: false,
+        wednesday: true,
+        thursday: false,
+        friday: true,
+        saturday: true,
+        sunday: false,
+      },
+      available_equipment: profile.availableEquipment ?? ["peso corporal", "halteres", "elastico"],
+      resting_heart_rate: profile.restingHeartRate ?? 58,
+      threshold_pace: profile.thresholdPace ?? null,
+      max_load_notes: profile.maxLoadNotes ?? null,
+      next_competition_date: profile.nextCompetitionDate ?? null,
+      medical_restrictions: profile.medicalRestrictions ?? null,
+      coach_notes: profile.coachNotes ?? "Monitorar resposta de carga antes de progredir.",
     },
     create: {
       user_id: athlete.id,
       organization_id: organizationId,
-      cpf,
-      city,
-      state,
+      cpf: profile.cpf,
+      city: profile.city,
+      state: profile.state,
       phone: "48999990000",
+      primary_modality: profile.primaryModality ?? "Corrida",
+      sport_level: profile.sportLevel ?? SportLevel.INTERMEDIATE,
+      sport_goal: profile.sportGoal ?? "Condicionamento e evolucao gradual",
+      injury_history: profile.injuryHistory ?? null,
+      weekly_availability: profile.weeklyAvailability ?? {
+        monday: true,
+        tuesday: false,
+        wednesday: true,
+        thursday: false,
+        friday: true,
+        saturday: true,
+        sunday: false,
+      },
+      available_equipment: profile.availableEquipment ?? ["peso corporal", "halteres", "elastico"],
+      resting_heart_rate: profile.restingHeartRate ?? 58,
+      threshold_pace: profile.thresholdPace ?? null,
+      max_load_notes: profile.maxLoadNotes ?? null,
+      next_competition_date: profile.nextCompetitionDate ?? null,
+      medical_restrictions: profile.medicalRestrictions ?? null,
+      coach_notes: profile.coachNotes ?? "Monitorar resposta de carga antes de progredir.",
     },
   });
+}
+
+async function seedExerciseLibrary({ organizationId, createdBy }) {
+  for (const exercise of EXERCISE_LIBRARY) {
+    const existing = await prisma.exercise.findFirst({
+      where: {
+        organization_id: organizationId,
+        name: exercise.name,
+        modality: exercise.modality,
+      },
+      select: { id: true },
+    });
+
+    const data = {
+      organization_id: organizationId,
+      created_by: createdBy,
+      active: true,
+      ...exercise,
+    };
+
+    if (existing) {
+      await prisma.exercise.update({
+        where: { id: existing.id },
+        data,
+      });
+      continue;
+    }
+
+    await prisma.exercise.create({ data });
+  }
 }
 
 async function upsertEventWithDistances({ organizationId, creatorId, event, distances }) {
@@ -451,8 +611,13 @@ async function main() {
   for (const profile of ATHLETE_PROFILES) {
     const athlete = users[profile.email];
     if (!athlete) continue;
-    await upsertAthleteProfile(organization.id, athlete, profile.city, profile.state, profile.cpf);
+    await upsertAthleteProfile(organization.id, athlete, profile);
   }
+
+  await seedExerciseLibrary({
+    organizationId: organization.id,
+    createdBy: users["coach@ventu.demo"].id,
+  });
 
   const eventSeeds = [
     {

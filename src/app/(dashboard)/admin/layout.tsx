@@ -14,6 +14,9 @@ function canAccessAdmin(role: UserRole | null, pathname: string): boolean {
   if (pathname === "/admin/financeiro" || pathname.startsWith("/admin/financeiro/")) {
     return FINANCE_ROLES.includes(role);
   }
+  if (/^\/admin\/eventos\/[^/]+$/.test(pathname)) {
+    return FINANCE_ROLES.includes(role);
+  }
   return ADMIN_ROLES.includes(role);
 }
 

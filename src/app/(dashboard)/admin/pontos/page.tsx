@@ -122,6 +122,9 @@ interface AthleteOption {
   status: "PENDING_APPROVAL" | "ACTIVE" | "REJECTED" | "BLOCKED";
 }
 
+type ActivityTemplate = "ASSESSORIA" | "PROVA" | "BONUS";
+type ManualAdjustmentType = "CREDIT" | "DEBIT" | "ADJUSTMENT";
+
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const DATETIME = new Intl.DateTimeFormat("pt-BR", {
   day: "2-digit",
@@ -271,6 +274,8 @@ export default function AdminPontosPage() {
   const [creatingEntry, setCreatingEntry] = useState(false);
   const [reviewingEntryId, setReviewingEntryId] = useState<string | null>(null);
   const [activityForm, setActivityForm] = useState({
+    template: "ASSESSORIA" as ActivityTemplate,
+    eventId: "",
     name: "",
     description: "",
     suggestedPoints: 50,
@@ -283,6 +288,13 @@ export default function AdminPontosPage() {
     note: "",
     proofUrl: "",
   });
+  const [manualAdjustmentForm, setManualAdjustmentForm] = useState({
+    userId: "",
+    points: 30,
+    type: "CREDIT" as ManualAdjustmentType,
+    reason: "",
+  });
+  const [submittingManualAdjustment, setSubmittingManualAdjustment] = useState(false);
 
   const loadEntries = useCallback(async () => {
     const params = new URLSearchParams({
@@ -391,6 +403,16 @@ export default function AdminPontosPage() {
   useEffect(() => {
     setEntryMeta((prev) => (prev.page === 1 ? prev : { ...prev, page: 1 }));
   }, [activityFilters.activityId, activityFilters.status, activityFilters.userId]);
+
+  const getSuggestedPointsForEvent = useCallback(
+    (eventId: string) => {
+      const specificRule = rules.find((rule) => rule.eventId === eventId && rule.active);
+      if (specificRule) return specificRule.basePoints;
+      const defaultRule = rules.find((rule) => !rule.eventId && rule.active);
+      return defaultRule?.basePoints ?? 10;
+    },
+    [rules],
+  );
 
   const runRecurrence = async () => {
     try {
@@ -502,7 +524,16 @@ export default function AdminPontosPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: activityForm.name.trim(),
-          description: activityForm.description.trim() || null,
+          description: [
+            activityForm.template === "PROVA" && activityForm.eventId
+              ? `Atividade vinculada a prova: ${events.find((item) => item.id === activityForm.eventId)?.name ?? "Prova"}`
+              : activityForm.template === "BONUS"
+                ? "Bonificacao manual proposta pela assessoria."
+                : "Atividade proposta pela assessoria.",
+            activityForm.description.trim(),
+          ]
+            .filter(Boolean)
+            .join("\n\n"),
           suggestedPoints: Number(activityForm.suggestedPoints),
           activityDate: new Date(activityForm.activityDate).toISOString(),
         }),
@@ -513,6 +544,8 @@ export default function AdminPontosPage() {
       }
       toast.success("Atividade criada.");
       setActivityForm({
+        template: "ASSESSORIA",
+        eventId: "",
         name: "",
         description: "",
         suggestedPoints: 50,
@@ -523,6 +556,54 @@ export default function AdminPontosPage() {
       toast.error(error instanceof Error ? error.message : "Nao foi possivel criar a atividade.");
     } finally {
       setCreatingActivity(false);
+    }
+  };
+
+  const submitManualAdjustment = async () => {
+    if (!manualAdjustmentForm.userId) {
+      toast.error("Selecione o associado para a bonificacao manual.");
+      return;
+    }
+    if (!Number.isFinite(manualAdjustmentForm.points) || manualAdjustmentForm.points <= 0) {
+      toast.error("Informe uma quantidade valida de pontos.");
+      return;
+    }
+    if (!manualAdjustmentForm.reason.trim()) {
+      toast.error("Descreva o motivo da bonificacao ou ajuste manual.");
+      return;
+    }
+
+    setSubmittingManualAdjustment(true);
+    try {
+      const signal =
+        manualAdjustmentForm.type === "DEBIT" ? -Math.abs(Number(manualAdjustmentForm.points)) : Math.abs(Number(manualAdjustmentForm.points));
+      const response = await fetch("/api/admin/points/manual-adjustment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: manualAdjustmentForm.userId,
+          points: signal,
+          type: manualAdjustmentForm.type,
+          reason: manualAdjustmentForm.reason.trim(),
+        }),
+      });
+      const payload = (await response.json()) as { error?: { message?: string } };
+      if (!response.ok) {
+        throw new Error(payload.error?.message ?? "manual_adjustment_error");
+      }
+
+      toast.success("Bonificacao manual registrada com sucesso.");
+      setManualAdjustmentForm({
+        userId: "",
+        points: 30,
+        type: "CREDIT",
+        reason: "",
+      });
+      await loadReport();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Nao foi possivel registrar o ajuste manual.");
+    } finally {
+      setSubmittingManualAdjustment(false);
     }
   };
 
@@ -796,7 +877,7 @@ export default function AdminPontosPage() {
 
           <SectionCard
             title="Aprovacao por atividade"
-            description="Controle manual para registrar participacoes, validar solicitacoes e liberar pontos so depois da revisao."
+            description="Pontue provas, atividades da assessoria e bonificacoes complementares com revisao antes da liberacao."
           >
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <MetricCard label="Atividades ativas" value={String(activities.length)} />
@@ -805,13 +886,55 @@ export default function AdminPontosPage() {
               <MetricCard label="Pontos aprovados" value={`${totalApprovedPoints} pts`} />
             </div>
 
-            <div className="mt-4 grid gap-4 xl:grid-cols-[1.1fr_1.2fr]">
+            <div className="mt-4 grid gap-4 xl:grid-cols-3">
               <div className="rounded-2xl border border-white/10 bg-[#0c1f35] p-4">
                 <div className="mb-4">
                   <p className="text-sm font-semibold text-white">Nova atividade</p>
-                  <p className="text-xs text-slate-400">Cadastre a atividade com pontos sugeridos para orientar os lancamentos.</p>
+                  <p className="text-xs text-slate-400">Cadastre atividades da assessoria ou vincule uma prova para deixar a pontuacao sugerida pronta.</p>
                 </div>
                 <div className="grid gap-3">
+                  <select
+                    value={activityForm.template}
+                    onChange={(event) => {
+                      const template = event.target.value as ActivityTemplate;
+                      setActivityForm((prev) => ({
+                        ...prev,
+                        template,
+                        name:
+                          template === "BONUS"
+                            ? prev.name || "Bonificacao manual da assessoria"
+                            : prev.name,
+                      }));
+                    }}
+                    className="rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white"
+                  >
+                    <option value="ASSESSORIA">Atividade da assessoria</option>
+                    <option value="PROVA">Prova / evento</option>
+                    <option value="BONUS">Bonificacao manual</option>
+                  </select>
+                  {activityForm.template === "PROVA" ? (
+                    <select
+                      value={activityForm.eventId}
+                      onChange={(event) => {
+                        const eventId = event.target.value;
+                        const selectedEvent = events.find((item) => item.id === eventId);
+                        setActivityForm((prev) => ({
+                          ...prev,
+                          eventId,
+                          name: prev.name || (selectedEvent ? `Participacao em ${selectedEvent.name}` : prev.name),
+                          suggestedPoints: eventId ? getSuggestedPointsForEvent(eventId) : prev.suggestedPoints,
+                        }));
+                      }}
+                      className="rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white"
+                    >
+                      <option value="">Selecione a prova</option>
+                      {events.map((event) => (
+                        <option key={event.id} value={event.id}>
+                          {event.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : null}
                   <input
                     value={activityForm.name}
                     onChange={(event) => setActivityForm((prev) => ({ ...prev, name: event.target.value }))}
@@ -833,7 +956,7 @@ export default function AdminPontosPage() {
                         setActivityForm((prev) => ({ ...prev, suggestedPoints: Number(event.target.value) }))
                       }
                       className="rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white"
-                      placeholder="Pontos sugeridos"
+                      placeholder="Valor em pontos"
                     />
                     <input
                       type="datetime-local"
@@ -909,6 +1032,97 @@ export default function AdminPontosPage() {
                   <ActionButton disabled={creatingEntry} onClick={() => void createEntry()}>
                     {creatingEntry ? "Salvando..." : "Criar pendencia"}
                   </ActionButton>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-[#0c1f35] p-4">
+                <div className="mb-4">
+                  <p className="text-sm font-semibold text-white">Bonificacao e ajuste manual</p>
+                  <p className="text-xs text-slate-400">Use quando a assessoria quiser premiar comportamento, engajamento ou corrigir saldo manualmente.</p>
+                </div>
+                <div className="grid gap-3">
+                  <select
+                    value={manualAdjustmentForm.userId}
+                    onChange={(event) => setManualAdjustmentForm((prev) => ({ ...prev, userId: event.target.value }))}
+                    className="rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white"
+                  >
+                    <option value="">Selecione o associado</option>
+                    {athletes.map((athlete) => (
+                      <option key={athlete.id} value={athlete.id}>
+                        {athlete.name} {athlete.memberNumber ? `- ${athlete.memberNumber}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <select
+                      value={manualAdjustmentForm.type}
+                      onChange={(event) =>
+                        setManualAdjustmentForm((prev) => ({
+                          ...prev,
+                          type: event.target.value as ManualAdjustmentType,
+                        }))
+                      }
+                      className="rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white"
+                    >
+                      <option value="CREDIT">Credito manual</option>
+                      <option value="ADJUSTMENT">Bonificacao manual</option>
+                      <option value="DEBIT">Debito / correcao</option>
+                    </select>
+                    <input
+                      type="number"
+                      min={1}
+                      value={manualAdjustmentForm.points}
+                      onChange={(event) =>
+                        setManualAdjustmentForm((prev) => ({ ...prev, points: Number(event.target.value) }))
+                      }
+                      className="rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white"
+                      placeholder="Pontos"
+                    />
+                  </div>
+                  <textarea
+                    value={manualAdjustmentForm.reason}
+                    onChange={(event) => setManualAdjustmentForm((prev) => ({ ...prev, reason: event.target.value }))}
+                    className="min-h-[120px] rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white"
+                    placeholder="Ex.: bonus por ajudar na organizacao da assessoria, desafio concluido, ajuste de auditoria..."
+                  />
+                  <ActionButton disabled={submittingManualAdjustment} onClick={() => void submitManualAdjustment()}>
+                    {submittingManualAdjustment ? "Registrando..." : "Registrar bonificacao manual"}
+                  </ActionButton>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3 xl:grid-cols-2">
+              <div className="rounded-2xl border border-white/10 bg-[#0c1f35] p-4">
+                <p className="text-sm font-semibold text-white">Atividades com valor definido</p>
+                <p className="mt-1 text-xs text-slate-400">Cada atividade criada ja guarda sua sugestao de pontos para acelerar os lancamentos.</p>
+                <div className="mt-3 space-y-2">
+                  {activities.length === 0 ? (
+                    <EmptyState title="Sem atividades ativas" description="Cadastre provas e atividades da assessoria para definir pontos base." />
+                  ) : (
+                    activities.slice(0, 6).map((activity) => (
+                      <div key={activity.id} className="rounded-xl border border-white/10 bg-[#0b1d33] p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-semibold text-white">{activity.name}</p>
+                            <p className="mt-1 text-xs text-slate-400">{activity.description ?? "Sem descricao adicional."}</p>
+                          </div>
+                          <span className="rounded-full border border-[#f7b529]/30 bg-[#f7b529]/10 px-2.5 py-1 text-xs font-semibold text-[#ffd36a]">
+                            {activity.suggestedPoints} pts
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-[#0c1f35] p-4">
+                <p className="text-sm font-semibold text-white">Como a pontuacao passa a funcionar</p>
+                <div className="mt-3 space-y-3 text-sm leading-6 text-slate-300">
+                  <p>Provas e eventos continuam usando regras por prova em &quot;Pontos por prova&quot;, com participacao, inscricao antecipada, pagamento antecipado e bonus de campanha.</p>
+                  <p>Atividades propostas pela assessoria agora podem nascer com um valor em pontos no cadastro, servindo como base para o lancamento e para a aprovacao.</p>
+                  <p>Bonificacoes manuais ficam separadas para premiar apoio ao grupo, desafios internos, presenca em acoes especiais ou correcoes operacionais.</p>
                 </div>
               </div>
             </div>

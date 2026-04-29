@@ -41,10 +41,17 @@ export interface ServiceEventRegistration {
   payment_status: string;
   amount_cents: number;
   registered_at: string;
+  attendance_status: "PENDING" | "PRESENT" | "ABSENT";
+  attendance_checked_at?: string | null;
+  attendance_checked_by?: string | null;
 }
 
 interface EventRegistrationsApiResponse {
   data: ServiceEventRegistration[];
+}
+
+interface EventRegistrationMutationResponse {
+  data: ServiceEventRegistration;
 }
 
 function normalizeDistance(distance: ApiEventDistanceInput): ServiceEventDistance {
@@ -235,5 +242,29 @@ export async function getEventRegistrations(
   }
 
   const payload = (await response.json()) as EventRegistrationsApiResponse;
+  return payload.data;
+}
+
+export async function updateEventRegistrationAttendance(
+  eventId: string,
+  registrationId: string,
+  action: "MARK_PRESENT" | "MARK_ABSENT" | "RESET",
+  accessToken?: string | null,
+): Promise<ServiceEventRegistration> {
+  const response = await fetch(`/api/events/${eventId}/registrations`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      ...buildAuthHeaders(accessToken),
+    },
+    body: JSON.stringify({ registrationId, action }),
+  });
+
+  if (!response.ok) {
+    const errPayload = (await response.json()) as { error?: { message?: string } };
+    throw new Error(errPayload.error?.message ?? "Nao foi possivel validar presenca.");
+  }
+
+  const payload = (await response.json()) as EventRegistrationMutationResponse;
   return payload.data;
 }

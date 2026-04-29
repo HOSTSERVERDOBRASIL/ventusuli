@@ -83,6 +83,15 @@ export const navItems: NavItem[] = [
     quickSearch: true,
   },
   {
+    href: "/treinos",
+    label: "Treinos",
+    icon: Dumbbell,
+    roles: [...ROLE_GROUPS.athlete],
+    policy: "ATHLETE_AREA",
+    section: "home",
+    quickSearch: true,
+  },
+  {
     href: "/calendario",
     label: "Calendario",
     icon: CalendarDays,

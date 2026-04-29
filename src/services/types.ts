@@ -534,6 +534,7 @@ export interface AthleteDetail {
     memberSince: string | null;
     signupSource: "SLUG" | "INVITE" | "ADMIN" | null;
   };
+  trainingProfile?: AthleteTrainingProfile | null;
   summary: {
     registrationsCount: number;
     paidAmountCents: number;
@@ -542,4 +543,227 @@ export interface AthleteDetail {
     nextEventDate: string | null;
   };
   registrations: AthleteDetailRegistration[];
+}
+
+export type SportLevel = "BEGINNER" | "INTERMEDIATE" | "ADVANCED" | "ELITE";
+export type TrainingPlanStatus = "DRAFT" | "ACTIVE" | "COMPLETED" | "ARCHIVED";
+export type WorkoutSessionStatus = "PENDING" | "COMPLETED" | "PARTIAL" | "MISSED";
+export type AIRecommendationStatus = "PENDING" | "APPLIED" | "DISMISSED";
+
+export interface AthleteTrainingProfile {
+  primaryModality: string | null;
+  sportLevel: SportLevel | null;
+  sportGoal: string | null;
+  injuryHistory: string | null;
+  weeklyAvailability: Record<string, unknown> | null;
+  availableEquipment: string[];
+  restingHeartRate: number | null;
+  thresholdPace: string | null;
+  maxLoadNotes: string | null;
+  nextCompetitionDate: string | null;
+  medicalRestrictions: string | null;
+  coachNotes: string | null;
+}
+
+export interface ExerciseLibraryItem {
+  id: string;
+  name: string;
+  modality: string;
+  stimulusType: string | null;
+  intensityLabel: string | null;
+  durationMinutes: number | null;
+  series: number | null;
+  repetitions: string | null;
+  loadDescription: string | null;
+  distanceMeters: number | null;
+  instructions: string | null;
+  contraindications: string | null;
+  levelRecommended: SportLevel | null;
+  active: boolean;
+}
+
+export interface TrainingDayExercise {
+  id: string;
+  sortOrder: number;
+  exerciseId: string | null;
+  exerciseName: string;
+  instructions: string | null;
+  intensityLabel: string | null;
+  durationMinutes: number | null;
+  series: number | null;
+  repetitions: string | null;
+  loadDescription: string | null;
+  distanceMeters: number | null;
+  paceTarget: string | null;
+  heartRateTarget: string | null;
+  targetRpe: number | null;
+  notes: string | null;
+}
+
+export interface TrainingSessionFeedback {
+  id: string;
+  completedFlag: "COMPLETED" | "PARTIAL" | "MISSED";
+  perceivedEffort: number | null;
+  painLevel: number | null;
+  painArea: string | null;
+  discomfortNotes: string | null;
+  observation: string | null;
+  actualDurationMinutes: number | null;
+  actualLoad: string | null;
+  actualDistanceM: number | null;
+  actualPace: string | null;
+  actualHeartRate: number | null;
+  submittedAt: string;
+}
+
+export interface TrainingSessionSummary {
+  id: string;
+  trainingDayId: string;
+  scheduledDate: string;
+  title: string;
+  objective: string | null;
+  isRestDay: boolean;
+  status: WorkoutSessionStatus;
+  perceivedEffort: number | null;
+  coachNotes: string | null;
+  athleteNotes: string | null;
+  completedAt: string | null;
+  exercises: TrainingDayExercise[];
+  feedback: TrainingSessionFeedback | null;
+}
+
+export interface TrainingWeekSummary {
+  id: string;
+  weekNumber: number;
+  focus: string | null;
+  notes: string | null;
+  days: TrainingSessionSummary[];
+}
+
+export interface AIRecommendationItem {
+  id: string;
+  recommendationType: string;
+  summary: string;
+  rationale: string | null;
+  status: AIRecommendationStatus;
+  createdAt: string;
+  reviewedAt: string | null;
+}
+
+export type TrainingLoadAlertLevel = "OK" | "ATTENTION" | "HIGH";
+
+export interface TrainingLoadSessionMetric {
+  sessionId: string;
+  scheduledDate: string;
+  title: string;
+  status: string;
+  durationMinutes: number | null;
+  distanceM: number | null;
+  perceivedEffort: number | null;
+  painLevel: number | null;
+  trainingLoad: number | null;
+  plannedDurationMinutes: number | null;
+  plannedDistanceM: number | null;
+  plannedLoad: number | null;
+}
+
+export interface WeeklyTrainingLoadSummary {
+  weekStart: string;
+  weekEnd: string;
+  label: string;
+  sessionsDone: number;
+  sessionsPlanned: number;
+  totalLoad: number;
+  averageLoad: number;
+  totalDistanceM: number;
+  averageEffort: number | null;
+  averagePain: number | null;
+  loadChangePercent: number | null;
+  alertLevel: TrainingLoadAlertLevel;
+  alertReason: string | null;
+  sessions: TrainingLoadSessionMetric[];
+}
+
+export interface TrainingLoadMethodology {
+  sessionFormula: string;
+  weeklyFormula: string;
+  painAlertThreshold: number;
+  overloadIncreaseThresholdPercent: number;
+  borgScale: Array<{ value: number | string; label: string }>;
+  paceZones: Array<{ zone: string; label: string; paceRange: string }>;
+}
+
+export interface TrainingPlanSummary {
+  id: string;
+  athleteId: string;
+  athleteName: string;
+  coachId: string;
+  coachName: string;
+  name: string;
+  cycleGoal: string;
+  objective: string | null;
+  focusModality: string | null;
+  startDate: string;
+  endDate: string;
+  status: TrainingPlanStatus;
+  aiGenerated: boolean;
+  version: number;
+  notes: string | null;
+  weeks: TrainingWeekSummary[];
+  recommendations: AIRecommendationItem[];
+}
+
+export interface CoachTrainingDashboard {
+  metrics: {
+    activeAthletes: number;
+    activePlans: number;
+    pendingSessions: number;
+    completedSessions: number;
+    overloadRiskAthletes: number;
+    pendingRecommendations: number;
+    currentWeekLoad: number;
+  };
+  priorityAthletes: Array<{
+    athleteId: string;
+    athleteName: string;
+    athleteEmail: string;
+    pendingSessions: number;
+    recentPainAlerts: number;
+    averageEffort: number | null;
+    nextSessionDate: string | null;
+    currentWeekLoad: number;
+    previousWeekLoad: number;
+    loadChangePercent: number | null;
+    loadAlertLevel: TrainingLoadAlertLevel;
+    loadAlertReason: string | null;
+  }>;
+  recentRecommendations: AIRecommendationItem[];
+  loadControl: {
+    currentWeek: WeeklyTrainingLoadSummary;
+    previousWeek: WeeklyTrainingLoadSummary;
+    recentWeeks: WeeklyTrainingLoadSummary[];
+    methodology: TrainingLoadMethodology;
+  };
+}
+
+export interface AthleteTrainingDashboard {
+  athleteId: string;
+  athleteName: string;
+  profile: AthleteTrainingProfile | null;
+  currentPlan: TrainingPlanSummary | null;
+  todaySession: TrainingSessionSummary | null;
+  nextSessions: TrainingSessionSummary[];
+  recentRecommendations: AIRecommendationItem[];
+  metrics: {
+    completedSessions: number;
+    pendingSessions: number;
+    averageEffort: number | null;
+    consistencyPercent: number;
+  };
+  loadControl: {
+    currentWeek: WeeklyTrainingLoadSummary;
+    previousWeek: WeeklyTrainingLoadSummary;
+    recentWeeks: WeeklyTrainingLoadSummary[];
+    methodology: TrainingLoadMethodology;
+  };
 }

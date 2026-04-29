@@ -2,6 +2,7 @@
 import { UserRole } from "@prisma/client";
 import { z } from "zod";
 import { apiError } from "@/lib/api-error";
+import { mergeFinanceProfileSettings, normalizeFinanceProfile } from "@/lib/finance-profile";
 import { isAllowedImageUrl } from "@/lib/storage/image-url";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/request-auth";
@@ -33,6 +34,27 @@ const updateSchema = z.object({
   telegramEnabled: z.boolean().optional(),
   telegramChatId: z.string().trim().min(3).max(128).optional(),
   telegramBotToken: z.string().trim().min(10).max(256).optional(),
+  financeProfile: z
+    .object({
+      businessModel: z.enum(["ASSESSORIA", "GRUPO_CORRIDA", "ASSOCIACAO", "CLUBE"]).optional(),
+      revenueMode: z.enum(["MENSALIDADES", "EVENTOS", "MISTO", "PATROCINIOS"]).optional(),
+      billingDay: z.number().int().min(1).max(31).nullable().optional(),
+      recurringMonthlyFeeCents: z.number().int().min(0).optional(),
+      recurringChargeEnabled: z.boolean().optional(),
+      recurringGraceDays: z.number().int().min(0).max(31).optional(),
+      recurringDescription: z.string().trim().min(2).max(160).optional(),
+      defaultEntryKind: z.enum(["CASH", "RECEIVABLE", "PAYABLE"]).optional(),
+      defaultAccountCode: z.string().trim().min(2).max(80).optional(),
+      defaultCostCenter: z.string().trim().min(2).max(80).optional(),
+      defaultPaymentMethod: z.string().trim().min(2).max(60).optional(),
+      requireDueDateForOpenEntries: z.boolean().optional(),
+      allowManualCashbook: z.boolean().optional(),
+      categories: z.array(z.string().trim().min(2).max(80)).max(20).optional(),
+      costCenters: z.array(z.string().trim().min(2).max(80)).max(20).optional(),
+      paymentMethods: z.array(z.string().trim().min(2).max(60)).max(20).optional(),
+      quickNotes: z.array(z.string().trim().min(2).max(160)).max(12).optional(),
+    })
+    .optional(),
 });
 
 function canEditOrganization(role: UserRole): boolean {
@@ -108,6 +130,7 @@ export async function GET(req: NextRequest) {
   const requireAthleteApproval =
     getSettingsValue<boolean>(organization.settings, "requireAthleteApproval") ?? false;
   const telegram = getTelegramSettings(organization.settings);
+  const financeProfile = normalizeFinanceProfile(organization.settings);
 
   return NextResponse.json({
     data: {
@@ -124,6 +147,7 @@ export async function GET(req: NextRequest) {
       telegramChatId: telegram.telegramChatId,
       telegramBotToken: telegram.telegramBotToken,
       createdAt: organization.created_at,
+      financeProfile,
     },
   });
 }
@@ -196,6 +220,7 @@ export async function PATCH(req: NextRequest) {
       ? { telegram_bot_token: parsed.data.telegramBotToken }
       : {}),
   };
+  const settingsWithFinance = mergeFinanceProfileSettings(currentSettings, parsed.data.financeProfile);
 
   const updated = await prisma.organization.update({
     where: { id: auth.organizationId },
@@ -204,7 +229,7 @@ export async function PATCH(req: NextRequest) {
       ...(parsed.data.slug !== undefined ? { slug: parsed.data.slug } : {}),
       ...(parsed.data.logoUrl !== undefined ? { logo_url: parsed.data.logoUrl } : {}),
       settings: {
-        ...currentSettings,
+        ...settingsWithFinance,
         branding: nextBranding,
         integrations: {
           ...currentIntegrations,
@@ -234,6 +259,7 @@ export async function PATCH(req: NextRequest) {
   const updatedRequireApproval =
     getSettingsValue<boolean>(updated.settings, "requireAthleteApproval") ?? false;
   const updatedTelegram = getTelegramSettings(updated.settings);
+  const financeProfile = normalizeFinanceProfile(updated.settings);
 
   return NextResponse.json({
     data: {
@@ -249,6 +275,7 @@ export async function PATCH(req: NextRequest) {
       telegramEnabled: updatedTelegram.telegramEnabled,
       telegramChatId: updatedTelegram.telegramChatId,
       telegramBotToken: updatedTelegram.telegramBotToken,
+      financeProfile,
       settings: updated.settings,
     },
   });

@@ -99,13 +99,14 @@ function SocialButton({
     <button
       type="button"
       onClick={onClick}
-      className="flex h-14 items-center justify-center gap-3 rounded-2xl border border-white/12 bg-white/5 px-4 text-sm font-semibold text-white transition hover:border-white/30 hover:bg-white/8 sm:h-16 sm:text-base"
+      className="flex h-16 items-center justify-center rounded-2xl border border-white/12 bg-white/5 px-4 text-sm font-semibold text-white transition hover:border-white/30 hover:bg-white/8"
       aria-label={`Entrar com ${label}`}
+      title={label}
     >
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-lg font-bold text-[#0b1324]">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-xl font-bold text-[#0b1324]">
         {brand}
       </span>
-      <span>{label}</span>
+      <span className="sr-only">{label}</span>
     </button>
   );
 }
@@ -249,8 +250,16 @@ export function LoginForm() {
 
   return (
     <AuthShell
-      title="Bem-vindo(a) de volta!"
-      description="Faca login para continuar sua jornada com seguranca, consistencia e foco em evolucao."
+      title={
+        <>
+          Bem-vindo(a) de <span className="text-[#f7b529]">volta!</span>
+        </>
+      }
+      description={
+        <>
+          Faca login para continuar <span className="text-[#f7b529]">sua jornada.</span>
+        </>
+      }
     >
       {demoUiEnabled ? (
         <section className="mb-4 hidden rounded-[1.6rem] border border-[#f7b529]/20 bg-[#f7b529]/8 p-4 sm:block">
@@ -282,7 +291,7 @@ export function LoginForm() {
         </section>
       ) : null}
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-3.5 sm:space-y-5">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 sm:space-y-4 xl:space-y-5">
         {error ? (
           <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
             {error}
@@ -352,7 +361,7 @@ export function LoginForm() {
         <Button
           type="submit"
           disabled={isSubmitting || !isValid}
-          className="h-auto min-h-12 w-full rounded-2xl bg-[#f7b529] px-4 py-3 text-sm font-bold text-[#0a1220] shadow-[0_18px_45px_rgba(247,181,41,0.3)] hover:bg-[#ffbf3e] sm:min-h-16 sm:px-5 sm:py-4 sm:text-lg"
+          className="h-auto min-h-12 w-full rounded-2xl bg-[#f7b529] px-4 py-3 text-sm font-bold text-[#0a1220] shadow-[0_18px_45px_rgba(247,181,41,0.3)] hover:bg-[#ffbf3e] sm:min-h-14 sm:px-5 sm:py-3.5 sm:text-base xl:min-h-16 xl:py-4 xl:text-lg"
         >
           {isSubmitting ? (
             <span className="flex items-center justify-center gap-2 text-center">
@@ -367,12 +376,12 @@ export function LoginForm() {
           )}
         </Button>
 
-        <div className="relative py-1 text-center">
+        <div className="relative hidden py-1 text-center sm:block">
           <span className="relative z-10 bg-[#091223] px-3 text-xs text-slate-400 sm:px-4 sm:text-sm">ou continue com</span>
           <div className="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-white/10" />
         </div>
 
-        <div className="hidden gap-3 sm:grid sm:grid-cols-3">
+        <div className="hidden gap-4 sm:grid sm:grid-cols-3 max-[860px]:hidden">
           <SocialButton label="Google" brand="G" onClick={() => notifySocialLogin("Google")} />
           <SocialButton label="Apple" brand="A" onClick={() => notifySocialLogin("Apple")} />
           <SocialButton label="Facebook" brand="f" onClick={() => notifySocialLogin("Facebook")} />
@@ -386,9 +395,21 @@ export function LoginForm() {
             </Link>
           </p>
         ) : (
-          <div className="space-y-1.5 text-center text-xs text-slate-400 sm:space-y-2 sm:text-sm">
+          <div className="space-y-1.5 pt-1 text-center text-xs text-slate-400 sm:space-y-2 sm:pt-2 sm:text-sm max-[860px]:hidden">
             <p className="hidden sm:block">Cadastro de assessoria por convite comercial.</p>
             <p>
+              Ainda nao tem conta?{" "}
+              <Link href="/register/atleta" className="font-semibold text-[#f7b529] hover:text-[#ffd27a]">
+                Comecar agora
+              </Link>
+            </p>
+            <p className="sm:hidden">
+              Tenho convite de atleta:{" "}
+              <Link href="/register/atleta" className="font-semibold text-[#f7b529] hover:text-[#ffd27a]">
+                Cadastrar atleta
+              </Link>
+            </p>
+            <p className="hidden sm:block">
               Sou atleta e tenho convite:{" "}
               <Link href="/register/atleta" className="font-semibold text-[#f7b529] hover:text-[#ffd27a]">
                 Cadastrar atleta

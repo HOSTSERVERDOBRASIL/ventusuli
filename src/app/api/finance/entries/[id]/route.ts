@@ -10,6 +10,7 @@ const patchSchema = z.object({
 
 function mapEntry(entry: {
   id: string;
+  subject_user_id: string | null;
   type: string;
   amount_cents: number;
   category: string;
@@ -24,11 +25,13 @@ function mapEntry(entry: {
   counterparty: string | null;
   payment_method: string | null;
   document_url: string | null;
+  reference_code: string | null;
   created_at: Date;
   creator: { name: string; email: string };
 }) {
   return {
     id: entry.id,
+    subjectUserId: entry.subject_user_id,
     type: entry.type,
     amountCents: entry.amount_cents,
     category: entry.category,
@@ -43,6 +46,7 @@ function mapEntry(entry: {
     counterparty: entry.counterparty,
     paymentMethod: entry.payment_method,
     documentUrl: entry.document_url,
+    referenceCode: entry.reference_code,
     createdAt: entry.created_at.toISOString(),
     createdByName: entry.creator.name,
     createdByEmail: entry.creator.email,

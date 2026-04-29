@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PaymentStatus, RegistrationStatus } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { apiError } from "@/lib/api-error";
 import { creditEventPoints, EventTriggerSource } from "@/lib/points/pointsService";
 import { prisma } from "@/lib/prisma";
-import { getAuthContext, isAdminRole } from "@/lib/request-auth";
+import { getAuthContext, isFinanceRole } from "@/lib/request-auth";
 
 const bodySchema = z.object({
   eventId: z.string().min(1),
@@ -37,7 +37,7 @@ function hasEarlyPaymentFlag(value: unknown): boolean {
 export async function POST(req: NextRequest) {
   const auth = getAuthContext(req);
   if (!auth) return apiError("UNAUTHORIZED", "Token de acesso ausente.", 401);
-  if (!isAdminRole(auth.role)) return apiError("FORBIDDEN", "Acesso restrito ao ADMIN.", 403);
+  if (!isFinanceRole(auth.role)) return apiError("FORBIDDEN", "Acesso restrito ao Gestor ou Financeiro.", 403);
 
   let body: unknown;
   try {
@@ -63,27 +63,31 @@ export async function POST(req: NextRequest) {
     return apiError("USER_NOT_FOUND", "Prova nao encontrada.", 404);
   }
 
-  const registrations = await prisma.registration.findMany({
-    where: {
-      organization_id: auth.organizationId,
-      event_id: parsed.data.eventId,
-      OR: [
-        { status: RegistrationStatus.CONFIRMED },
-        { payment: { status: PaymentStatus.PAID } },
-      ],
-    },
-    select: {
-      id: true,
-      user_id: true,
-      event_id: true,
-      status: true,
-      payment: {
-        select: {
-          status: true,
-        },
-      },
-    },
-  });
+  const registrations = await prisma.$queryRaw<
+    Array<{
+      id: string;
+      user_id: string;
+      event_id: string;
+      status: string;
+      payment_status: string | null;
+    }>
+  >(Prisma.sql`
+    SELECT
+      r.id,
+      r.user_id,
+      r.event_id,
+      r.status::text AS status,
+      p.status::text AS payment_status
+    FROM public.registrations r
+    LEFT JOIN public.payments p ON p.registration_id = r.id
+    WHERE r.organization_id = ${auth.organizationId}
+      AND r.event_id = ${parsed.data.eventId}
+      AND r.attendance_status = 'PRESENT'::"public"."AttendanceStatus"
+      AND (
+        r.status = 'CONFIRMED'::"public"."RegistrationStatus"
+        OR p.status = 'PAID'::"public"."PaymentStatus"
+      )
+  `);
 
   const tasks: Array<Promise<{ created: boolean }>> = [];
 

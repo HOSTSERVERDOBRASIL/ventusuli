@@ -4,6 +4,7 @@ import { z } from "zod";
 import { apiError } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/request-auth";
+import { mapAthleteTrainingProfile } from "@/lib/training-serializers";
 
 const patchSchema = z.object({
   name: z.string().trim().min(2).optional(),
@@ -144,6 +145,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
         athleteStatus,
         approvalPending: athleteStatus === "PENDING_APPROVAL",
       },
+      trainingProfile: mapAthleteTrainingProfile(athlete.athlete_profile),
       summary: {
         registrationsCount: athlete.registrations.length,
         paidAmountCents: totalPaidCents,

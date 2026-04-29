@@ -33,6 +33,7 @@ export interface PaymentQueueSummary {
 
 export interface FinancialEntryRow {
   id: string;
+  subjectUserId: string | null;
   type: "INCOME" | "EXPENSE";
   amountCents: number;
   category: string;
@@ -47,6 +48,7 @@ export interface FinancialEntryRow {
   counterparty: string | null;
   paymentMethod: string | null;
   documentUrl: string | null;
+  referenceCode: string | null;
   createdAt: string;
   createdByName: string;
   createdByEmail: string;
@@ -170,6 +172,17 @@ export async function getPaymentDetail(paymentId: string, accessToken?: string |
   return payload.data;
 }
 
+export interface RecurringChargeProcessResult {
+  data: {
+    monthKey: string;
+    generatedCount: number;
+    skippedCount: number;
+    totalAmountCents: number;
+    generatedIds: string[];
+    organizationName: string;
+  };
+}
+
 export async function getFinancialEntries(input: {
   startDate: string;
   endDate: string;
@@ -252,5 +265,26 @@ export async function patchFinancialEntry(
   }
 
   const payload = (await response.json()) as { data: FinancialEntryRow };
+  return payload.data;
+}
+
+export async function processRecurringCharges(
+  input: { monthKey?: string; accessToken?: string | null } = {},
+): Promise<RecurringChargeProcessResult["data"]> {
+  const response = await fetch("/api/finance/recurring/process", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...buildAuthHeaders(input.accessToken),
+    },
+    body: JSON.stringify({ monthKey: input.monthKey }),
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json()) as { error?: { message?: string } };
+    throw new Error(payload.error?.message ?? "Nao foi possivel processar mensalidades.");
+  }
+
+  const payload = (await response.json()) as RecurringChargeProcessResult;
   return payload.data;
 }

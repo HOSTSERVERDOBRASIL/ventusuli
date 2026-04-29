@@ -1,19 +1,19 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Activity, MapPin, Trophy, Users } from "lucide-react";
+import { Activity, MapPin, Quote, Trophy, Users } from "lucide-react";
 
 const showcaseCards = [
   {
     title: "Praia do Campeche",
-    image: "/auth/campeche.webp",
+    image: "/auth/praia-campeche-card.webp",
   },
   {
     title: "Beira-Mar Norte",
-    image: "/auth/beira-mar.png",
+    image: "/auth/beira-mar-card.png",
   },
   {
     title: "Mercado Publico",
-    image: "/auth/mercado-publico.png",
+    image: "/auth/mercado-publico-card.png",
   },
 ];
 
@@ -41,64 +41,62 @@ export function AuthShell({
   description,
 }: {
   children: React.ReactNode;
-  title: string;
-  description: string;
+  title: React.ReactNode;
+  description: React.ReactNode;
 }) {
   return (
     <div className="relative min-h-svh overflow-hidden bg-[#050b16] text-white">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(245,179,43,0.2),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(15,72,139,0.35),transparent_36%),linear-gradient(135deg,rgba(4,9,20,0.92),rgba(4,9,20,0.55))]" />
-      <div className="relative z-10 min-h-svh lg:grid lg:grid-cols-[1.15fr_0.85fr]">
-        <section className="relative hidden min-h-svh overflow-hidden lg:flex">
+      <div className="relative z-10 h-svh lg:grid lg:grid-cols-[1.15fr_0.85fr]">
+        <section className="relative hidden h-svh overflow-hidden lg:flex">
           <Image
-            src="/auth/hercules-sunrise.webp"
-            alt="Ponte Hercilio Luz ao amanhecer"
+            src="/auth/floripa-bridge-hero.webp"
+            alt="Ponte Hercilio Luz em Florianopolis ao entardecer"
             fill
             priority
             className="object-cover"
           />
-          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(4,9,20,0.75),rgba(4,9,20,0.35)),linear-gradient(180deg,rgba(6,12,25,0.1),rgba(6,12,25,0.78))]" />
-          <div className="relative z-10 flex w-full flex-col justify-between p-10 xl:p-14">
-            <div className="max-w-[36rem]">
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(4,9,20,0.84),rgba(4,9,20,0.42),rgba(4,9,20,0.16)),linear-gradient(180deg,rgba(6,12,25,0.06),rgba(6,12,25,0.76))]" />
+          <div className="relative z-10 flex w-full flex-col justify-between p-8 xl:p-12 2xl:p-14">
+            <div className="max-w-[34rem]">
               <Image
                 src="/auth/ventu-suli-logo.png"
                 alt="Logo Ventu Suli"
-                width={188}
-                height={188}
-                className="h-auto w-36 xl:w-44"
+                width={224}
+                height={224}
+                className="h-auto w-32 xl:w-40 2xl:w-48"
               />
-              <p className="mt-8 text-[0.72rem] font-semibold uppercase tracking-[0.38em] text-[#ffd27a]">
-                Floripa performance club
-              </p>
-              <h1 className="mt-5 max-w-[13ch] text-5xl font-semibold leading-[0.95] text-white xl:text-7xl">
+
+              <h1 className="mt-5 max-w-[11ch] text-[2.8rem] font-semibold leading-[0.94] text-white xl:text-6xl 2xl:text-[4.4rem]">
                 Transforme treinos em <span className="text-[#f7b529]">evolucao real.</span>
               </h1>
-              <p className="mt-5 max-w-xl text-lg leading-8 text-slate-200/90">
-                Conecte dados, disciplina e comunidade para alcancar sua melhor versao.
+              <p className="mt-4 max-w-[28rem] text-base leading-7 text-slate-100/90 2xl:text-lg 2xl:leading-8">
+                Conecte dados, disciplina e proposito para alcancar sua melhor versao.
               </p>
 
-              <div className="mt-9 space-y-4">
+              <div className="mt-6 space-y-4 2xl:mt-8 2xl:space-y-5">
                 {valuePoints.map(({ icon: Icon, title: pointTitle, description: pointDescription }) => (
-                  <div
-                    key={pointTitle}
-                    className="flex items-start gap-4 rounded-2xl border border-white/12 bg-white/6 p-4 backdrop-blur-sm"
-                  >
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#f7b529]/30 bg-[#f7b529]/10 text-[#f7b529]">
-                      <Icon className="h-5 w-5" />
+                  <div key={pointTitle} className="flex items-start gap-4">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/12 bg-[#091224]/80 text-[#f7b529] shadow-[0_8px_30px_rgba(0,0,0,0.2)] 2xl:h-12 2xl:w-12">
+                      <Icon className="h-4 w-4 2xl:h-5 2xl:w-5" />
                     </div>
                     <div>
-                      <p className="text-lg font-semibold text-white">{pointTitle}</p>
-                      <p className="mt-1 text-sm leading-6 text-slate-200/85">{pointDescription}</p>
+                      <p className="text-base font-semibold text-white 2xl:text-lg">{pointTitle}</p>
+                      <p className="mt-1 max-w-[24rem] text-sm leading-5 text-slate-200/85 2xl:leading-6">{pointDescription}</p>
                     </div>
                   </div>
                 ))}
               </div>
 
-              <p className="mt-8 text-3xl font-medium leading-tight text-white/95">
-                Disciplina constroi o que a motivacao nao sustenta.
-              </p>
+              <div className="mt-7 flex items-start gap-4 text-white/95 max-[900px]:hidden 2xl:mt-9">
+                <Quote className="mt-1 h-8 w-8 shrink-0 text-[#f7b529]" />
+                <p className="max-w-[24rem] text-[1.7rem] font-medium leading-tight 2xl:text-3xl">
+                  Disciplina constroi o que a motivacao <span className="text-[#f7b529]">nao sustenta.</span>
+                </p>
+              </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-3 gap-4 max-[980px]:hidden">
               {showcaseCards.map((card) => (
                 <div
                   key={card.title}
@@ -120,16 +118,16 @@ export function AuthShell({
           </div>
         </section>
 
-        <section className="relative flex h-svh items-center justify-center overflow-hidden px-3 py-3 sm:min-h-svh sm:px-6 sm:py-8 lg:px-8">
+        <section className="relative flex h-svh items-center justify-center overflow-hidden px-3 py-3 sm:px-6 sm:py-4 lg:px-8 xl:py-6">
           <div className="absolute inset-0 lg:hidden">
             <Image
-              src="/auth/hercules-sunrise.webp"
+              src="/auth/floripa-bridge-hero.webp"
               alt="Ponte Hercilio Luz"
               fill
               priority
-              className="object-cover opacity-30"
+              className="object-cover opacity-40"
             />
-            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,9,20,0.9),rgba(4,9,20,0.98))]" />
+            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,9,20,0.86),rgba(4,9,20,0.98))]" />
           </div>
 
           <div className="relative z-10 w-full max-w-[34rem]">
@@ -166,8 +164,8 @@ export function AuthShell({
               ))}
             </div>
 
-            <div className="rounded-[1.5rem] border border-white/14 bg-[linear-gradient(180deg,rgba(9,18,34,0.96),rgba(6,12,25,0.92))] p-3.5 shadow-[0_30px_100px_rgba(0,0,0,0.55)] backdrop-blur-xl sm:rounded-[2rem] sm:p-8 lg:p-10">
-              <div className="mb-4 sm:mb-8">
+            <div className="rounded-[1.5rem] border border-white/14 bg-[linear-gradient(180deg,rgba(9,18,34,0.96),rgba(6,12,25,0.92))] p-3.5 shadow-[0_30px_100px_rgba(0,0,0,0.55)] backdrop-blur-xl sm:rounded-[2rem] sm:p-6 lg:p-8 xl:p-10">
+              <div className="mb-4 sm:mb-6 xl:mb-8">
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#f7b529] sm:text-sm sm:tracking-[0.24em]">
                   Acesso seguro
                 </p>

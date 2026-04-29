@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { apiError } from "@/lib/api-error";
+import { normalizeFinanceProfile } from "@/lib/finance-profile";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext, isFinanceRole } from "@/lib/request-auth";
 
@@ -23,6 +24,7 @@ const entrySchema = z.object({
 
 function mapEntry(entry: {
   id: string;
+  subject_user_id: string | null;
   type: string;
   amount_cents: number;
   category: string;
@@ -37,11 +39,13 @@ function mapEntry(entry: {
   counterparty: string | null;
   payment_method: string | null;
   document_url: string | null;
+  reference_code: string | null;
   created_at: Date;
   creator: { name: string; email: string };
 }) {
   return {
     id: entry.id,
+    subjectUserId: entry.subject_user_id,
     type: entry.type,
     amountCents: entry.amount_cents,
     category: entry.category,
@@ -56,6 +60,7 @@ function mapEntry(entry: {
     counterparty: entry.counterparty,
     paymentMethod: entry.payment_method,
     documentUrl: entry.document_url,
+    referenceCode: entry.reference_code,
     createdAt: entry.created_at.toISOString(),
     createdByName: entry.creator.name,
     createdByEmail: entry.creator.email,
@@ -133,6 +138,32 @@ export async function POST(req: NextRequest) {
     return apiError("VALIDATION_ERROR", parsed.error.errors[0]?.message ?? "Dados invalidos.", 400);
   }
 
+  const organization = await prisma.organization.findUnique({
+    where: { id: auth.organizationId },
+    select: { settings: true },
+  });
+  const financeProfile = normalizeFinanceProfile(organization?.settings);
+
+  if (
+    financeProfile.requireDueDateForOpenEntries &&
+    parsed.data.status === "OPEN" &&
+    !parsed.data.dueAt
+  ) {
+    return apiError(
+      "VALIDATION_ERROR",
+      "Titulos em aberto precisam de vencimento nesta assessoria.",
+      400,
+    );
+  }
+
+  if (!financeProfile.allowManualCashbook && parsed.data.entryKind === "CASH") {
+    return apiError(
+      "VALIDATION_ERROR",
+      "O livro-caixa manual esta desabilitado para esta assessoria.",
+      400,
+    );
+  }
+
   const entry = await prisma.financialEntry.create({
     data: {
       organization_id: auth.organizationId,
@@ -145,11 +176,12 @@ export async function POST(req: NextRequest) {
       settled_at: parsed.data.settledAt ? new Date(parsed.data.settledAt) : parsed.data.status === "PAID" ? new Date(parsed.data.occurredAt) : null,
       status: parsed.data.status,
       entry_kind: parsed.data.entryKind,
-      account_code: parsed.data.accountCode || null,
-      cost_center: parsed.data.costCenter || null,
+      account_code: parsed.data.accountCode || financeProfile.defaultAccountCode,
+      cost_center: parsed.data.costCenter || financeProfile.defaultCostCenter,
       counterparty: parsed.data.counterparty || null,
-      payment_method: parsed.data.paymentMethod || null,
+      payment_method: parsed.data.paymentMethod || financeProfile.defaultPaymentMethod,
       document_url: parsed.data.documentUrl || null,
+      reference_code: null,
       created_by: auth.userId,
     },
     include: { creator: { select: { name: true, email: true } } },

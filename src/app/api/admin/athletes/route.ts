@@ -42,6 +42,14 @@ type AthleteListUser = Prisma.UserGetPayload<{
         };
       };
     };
+    financial_entries_subject: {
+      select: {
+        status: true;
+        amount_cents: true;
+        settled_at: true;
+        created_at: true;
+      };
+    };
   };
 }>;
 
@@ -160,14 +168,21 @@ function buildAthleteRow(
   const payments = user.registrations.flatMap((registration) =>
     registration.payment ? [registration.payment] : [],
   );
+  const recurringEntries = user.financial_entries_subject;
 
   const pendingAmountCents = payments
     .filter((payment) => payment.status === "PENDING")
-    .reduce((sum, payment) => sum + payment.amount_cents, 0);
+    .reduce((sum, payment) => sum + payment.amount_cents, 0) +
+    recurringEntries
+      .filter((entry) => entry.status === "OPEN")
+      .reduce((sum, entry) => sum + entry.amount_cents, 0);
 
   const paidAmountCents = payments
     .filter((payment) => payment.status === "PAID")
-    .reduce((sum, payment) => sum + payment.amount_cents, 0);
+    .reduce((sum, payment) => sum + payment.amount_cents, 0) +
+    recurringEntries
+      .filter((entry) => entry.status === "PAID")
+      .reduce((sum, entry) => sum + entry.amount_cents, 0);
 
   const nextRegistration =
     user.registrations
@@ -176,11 +191,23 @@ function buildAthleteRow(
     null;
 
   const lastPayment =
-    payments
-      .filter((payment) => payment.status === "PAID")
+    [
+      ...payments
+        .filter((payment) => payment.status === "PAID")
+        .map((payment) => ({
+          paidAt: payment.paid_at,
+          createdAt: payment.created_at,
+        })),
+      ...recurringEntries
+        .filter((entry) => entry.status === "PAID")
+        .map((entry) => ({
+          paidAt: entry.settled_at,
+          createdAt: entry.created_at,
+        })),
+    ]
       .sort((a, b) => {
-        const aDate = a.paid_at ? new Date(a.paid_at) : new Date(a.created_at);
-        const bDate = b.paid_at ? new Date(b.paid_at) : new Date(b.created_at);
+        const aDate = a.paidAt ? new Date(a.paidAt) : new Date(a.createdAt);
+        const bDate = b.paidAt ? new Date(b.paidAt) : new Date(b.createdAt);
         return bDate.getTime() - aDate.getTime();
       })[0] ?? null;
 
@@ -207,8 +234,8 @@ function buildAthleteRow(
     nextEventDate: nextRegistration ? new Date(nextRegistration.event.event_date).toISOString() : null,
     pendingAmountCents,
     paidAmountCents,
-    financialSituation: financialFromData(payments.length, pendingAmountCents),
-    lastPaymentAt: lastPayment?.paid_at ? new Date(lastPayment.paid_at).toISOString() : null,
+    financialSituation: financialFromData(payments.length + recurringEntries.length, pendingAmountCents),
+    lastPaymentAt: lastPayment?.paidAt ? new Date(lastPayment.paidAt).toISOString() : null,
     city: user.athlete_profile?.city ?? null,
     state: user.athlete_profile?.state ?? null,
     internalNote: null,
@@ -281,6 +308,18 @@ export async function GET(req: NextRequest) {
                 created_at: true,
               },
             },
+          },
+        },
+        financial_entries_subject: {
+          where: {
+            organization_id: auth.organizationId,
+            entry_kind: "RECEIVABLE",
+          },
+          select: {
+            status: true,
+            amount_cents: true,
+            settled_at: true,
+            created_at: true,
           },
         },
       },
