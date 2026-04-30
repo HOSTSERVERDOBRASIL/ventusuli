@@ -1,0 +1,15 @@
+
+> ventu-suli@0.1.0 dev
+> next dev
+
+  ▲ Next.js 14.2.35
+  - Local:        http://localhost:3000
+  - Environments: .env
+  - Experiments (use with caution):
+    · instrumentationHook
+
+ ✓ Starting...
+ ○ Compiling /instrumentation ...
+ ✓ Compiled /instrumentation in 2.6s (42 modules)
+ ✓ Ready in 20.7s
+ ✓ Compiled in 203ms (42 modules)
