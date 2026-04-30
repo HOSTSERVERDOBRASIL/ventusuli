@@ -389,7 +389,7 @@ export function MfaChallengeForm() {
             inputMode={method === "RECOVERY_CODE" ? "text" : "numeric"}
             maxLength={method === "RECOVERY_CODE" ? 16 : 6}
             placeholder={method === "RECOVERY_CODE" ? "ABCD-1234" : "000000"}
-            className="h-16 rounded-2xl border-white/12 bg-white/6 text-center font-mono text-2xl tracking-[0.32em] text-white placeholder:tracking-normal placeholder:text-slate-500 focus-visible:ring-[#f7b529]"
+            className="auth-readable-input h-16 rounded-2xl border-white/12 bg-white/6 text-center font-mono text-2xl tracking-[0.32em] text-white placeholder:tracking-normal placeholder:text-slate-500 focus-visible:ring-[#f7b529]"
           />
         </div>
 

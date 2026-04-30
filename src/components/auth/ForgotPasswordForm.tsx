@@ -72,13 +72,13 @@ export function ForgotPasswordForm() {
             E-mail
           </label>
           <div className="relative">
-            <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+            <Mail className="auth-readable-icon pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
             <Input
               id="email"
               type="email"
               placeholder="voce@assessoria.com"
               autoComplete="email"
-              className="h-16 rounded-2xl border-white/12 bg-white/6 pl-12 text-white placeholder:text-slate-400 focus-visible:ring-[#f7b529]"
+              className="auth-readable-input h-16 rounded-2xl border-white/12 bg-white/6 pl-12 text-white placeholder:text-slate-400 focus-visible:ring-[#f7b529]"
               {...register("email")}
             />
           </div>

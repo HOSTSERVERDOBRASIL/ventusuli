@@ -197,7 +197,7 @@ function SocialButton({
     <button
       type="button"
       onClick={onClick}
-      className="flex h-11 items-center justify-center rounded-lg border border-white/12 bg-white/[0.045] px-4 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition hover:border-white/30 hover:bg-white/[0.08] sm:h-[4.65rem]"
+      className="flex h-10 items-center justify-center rounded-lg border border-white/12 bg-white/[0.045] px-4 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition hover:border-white/30 hover:bg-white/[0.08] sm:h-11"
       aria-label={`Entrar com ${label}`}
       title={label}
     >
@@ -407,6 +407,7 @@ export function LoginForm() {
 
   return (
     <AuthShell
+      fitViewport
       title={
         <>
           Bem-vindo(a) de <span className="text-[#f7b529]">volta!</span>
@@ -418,8 +419,8 @@ export function LoginForm() {
         </>
       }
     >
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 sm:space-y-5">
-        <section className="hidden rounded-xl border border-white/12 bg-white/[0.045] p-3 sm:block sm:p-4">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-2.5 sm:space-y-3">
+        <section className="hidden">
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#f7b529] text-[#071225]">
               <UserRound className="h-5 w-5" />
@@ -442,7 +443,7 @@ export function LoginForm() {
         </section>
 
         {demoUiEnabled ? (
-          <section className="hidden rounded-xl border border-[#f7b529]/22 bg-[#f7b529]/8 p-3 sm:block sm:p-4">
+          <section className="hidden">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-[#f7b529]" />
@@ -483,43 +484,43 @@ export function LoginForm() {
           </div>
         ) : null}
 
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <Label htmlFor="email" className="text-xs font-bold uppercase text-slate-100">
             E-mail
           </Label>
           <div className="relative">
-            <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-700" />
+            <Mail className="auth-readable-icon pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-700" />
             <Input
               id="email"
               type="email"
               placeholder="seu@email.com"
               autoComplete="email"
-              className="h-12 rounded-lg border-[#f7b529]/45 bg-slate-50 pl-12 text-base font-medium text-[#071225] placeholder:text-slate-500 focus-visible:ring-[#f7b529] sm:h-16"
+              className="auth-readable-input h-11 rounded-lg border-[#f7b529]/45 bg-slate-50 pl-12 text-base font-medium text-[#071225] placeholder:text-slate-500 focus-visible:ring-[#f7b529] sm:h-12"
               {...register("email")}
             />
           </div>
           {errors.email ? <p className="text-xs text-amber-300">{errors.email.message}</p> : null}
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <Label htmlFor="password" className="text-xs font-bold uppercase text-slate-100">
             Senha
           </Label>
           <div className="relative">
-            <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-700" />
+            <LockKeyhole className="auth-readable-icon pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-700" />
             <Input
               id="password"
               type={showPassword ? "text" : "password"}
               placeholder="Digite sua senha"
               autoComplete="current-password"
-              className="h-12 rounded-lg border-[#f7b529]/45 bg-slate-50 pl-12 pr-12 text-base font-medium text-[#071225] placeholder:text-slate-500 focus-visible:ring-[#f7b529] sm:h-16"
+              className="auth-readable-input h-11 rounded-lg border-[#f7b529]/45 bg-slate-50 pl-12 pr-12 text-base font-medium text-[#071225] placeholder:text-slate-500 focus-visible:ring-[#f7b529] sm:h-12"
               {...register("password")}
             />
             <button
               type="button"
               aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
               onClick={() => setShowPassword((prev) => !prev)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-700 transition hover:text-[#071225]"
+              className="auth-readable-toggle absolute right-4 top-1/2 -translate-y-1/2 text-slate-700 transition hover:text-[#071225]"
             >
               {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
             </button>
@@ -529,7 +530,7 @@ export function LoginForm() {
           ) : null}
         </div>
 
-        <div className="hidden gap-2 min-[460px]:grid-cols-3 sm:grid">
+        <div className="hidden">
           {readinessItems.map((item) => (
             <div
               key={item.label}
@@ -565,7 +566,7 @@ export function LoginForm() {
         <Button
           type="submit"
           disabled={isSubmitting || !isValid}
-          className="h-12 w-full rounded-lg bg-[#f7b529] px-4 text-sm font-black text-[#06101f] shadow-[0_16px_42px_rgba(247,181,41,0.34)] hover:bg-[#ffbf3e] disabled:bg-slate-300 disabled:text-slate-700 disabled:opacity-100 sm:h-16 sm:px-5 sm:text-base sm:disabled:opacity-55"
+          className="h-11 w-full rounded-lg bg-[#f7b529] px-4 text-sm font-black text-[#06101f] shadow-[0_16px_42px_rgba(247,181,41,0.34)] hover:bg-[#ffbf3e] disabled:bg-slate-300 disabled:text-slate-700 disabled:opacity-100 sm:h-12 sm:px-5 sm:text-base sm:disabled:opacity-55"
         >
           {isSubmitting ? (
             <span className="flex items-center justify-center gap-2 text-center">
@@ -580,14 +581,14 @@ export function LoginForm() {
           )}
         </Button>
 
-        <div className="relative hidden py-1 text-center sm:block sm:py-2">
+        <div className="relative py-0.5 text-center">
           <span className="relative z-10 bg-[#050d1b] px-4 text-sm text-slate-200">
             ou continue com
           </span>
           <div className="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-white/10" />
         </div>
 
-        <div className="hidden grid-cols-3 gap-2 sm:grid sm:gap-3">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
           <SocialButton label="Google" onClick={() => notifySocialLogin("Google")}>
             <GoogleIcon />
           </SocialButton>
@@ -599,17 +600,14 @@ export function LoginForm() {
           </SocialButton>
         </div>
 
-        <div className="hidden rounded-xl border border-white/10 bg-white/[0.035] p-3 sm:block">
-          <div className="flex items-start gap-3 text-sm text-slate-300">
-            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
-            <p>
-              A sessão usa token seguro, respeita permissões por papel e aciona MFA quando a conta
-              exige verificação adicional.
-            </p>
+        <div className="rounded-lg border border-white/10 bg-white/[0.035] px-3 py-2">
+          <div className="flex items-center gap-2 text-xs text-slate-300 sm:text-sm">
+            <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-300" />
+            <p>MFA ativo quando a conta exige verificação adicional.</p>
           </div>
         </div>
 
-        <p className="flex flex-wrap items-center justify-center gap-2 pt-1 text-sm text-slate-100 sm:text-lg">
+        <p className="flex flex-wrap items-center justify-center gap-2 pt-0.5 text-sm text-slate-100">
           Ainda não tem conta?
           <Link
             href={registrationHref}

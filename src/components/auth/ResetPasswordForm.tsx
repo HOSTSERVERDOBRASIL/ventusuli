@@ -108,19 +108,19 @@ export function ResetPasswordForm() {
             Nova senha
           </label>
           <div className="relative">
-            <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+            <LockKeyhole className="auth-readable-icon pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
             <Input
               id="password"
               type={showPassword ? "text" : "password"}
               placeholder="Nova senha"
               autoComplete="new-password"
-              className="h-16 rounded-2xl border-white/12 bg-white/6 pl-12 pr-11 text-white placeholder:text-slate-400 focus-visible:ring-[#f7b529]"
+              className="auth-readable-input h-16 rounded-2xl border-white/12 bg-white/6 pl-12 pr-11 text-white placeholder:text-slate-400 focus-visible:ring-[#f7b529]"
               {...register("password")}
             />
             <button
               type="button"
               onClick={() => setShowPassword((prev) => !prev)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 transition hover:text-white"
+              className="auth-readable-toggle absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 transition hover:text-[#071225]"
               aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
             >
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -137,19 +137,19 @@ export function ResetPasswordForm() {
             Confirmar nova senha
           </label>
           <div className="relative">
-            <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+            <LockKeyhole className="auth-readable-icon pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
             <Input
               id="confirmPassword"
               type={showConfirmPassword ? "text" : "password"}
               placeholder="Confirme a nova senha"
               autoComplete="new-password"
-              className="h-16 rounded-2xl border-white/12 bg-white/6 pl-12 pr-11 text-white placeholder:text-slate-400 focus-visible:ring-[#f7b529]"
+              className="auth-readable-input h-16 rounded-2xl border-white/12 bg-white/6 pl-12 pr-11 text-white placeholder:text-slate-400 focus-visible:ring-[#f7b529]"
               {...register("confirmPassword")}
             />
             <button
               type="button"
               onClick={() => setShowConfirmPassword((prev) => !prev)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 transition hover:text-white"
+              className="auth-readable-toggle absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 transition hover:text-[#071225]"
               aria-label={showConfirmPassword ? "Ocultar senha" : "Mostrar senha"}
             >
               {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}

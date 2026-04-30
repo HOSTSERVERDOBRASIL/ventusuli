@@ -163,7 +163,7 @@ export function RegisterForm() {
             id="name"
             placeholder="Seu nome"
             autoComplete="name"
-            className="border-white/15 bg-[#0F2743] text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]"
+            className="auth-readable-input border-white/15 bg-[#0F2743] text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]"
             {...register("name")}
           />
           {errors.name ? <p className="text-xs text-amber-300">{errors.name.message}</p> : null}
@@ -177,7 +177,7 @@ export function RegisterForm() {
             id="orgName"
             placeholder="Ex: Atlas Assessoria"
             autoComplete="organization"
-            className="border-white/15 bg-[#0F2743] text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]"
+            className="auth-readable-input border-white/15 bg-[#0F2743] text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]"
             {...register("orgName")}
           />
           {errors.orgName ? <p className="text-xs text-amber-300">{errors.orgName.message}</p> : null}
@@ -192,7 +192,7 @@ export function RegisterForm() {
             type="email"
             placeholder="você@assessoria.com"
             autoComplete="email"
-            className="border-white/15 bg-[#0F2743] text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]"
+            className="auth-readable-input border-white/15 bg-[#0F2743] text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]"
             {...register("email")}
           />
           {errors.email ? <p className="text-xs text-amber-300">{errors.email.message}</p> : null}
@@ -208,14 +208,14 @@ export function RegisterForm() {
               type={showPassword ? "text" : "password"}
               placeholder="Crie sua senha"
               autoComplete="new-password"
-              className="border-white/15 bg-[#0F2743] pr-11 text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]"
+              className="auth-readable-input border-white/15 bg-[#0F2743] pr-11 text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]"
               {...register("password")}
             />
             <button
               type="button"
               aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
               onClick={() => setShowPassword((prev) => !prev)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 transition hover:text-white"
+              className="auth-readable-toggle absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 transition hover:text-[#071225]"
             >
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
@@ -255,14 +255,14 @@ export function RegisterForm() {
               type={showConfirmPassword ? "text" : "password"}
               placeholder="Repita sua senha"
               autoComplete="new-password"
-              className="border-white/15 bg-[#0F2743] pr-11 text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]"
+              className="auth-readable-input border-white/15 bg-[#0F2743] pr-11 text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]"
               {...register("confirmPassword")}
             />
             <button
               type="button"
               aria-label={showConfirmPassword ? "Ocultar senha" : "Mostrar senha"}
               onClick={() => setShowConfirmPassword((prev) => !prev)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 transition hover:text-white"
+              className="auth-readable-toggle absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 transition hover:text-[#071225]"
             >
               {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>

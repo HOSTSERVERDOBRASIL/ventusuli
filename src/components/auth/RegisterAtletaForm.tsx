@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -20,14 +20,14 @@ const formSchema = registerAthleteSchemaBase
   .extend({
     confirmPassword: z.string({ required_error: "Confirme sua senha" }).min(1, "Confirme sua senha"),
     termsAccepted: z.boolean().refine((value) => value, {
-      message: "VocÃª precisa aceitar os termos para continuar",
+      message: "Você precisa aceitar os termos para continuar",
     }),
   })
   .superRefine(({ password, confirmPassword }, ctx) => {
     if (password !== confirmPassword) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "As senhas nÃ£o coincidem",
+        message: "As senhas não coincidem",
         path: ["confirmPassword"],
       });
     }
@@ -59,11 +59,11 @@ interface OrganizationBySlugResponse {
 }
 
 const PASSWORD_RULES = [
-  { label: "MÃ­nimo de 8 caracteres", test: (value: string) => value.length >= 8 },
-  { label: "Ao menos uma letra maiÃºscula", test: (value: string) => /[A-Z]/.test(value) },
-  { label: "Ao menos um nÃºmero", test: (value: string) => /[0-9]/.test(value) },
-  { label: "Ao menos uma letra minÃºscula", test: (value: string) => /[a-z]/.test(value) },
-  { label: "Ao menos um sÃ­mbolo", test: (value: string) => /[^A-Za-z0-9]/.test(value) },
+  { label: "Mínimo de 8 caracteres", test: (value: string) => value.length >= 8 },
+  { label: "Ao menos uma letra maiúscula", test: (value: string) => /[A-Z]/.test(value) },
+  { label: "Ao menos um número", test: (value: string) => /[0-9]/.test(value) },
+  { label: "Ao menos uma letra minúscula", test: (value: string) => /[a-z]/.test(value) },
+  { label: "Ao menos um símbolo", test: (value: string) => /[^A-Za-z0-9]/.test(value) },
 ] as const;
 
 export function RegisterAtletaForm() {
@@ -116,7 +116,7 @@ export function RegisterAtletaForm() {
   const passwordScore = passwordStatus.filter((item) => item.valid).length;
   const passwordPercent = (passwordScore / PASSWORD_RULES.length) * 100;
   const strengthLabel =
-    passwordScore <= 2 ? "Fraca" : passwordScore === 3 ? "MÃ©dia" : passwordScore === 4 ? "Boa" : "Forte";
+    passwordScore <= 2 ? "Fraca" : passwordScore === 3 ? "Média" : passwordScore === 4 ? "Boa" : "Forte";
   const strengthColor =
     passwordScore <= 2
       ? "bg-red-400"
@@ -147,8 +147,8 @@ export function RegisterAtletaForm() {
       if (!response.ok || !("user" in payload)) {
         const message =
           "error" in payload
-            ? (payload.error?.message ?? "NÃ£o foi possÃ­vel criar sua conta de atleta.")
-            : "NÃ£o foi possÃ­vel criar sua conta de atleta.";
+            ? (payload.error?.message ?? "Não foi possível criar sua conta de atleta.")
+            : "Não foi possível criar sua conta de atleta.";
         setError(message);
         toast.error(message);
         return;
@@ -165,7 +165,7 @@ export function RegisterAtletaForm() {
       toast.success("Conta de atleta criada com sucesso.");
       router.push("/dashboard");
     } catch {
-      const message = "Erro de conexÃ£o. Tente novamente em instantes.";
+      const message = "Erro de conexão. Tente novamente em instantes.";
       setError(message);
       toast.error(message);
     }
@@ -178,14 +178,14 @@ export function RegisterAtletaForm() {
 
         <div className="space-y-2">
           <Label htmlFor="name" className="text-slate-100">Nome completo</Label>
-          <Input id="name" placeholder="Seu nome" autoComplete="name" className="border-white/15 bg-[#0F2743] text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]" {...register("name")} />
+          <Input id="name" placeholder="Seu nome" autoComplete="name" className="auth-readable-input border-white/15 bg-[#0F2743] text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]" {...register("name")} />
           {errors.name ? <p className="text-xs text-amber-300">{errors.name.message}</p> : null}
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="organizationSlug" className="text-slate-100">Slug da assessoria</Label>
           <div className="flex gap-2">
-            <Input id="organizationSlug" placeholder="Ex: assessoria-ventu-demo" autoComplete="off" className="border-white/15 bg-[#0F2743] text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]" {...register("organizationSlug")} />
+            <Input id="organizationSlug" placeholder="Ex: assessoria-ventu-demo" autoComplete="off" className="auth-readable-input border-white/15 bg-[#0F2743] text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]" {...register("organizationSlug")} />
             <Button
               type="button"
               variant="outline"
@@ -203,7 +203,7 @@ export function RegisterAtletaForm() {
                   const payload = (await response.json()) as OrganizationBySlugResponse | { error?: { message?: string } };
 
                   if (!response.ok || !("data" in payload)) {
-                    const message = "error" in payload ? payload.error?.message ?? "Slug nÃ£o encontrado." : "Slug nÃ£o encontrado.";
+                    const message = "error" in payload ? payload.error?.message ?? "Slug não encontrado." : "Slug não encontrado.";
                     setOrganizationPreview(null);
                     toast.error(message);
                     return;
@@ -213,7 +213,7 @@ export function RegisterAtletaForm() {
                   toast.success(`Assessoria encontrada: ${payload.data.name}`);
                 } catch {
                   setOrganizationPreview(null);
-                  toast.error("NÃ£o foi possÃ­vel validar o slug.");
+                  toast.error("Não foi possível validar o slug.");
                 } finally {
                   setValidatingSlug(false);
                 }
@@ -230,7 +230,7 @@ export function RegisterAtletaForm() {
               <p className="font-semibold">{organizationPreview.name}</p>
               <p>Slug: {organizationPreview.slug}</p>
               <p>
-                AprovaÃ§Ã£o de atleta: {organizationPreview.requireAthleteApproval ? "necessÃ¡ria" : "nÃ£o exigida"}
+                Aprovação de atleta: {organizationPreview.requireAthleteApproval ? "necessária" : "não exigida"}
               </p>
             </div>
           ) : null}
@@ -243,24 +243,24 @@ export function RegisterAtletaForm() {
 
         <div className="space-y-2">
           <Label htmlFor="inviteToken" className="text-slate-100">Token de convite</Label>
-          <Input id="inviteToken" placeholder="Cole o token enviado pela assessoria" autoComplete="off" className="border-white/15 bg-[#0F2743] text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]" {...register("inviteToken")} />
+          <Input id="inviteToken" placeholder="Cole o token enviado pela assessoria" autoComplete="off" className="auth-readable-input border-white/15 bg-[#0F2743] text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]" {...register("inviteToken")} />
           {watchedInvite.trim() && !watchedSlug.trim() ? (
-            <p className="text-xs text-emerald-300">Token de convite detectado â€” assessoria serÃ¡ identificada automaticamente.</p>
+            <p className="text-xs text-emerald-300">Token de convite detectado — assessoria será identificada automaticamente.</p>
           ) : null}
           {errors.organizationSlug ? <p className="text-xs text-amber-300">{errors.organizationSlug.message}</p> : null}
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="email" className="text-slate-100">Email</Label>
-          <Input id="email" type="email" placeholder="voce@email.com" autoComplete="email" className="border-white/15 bg-[#0F2743] text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]" {...register("email")} />
+          <Input id="email" type="email" placeholder="voce@email.com" autoComplete="email" className="auth-readable-input border-white/15 bg-[#0F2743] text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]" {...register("email")} />
           {errors.email ? <p className="text-xs text-amber-300">{errors.email.message}</p> : null}
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="password" className="text-slate-100">Senha</Label>
           <div className="relative">
-            <Input id="password" type={showPassword ? "text" : "password"} placeholder="Crie sua senha" autoComplete="new-password" className="border-white/15 bg-[#0F2743] pr-11 text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]" {...register("password")} />
-            <button type="button" aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"} onClick={() => setShowPassword((prev) => !prev)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 transition hover:text-white">
+            <Input id="password" type={showPassword ? "text" : "password"} placeholder="Crie sua senha" autoComplete="new-password" className="auth-readable-input border-white/15 bg-[#0F2743] pr-11 text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]" {...register("password")} />
+            <button type="button" aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"} onClick={() => setShowPassword((prev) => !prev)} className="auth-readable-toggle absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 transition hover:text-[#071225]">
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
@@ -288,8 +288,8 @@ export function RegisterAtletaForm() {
         <div className="space-y-2">
           <Label htmlFor="confirmPassword" className="text-slate-100">Confirmar senha</Label>
           <div className="relative">
-            <Input id="confirmPassword" type={showConfirmPassword ? "text" : "password"} placeholder="Repita sua senha" autoComplete="new-password" className="border-white/15 bg-[#0F2743] pr-11 text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]" {...register("confirmPassword")} />
-            <button type="button" aria-label={showConfirmPassword ? "Ocultar senha" : "Mostrar senha"} onClick={() => setShowConfirmPassword((prev) => !prev)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 transition hover:text-white">
+            <Input id="confirmPassword" type={showConfirmPassword ? "text" : "password"} placeholder="Repita sua senha" autoComplete="new-password" className="auth-readable-input border-white/15 bg-[#0F2743] pr-11 text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]" {...register("confirmPassword")} />
+            <button type="button" aria-label={showConfirmPassword ? "Ocultar senha" : "Mostrar senha"} onClick={() => setShowConfirmPassword((prev) => !prev)} className="auth-readable-toggle absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 transition hover:text-[#071225]">
               {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>

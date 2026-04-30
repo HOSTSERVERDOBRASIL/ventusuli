@@ -135,27 +135,27 @@ export function RegisterAssessoriaForm() {
 
         <div className="space-y-2">
           <Label htmlFor="name" className="text-slate-100">Nome completo</Label>
-          <Input id="name" placeholder="Seu nome" autoComplete="name" className="border-white/15 bg-[#0F2743] text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]" {...register("name")} />
+          <Input id="name" placeholder="Seu nome" autoComplete="name" className="auth-readable-input border-white/15 bg-[#0F2743] text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]" {...register("name")} />
           {errors.name ? <p className="text-xs text-amber-300">{errors.name.message}</p> : null}
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="orgName" className="text-slate-100">Nome da assessoria</Label>
-          <Input id="orgName" placeholder="Ex: Atlas Assessoria" autoComplete="organization" className="border-white/15 bg-[#0F2743] text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]" {...register("orgName")} />
+          <Input id="orgName" placeholder="Ex: Atlas Assessoria" autoComplete="organization" className="auth-readable-input border-white/15 bg-[#0F2743] text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]" {...register("orgName")} />
           {errors.orgName ? <p className="text-xs text-amber-300">{errors.orgName.message}</p> : null}
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="email" className="text-slate-100">Email</Label>
-          <Input id="email" type="email" placeholder="voce@assessoria.com" autoComplete="email" className="border-white/15 bg-[#0F2743] text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]" {...register("email")} />
+          <Input id="email" type="email" placeholder="voce@assessoria.com" autoComplete="email" className="auth-readable-input border-white/15 bg-[#0F2743] text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]" {...register("email")} />
           {errors.email ? <p className="text-xs text-amber-300">{errors.email.message}</p> : null}
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="password" className="text-slate-100">Senha</Label>
           <div className="relative">
-            <Input id="password" type={showPassword ? "text" : "password"} placeholder="Crie sua senha" autoComplete="new-password" className="border-white/15 bg-[#0F2743] pr-11 text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]" {...register("password")} />
-            <button type="button" aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"} onClick={() => setShowPassword((prev) => !prev)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 transition hover:text-white">
+            <Input id="password" type={showPassword ? "text" : "password"} placeholder="Crie sua senha" autoComplete="new-password" className="auth-readable-input border-white/15 bg-[#0F2743] pr-11 text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]" {...register("password")} />
+            <button type="button" aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"} onClick={() => setShowPassword((prev) => !prev)} className="auth-readable-toggle absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 transition hover:text-[#071225]">
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
@@ -183,8 +183,8 @@ export function RegisterAssessoriaForm() {
         <div className="space-y-2">
           <Label htmlFor="confirmPassword" className="text-slate-100">Confirmar senha</Label>
           <div className="relative">
-            <Input id="confirmPassword" type={showConfirmPassword ? "text" : "password"} placeholder="Repita sua senha" autoComplete="new-password" className="border-white/15 bg-[#0F2743] pr-11 text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]" {...register("confirmPassword")} />
-            <button type="button" aria-label={showConfirmPassword ? "Ocultar senha" : "Mostrar senha"} onClick={() => setShowConfirmPassword((prev) => !prev)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 transition hover:text-white">
+            <Input id="confirmPassword" type={showConfirmPassword ? "text" : "password"} placeholder="Repita sua senha" autoComplete="new-password" className="auth-readable-input border-white/15 bg-[#0F2743] pr-11 text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]" {...register("confirmPassword")} />
+            <button type="button" aria-label={showConfirmPassword ? "Ocultar senha" : "Mostrar senha"} onClick={() => setShowConfirmPassword((prev) => !prev)} className="auth-readable-toggle absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 transition hover:text-[#071225]">
               {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
