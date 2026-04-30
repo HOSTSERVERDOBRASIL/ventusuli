@@ -785,7 +785,7 @@ export default function AdminFinanceiroPage() {
         }
         return right.openAmountCents - left.openAmountCents;
       });
-  }, [periodPayments]);
+  }, [manualEntries, periodPayments]);
   const delinquencySummary = useMemo(
     () => ({
       athletes: delinquencyRows.length,

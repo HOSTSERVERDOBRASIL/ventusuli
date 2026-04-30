@@ -197,7 +197,7 @@ function SocialButton({
     <button
       type="button"
       onClick={onClick}
-      className="flex h-[4.65rem] items-center justify-center rounded-lg border border-white/12 bg-white/[0.045] px-4 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition hover:border-white/30 hover:bg-white/[0.08]"
+      className="flex h-11 items-center justify-center rounded-lg border border-white/12 bg-white/[0.045] px-4 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition hover:border-white/30 hover:bg-white/[0.08] sm:h-[4.65rem]"
       aria-label={`Entrar com ${label}`}
       title={label}
     >
@@ -209,7 +209,7 @@ function SocialButton({
 
 function GoogleIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 48 48" className="h-9 w-9">
+    <svg aria-hidden="true" viewBox="0 0 48 48" className="h-7 w-7 sm:h-9 sm:w-9">
       <path
         fill="#FFC107"
         d="M43.61 20.08H42V20H24v8h11.3C33.65 32.66 29.22 36 24 36c-6.63 0-12-5.37-12-12s5.37-12 12-12c3.06 0 5.84 1.15 7.96 3.04l5.66-5.66C34.05 6.05 29.27 4 24 4 12.95 4 4 12.95 4 24s8.95 20 20 20 20-8.95 20-20c0-1.34-.14-2.65-.39-3.92Z"
@@ -232,7 +232,7 @@ function GoogleIcon() {
 
 function AppleIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-9 w-9 text-white">
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-7 w-7 text-white sm:h-9 sm:w-9">
       <path
         fill="currentColor"
         d="M16.37 1.43c0 1.12-.41 2.15-1.18 2.96-.79.84-2.05 1.48-3.17 1.39-.14-1.08.45-2.23 1.16-2.97.79-.85 2.18-1.46 3.19-1.38ZM20.02 17.5c-.57 1.31-.84 1.9-1.58 3.06-1.03 1.58-2.48 3.55-4.27 3.57-1.6.01-2.01-1.04-4.18-1.03-2.17.01-2.62 1.05-4.22 1.03-1.8-.02-3.17-1.79-4.2-3.37C-1.3 16.35-1.6 11.18.17 8.43c1.26-1.95 3.24-3.1 5.11-3.1 1.9 0 3.09 1.04 4.66 1.04 1.53 0 2.46-1.04 4.67-1.04 1.67 0 3.44.91 4.69 2.5-4.12 2.26-3.45 8.14.72 9.67Z"
@@ -243,7 +243,7 @@ function AppleIcon() {
 
 function FacebookIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 48 48" className="h-9 w-9">
+    <svg aria-hidden="true" viewBox="0 0 48 48" className="h-7 w-7 sm:h-9 sm:w-9">
       <circle cx="24" cy="24" r="20" fill="#1877F2" />
       <path
         fill="#fff"
@@ -418,8 +418,8 @@ export function LoginForm() {
         </>
       }
     >
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-        <section className="rounded-xl border border-white/12 bg-white/[0.045] p-4">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 sm:space-y-5">
+        <section className="hidden rounded-xl border border-white/12 bg-white/[0.045] p-3 sm:block sm:p-4">
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#f7b529] text-[#071225]">
               <UserRound className="h-5 w-5" />
@@ -429,7 +429,7 @@ export function LoginForm() {
               <p className="mt-1 text-sm leading-5 text-slate-300">{accessInsight.description}</p>
             </div>
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-2">
+          <div className="mt-3 grid grid-cols-1 gap-2 min-[380px]:grid-cols-2 sm:mt-4">
             <div className="rounded-lg border border-white/10 bg-[#071225]/64 px-3 py-2">
               <p className="text-[0.68rem] font-bold uppercase text-slate-400">Destino</p>
               <p className="mt-1 text-sm font-semibold text-white">{accessInsight.destination}</p>
@@ -442,7 +442,7 @@ export function LoginForm() {
         </section>
 
         {demoUiEnabled ? (
-          <section className="rounded-xl border border-[#f7b529]/22 bg-[#f7b529]/8 p-4">
+          <section className="hidden rounded-xl border border-[#f7b529]/22 bg-[#f7b529]/8 p-3 sm:block sm:p-4">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-[#f7b529]" />
@@ -452,7 +452,7 @@ export function LoginForm() {
                 Demo
               </span>
             </div>
-            <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            <div className="mt-3 grid gap-2 min-[460px]:grid-cols-3">
               {demoProfiles.map((profile) => (
                 <button
                   key={profile.id}
@@ -488,13 +488,13 @@ export function LoginForm() {
             E-mail
           </Label>
           <div className="relative">
-            <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+            <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-700" />
             <Input
               id="email"
               type="email"
               placeholder="seu@email.com"
               autoComplete="email"
-              className="h-16 rounded-lg border-white/18 bg-white/[0.055] pl-12 text-base text-white placeholder:text-slate-400 focus-visible:ring-[#f7b529]"
+              className="h-12 rounded-lg border-[#f7b529]/45 bg-slate-50 pl-12 text-base font-medium text-[#071225] placeholder:text-slate-500 focus-visible:ring-[#f7b529] sm:h-16"
               {...register("email")}
             />
           </div>
@@ -506,20 +506,20 @@ export function LoginForm() {
             Senha
           </Label>
           <div className="relative">
-            <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+            <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-700" />
             <Input
               id="password"
               type={showPassword ? "text" : "password"}
-              placeholder="••••••••"
+              placeholder="Digite sua senha"
               autoComplete="current-password"
-              className="h-16 rounded-lg border-white/18 bg-white/[0.055] pl-12 pr-12 text-base text-white placeholder:text-slate-300 focus-visible:ring-[#f7b529]"
+              className="h-12 rounded-lg border-[#f7b529]/45 bg-slate-50 pl-12 pr-12 text-base font-medium text-[#071225] placeholder:text-slate-500 focus-visible:ring-[#f7b529] sm:h-16"
               {...register("password")}
             />
             <button
               type="button"
               aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
               onClick={() => setShowPassword((prev) => !prev)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 transition hover:text-white"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-700 transition hover:text-[#071225]"
             >
               {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
             </button>
@@ -529,7 +529,7 @@ export function LoginForm() {
           ) : null}
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-3">
+        <div className="hidden gap-2 min-[460px]:grid-cols-3 sm:grid">
           {readinessItems.map((item) => (
             <div
               key={item.label}
@@ -565,7 +565,7 @@ export function LoginForm() {
         <Button
           type="submit"
           disabled={isSubmitting || !isValid}
-          className="h-16 w-full rounded-lg bg-[#f7b529] px-5 text-base font-black text-[#06101f] shadow-[0_16px_42px_rgba(247,181,41,0.34)] hover:bg-[#ffbf3e] disabled:opacity-55"
+          className="h-12 w-full rounded-lg bg-[#f7b529] px-4 text-sm font-black text-[#06101f] shadow-[0_16px_42px_rgba(247,181,41,0.34)] hover:bg-[#ffbf3e] disabled:bg-slate-300 disabled:text-slate-700 disabled:opacity-100 sm:h-16 sm:px-5 sm:text-base sm:disabled:opacity-55"
         >
           {isSubmitting ? (
             <span className="flex items-center justify-center gap-2 text-center">
@@ -574,20 +574,20 @@ export function LoginForm() {
             </span>
           ) : (
             <span className="flex items-center justify-center gap-2 text-center leading-5 sm:gap-3">
-              <span>{isValid ? "ACESSAR MINHA EVOLUÇÃO" : "PREENCHA PARA CONTINUAR"}</span>
+              <span>{isValid ? "ENTRAR" : "PREENCHA OS CAMPOS"}</span>
               <ArrowRight className="h-5 w-5" />
             </span>
           )}
         </Button>
 
-        <div className="relative hidden py-2 text-center sm:block">
+        <div className="relative hidden py-1 text-center sm:block sm:py-2">
           <span className="relative z-10 bg-[#050d1b] px-4 text-sm text-slate-200">
             ou continue com
           </span>
           <div className="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-white/10" />
         </div>
 
-        <div className="hidden gap-3 sm:grid sm:grid-cols-3">
+        <div className="hidden grid-cols-3 gap-2 sm:grid sm:gap-3">
           <SocialButton label="Google" onClick={() => notifySocialLogin("Google")}>
             <GoogleIcon />
           </SocialButton>
@@ -599,7 +599,7 @@ export function LoginForm() {
           </SocialButton>
         </div>
 
-        <div className="rounded-xl border border-white/10 bg-white/[0.035] p-3">
+        <div className="hidden rounded-xl border border-white/10 bg-white/[0.035] p-3 sm:block">
           <div className="flex items-start gap-3 text-sm text-slate-300">
             <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
             <p>
@@ -609,7 +609,7 @@ export function LoginForm() {
           </div>
         </div>
 
-        <p className="flex flex-wrap items-center justify-center gap-2 pt-1 text-base text-slate-100 sm:text-lg">
+        <p className="flex flex-wrap items-center justify-center gap-2 pt-1 text-sm text-slate-100 sm:text-lg">
           Ainda não tem conta?
           <Link
             href={registrationHref}

@@ -43,6 +43,7 @@ function emit(level: LogLevel, message: string, context?: LogContext): void {
     console.warn(serialized);
     return;
   }
+  // eslint-disable-next-line no-console
   console.log(serialized);
 }
 

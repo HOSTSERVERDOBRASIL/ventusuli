@@ -81,29 +81,29 @@ export function AuthShell({
         priority
         className="object-cover"
       />
-      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(2,8,23,0.9)_0%,rgba(2,8,23,0.58)_38%,rgba(2,8,23,0.24)_58%,rgba(2,8,23,0.86)_100%),linear-gradient(180deg,rgba(2,8,23,0.08)_0%,rgba(2,8,23,0.78)_100%)]" />
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(2,8,23,0.92)_0%,rgba(2,8,23,0.68)_42%,rgba(2,8,23,0.94)_100%)] lg:bg-[linear-gradient(90deg,rgba(2,8,23,0.9)_0%,rgba(2,8,23,0.58)_38%,rgba(2,8,23,0.24)_58%,rgba(2,8,23,0.86)_100%),linear-gradient(180deg,rgba(2,8,23,0.08)_0%,rgba(2,8,23,0.78)_100%)]" />
 
-      <div className="relative z-10 flex min-h-svh px-5 py-5 sm:px-6 lg:px-10 lg:py-7 xl:px-14">
-        <div className="grid w-full items-center gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(30rem,0.74fr)]">
-          <section className="hidden min-h-[calc(100svh-3.5rem)] flex-col justify-between gap-7 lg:flex">
-            <div className="grid items-center gap-7 xl:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="relative z-10 flex min-h-svh px-4 py-4 sm:px-6 lg:px-10 lg:py-7 xl:px-14">
+        <div className="grid w-full items-start gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(30rem,0.74fr)] lg:items-center lg:gap-8">
+          <section className="hidden min-h-[calc(100svh-3.5rem)] flex-col justify-center gap-7 lg:flex">
+            <div className="grid items-center gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
               <div className="max-w-[38rem]">
                 <Image
                   src="/auth/ventu-suli-logo.png"
                   alt="Logo Ventu Suli"
-                  width={280}
-                  height={280}
-                  className="h-auto w-44 xl:w-52"
+                  width={620}
+                  height={620}
+                  className="h-auto w-[30rem] max-w-full xl:w-[34rem] 2xl:w-[36rem]"
                 />
 
-                <h1 className="mt-3 max-w-[11ch] text-[2.7rem] font-semibold leading-[0.94] text-white xl:text-[3.55rem]">
+                <h1 className="mt-2 max-w-[12ch] text-[2.45rem] font-semibold leading-[0.96] text-white xl:text-[3.2rem]">
                   Transforme treinos em <span className="text-[#f7b529]">evolução real.</span>
                 </h1>
-                <p className="mt-4 max-w-[30rem] text-base leading-7 text-slate-50/95 xl:text-lg">
+                <p className="mt-3 max-w-[30rem] text-base leading-7 text-slate-50/95 xl:text-lg">
                   Conecte dados, disciplina e propósito para alcançar sua melhor versão.
                 </p>
 
-                <div className="mt-5 grid max-w-[33rem] grid-cols-3 gap-2">
+                <div className="mt-4 grid max-w-[33rem] grid-cols-3 gap-2">
                   {platformStats.map((stat) => (
                     <div
                       key={stat.label}
@@ -117,22 +117,20 @@ export function AuthShell({
                   ))}
                 </div>
 
-                <div className="mt-5 space-y-3">
-                  {valuePoints.map(
-                    ({ icon: Icon, title: pointTitle, description: pointDescription }) => (
-                      <div key={pointTitle} className="flex items-start gap-4">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/16 bg-[#071225]/78 text-[#f7b529] shadow-[0_12px_35px_rgba(0,0,0,0.24)] backdrop-blur-sm">
-                          <Icon className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <p className="text-base font-semibold text-white">{pointTitle}</p>
-                          <p className="mt-1 max-w-[27rem] text-sm leading-5 text-slate-50/90">
-                            {pointDescription}
-                          </p>
-                        </div>
+                <div className="mt-4 space-y-2.5">
+                  {valuePoints.map(({ icon: Icon, title: pointTitle, description: pointDescription }) => (
+                    <div key={pointTitle} className="flex items-start gap-4">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/16 bg-[#071225]/78 text-[#f7b529] shadow-[0_12px_35px_rgba(0,0,0,0.24)] backdrop-blur-sm">
+                        <Icon className="h-5 w-5" />
                       </div>
-                    ),
-                  )}
+                      <div>
+                        <p className="text-base font-semibold text-white">{pointTitle}</p>
+                        <p className="mt-1 max-w-[27rem] text-sm leading-5 text-slate-50/90">
+                          {pointDescription}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
 
                 <div className="mt-6 flex items-start gap-4 text-white/95">
@@ -206,7 +204,7 @@ export function AuthShell({
               </aside>
             </div>
 
-            <div className="grid max-w-[56rem] grid-cols-3 gap-3 xl:gap-4">
+            <div className="hidden max-w-[56rem] grid-cols-3 gap-3 2xl:grid">
               {showcaseCards.map((card) => (
                 <div
                   key={card.title}
@@ -236,44 +234,56 @@ export function AuthShell({
             </div>
           </section>
 
-          <section className="flex min-h-[calc(100svh-2.5rem)] items-center justify-center lg:min-h-[calc(100svh-3.5rem)] lg:justify-end">
+          <section className="flex min-h-[calc(100svh-2rem)] items-start justify-center py-2 sm:items-center lg:min-h-[calc(100svh-3.5rem)] lg:justify-end lg:py-0">
             <div className="relative z-10 w-full max-w-[35rem]">
-              <div className="mb-3 flex items-center justify-between sm:mb-5 lg:hidden">
-                <Link href="/login" className="flex items-center gap-3">
+              <div className="mb-4 flex items-center justify-center lg:hidden">
+                <Link href="/login" className="flex flex-col items-center gap-2 text-center">
                   <Image
                     src="/auth/ventu-suli-logo.png"
                     alt="Logo Ventu Suli"
-                    width={56}
-                    height={56}
-                    className="h-11 w-11 sm:h-14 sm:w-14"
+                    width={168}
+                    height={168}
+                    className="h-28 w-28 sm:h-32 sm:w-32"
                   />
                   <div className="min-w-0">
-                    <p className="text-[0.65rem] font-semibold uppercase tracking-[0.22em] text-[#ffd27a] sm:text-xs sm:tracking-[0.28em]">
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#ffd27a] sm:text-sm sm:tracking-[0.28em]">
                       Ventu Suli
                     </p>
-                    <p className="text-xs text-slate-300 sm:text-sm">
+                    <p className="mt-1 text-xs text-slate-300 sm:text-sm">
                       Evolução, performance e comunidade
                     </p>
                   </div>
                 </Link>
               </div>
 
-              <div className="mb-4 grid grid-cols-3 gap-2 lg:hidden">
+              <div className="mb-3 hidden grid-cols-3 gap-2 sm:grid lg:hidden">
                 {platformStats.map((stat) => (
                   <div
                     key={stat.label}
-                    className="rounded-xl border border-white/14 bg-[#061225]/72 px-2.5 py-3 text-center backdrop-blur-sm"
+                    className="rounded-lg border border-white/14 bg-[#061225]/72 px-2 py-2.5 text-center backdrop-blur-sm"
                   >
-                    <p className="text-lg font-black text-[#f7b529]">{stat.value}</p>
-                    <p className="mt-1 text-[0.62rem] font-semibold uppercase leading-3 text-slate-100/80">
+                    <p className="text-base font-black text-[#f7b529] sm:text-lg">{stat.value}</p>
+                    <p className="mt-1 text-[0.58rem] font-semibold uppercase leading-3 text-slate-100/80 sm:text-[0.62rem]">
                       {stat.label}
                     </p>
                   </div>
                 ))}
               </div>
 
-              <div className="rounded-[1.55rem] border border-white/25 bg-[linear-gradient(180deg,rgba(7,13,27,0.97),rgba(2,9,19,0.94))] p-5 shadow-[0_28px_90px_rgba(0,0,0,0.58)] backdrop-blur-xl sm:rounded-[1.7rem] sm:p-7 lg:px-9 lg:py-8">
-                <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+              <div className="mb-3 hidden gap-2 sm:grid sm:grid-cols-3 lg:hidden">
+                {valuePoints.map(({ icon: Icon, title: pointTitle }) => (
+                  <div
+                    key={pointTitle}
+                    className="flex items-center gap-2 rounded-lg border border-white/12 bg-[#061225]/72 px-3 py-2 text-xs font-semibold text-slate-100 backdrop-blur-sm"
+                  >
+                    <Icon className="h-4 w-4 shrink-0 text-[#f7b529]" />
+                    <span className="min-w-0 leading-4">{pointTitle}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="rounded-[1.1rem] border border-white/25 bg-[linear-gradient(180deg,rgba(7,13,27,0.98),rgba(2,9,19,0.96))] p-4 shadow-[0_28px_90px_rgba(0,0,0,0.58)] backdrop-blur-xl sm:rounded-[1.7rem] sm:p-7 lg:px-9 lg:py-8">
+                <div className="mb-4 hidden flex-wrap items-center justify-between gap-2 sm:flex sm:mb-5 sm:gap-3">
                   <span className="inline-flex items-center gap-2 rounded-full border border-emerald-400/24 bg-emerald-400/10 px-3 py-1.5 text-xs font-semibold text-emerald-100">
                     <CheckCircle2 className="h-4 w-4" />
                     Sistema online
@@ -284,11 +294,13 @@ export function AuthShell({
                   </span>
                 </div>
 
-                <div className="mb-6">
-                  <h2 className="text-[1.9rem] font-semibold leading-tight text-white sm:text-[2.05rem]">
+                <div className="mb-4 sm:mb-6">
+                  <h2 className="text-[1.58rem] font-semibold leading-tight text-white sm:text-[2.05rem]">
                     {title}
                   </h2>
-                  <p className="mt-3 max-w-lg text-base leading-7 text-slate-100">{description}</p>
+                  <p className="mt-1.5 max-w-lg text-sm leading-5 text-slate-100 sm:mt-3 sm:text-base sm:leading-7">
+                    {description}
+                  </p>
                 </div>
                 {children}
               </div>
