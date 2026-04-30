@@ -32,7 +32,7 @@ services:
       db:
         condition: service_healthy
     env_file:
-      - .env.production
+      - .env
     environment:
       NODE_ENV: production
       DATABASE_URL: ${DATABASE_URL:-postgresql://ventusuli:change-this-password@db:5432/ventu_suli?schema=public}
@@ -60,7 +60,7 @@ services:
       - "80:80"
       - "443:443"
     env_file:
-      - .env.production
+      - .env
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

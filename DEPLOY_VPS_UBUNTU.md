@@ -44,8 +44,8 @@ cd ventusuli
 ## 4. Configurar variáveis de produção
 
 ```bash
-cp .env.production.example .env.production
-nano .env.production
+cp .env.production.example .env
+nano .env
 ```
 
 Ajuste obrigatoriamente:
@@ -61,7 +61,7 @@ Ajuste obrigatoriamente:
 ## 5. Subir stack de produção
 
 ```bash
-docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+docker compose --env-file .env -f docker-compose.prod.yml up -d --build
 ```
 
 O container `app` executa automaticamente `./node_modules/.bin/prisma migrate deploy` antes de iniciar o Next.js. Isso aplica no PostgreSQL todas as migrations versionadas em `prisma/migrations`, incluindo convites individuais e numero de associado.
@@ -69,15 +69,15 @@ O container `app` executa automaticamente `./node_modules/.bin/prisma migrate de
 ## 6. Validar banco e app
 
 ```bash
-docker compose --env-file .env.production -f docker-compose.prod.yml ps
-docker compose --env-file .env.production -f docker-compose.prod.yml exec -T app ./node_modules/.bin/prisma migrate status
-docker compose --env-file .env.production -f docker-compose.prod.yml exec -T app ./node_modules/.bin/prisma migrate deploy
+docker compose --env-file .env -f docker-compose.prod.yml ps
+docker compose --env-file .env -f docker-compose.prod.yml exec -T app ./node_modules/.bin/prisma migrate status
+docker compose --env-file .env -f docker-compose.prod.yml exec -T app ./node_modules/.bin/prisma migrate deploy
 ```
 
 Se for ambiente demo/staging:
 
 ```bash
-docker compose --env-file .env.production -f docker-compose.prod.yml exec -T app npm run db:seed
+docker compose --env-file .env -f docker-compose.prod.yml exec -T app npm run db:seed
 ```
 
 ## 7. Verificar HTTPS
@@ -95,22 +95,22 @@ Antes de atualizar um ambiente com dados reais, gere um backup do PostgreSQL.
 ```bash
 cd ~/ventusuli
 git pull origin main
-docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
-docker compose --env-file .env.production -f docker-compose.prod.yml exec -T app ./node_modules/.bin/prisma migrate deploy
+docker compose --env-file .env -f docker-compose.prod.yml up -d --build
+docker compose --env-file .env -f docker-compose.prod.yml exec -T app ./node_modules/.bin/prisma migrate deploy
 ```
 
 ## 9. Logs e troubleshooting
 
 ```bash
-docker compose --env-file .env.production -f docker-compose.prod.yml logs -f app
-docker compose --env-file .env.production -f docker-compose.prod.yml logs -f proxy
-docker compose --env-file .env.production -f docker-compose.prod.yml logs -f db
+docker compose --env-file .env -f docker-compose.prod.yml logs -f app
+docker compose --env-file .env -f docker-compose.prod.yml logs -f proxy
+docker compose --env-file .env -f docker-compose.prod.yml logs -f db
 ```
 
 ## 10. Backup rápido do PostgreSQL
 
 ```bash
-docker compose --env-file .env.production -f docker-compose.prod.yml exec -T db \
+docker compose --env-file .env -f docker-compose.prod.yml exec -T db \
   pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" > backup_$(date +%F_%H-%M-%S).sql
 ```
 

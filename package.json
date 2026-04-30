@@ -28,12 +28,12 @@
     "docker:db:migrate": "docker compose exec -T app ./node_modules/.bin/prisma migrate deploy",
     "docker:db:status": "docker compose exec -T app ./node_modules/.bin/prisma migrate status",
     "docker:db:seed": "docker compose exec app npm run db:seed",
-    "docker:prod:up": "docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build",
-    "docker:prod:down": "docker compose --env-file .env.production -f docker-compose.prod.yml down",
-    "docker:prod:logs": "docker compose --env-file .env.production -f docker-compose.prod.yml logs -f app proxy db",
-    "docker:prod:db:status": "docker compose --env-file .env.production -f docker-compose.prod.yml exec -T app ./node_modules/.bin/prisma migrate status",
-    "docker:prod:db:migrate": "docker compose --env-file .env.production -f docker-compose.prod.yml exec -T app ./node_modules/.bin/prisma migrate deploy",
-    "docker:prod:db:seed": "docker compose --env-file .env.production -f docker-compose.prod.yml exec -T app npm run db:seed"
+    "docker:prod:up": "docker compose --env-file .env -f docker-compose.prod.yml up -d --build",
+    "docker:prod:down": "docker compose --env-file .env -f docker-compose.prod.yml down",
+    "docker:prod:logs": "docker compose --env-file .env -f docker-compose.prod.yml logs -f app proxy db",
+    "docker:prod:db:status": "docker compose --env-file .env -f docker-compose.prod.yml exec -T app ./node_modules/.bin/prisma migrate status",
+    "docker:prod:db:migrate": "docker compose --env-file .env -f docker-compose.prod.yml exec -T app ./node_modules/.bin/prisma migrate deploy",
+    "docker:prod:db:seed": "docker compose --env-file .env -f docker-compose.prod.yml exec -T app npm run db:seed"
   },
   "keywords": [],
   "author": "",
