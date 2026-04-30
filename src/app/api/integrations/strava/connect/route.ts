@@ -5,6 +5,7 @@ import { getAuthContext } from "@/lib/request-auth";
 import {
   buildStravaAuthorizeUrl,
   createStravaOAuthState,
+  getStravaOAuthConfigStatus,
   STRAVA_STATE_COOKIE,
 } from "@/lib/integrations/strava-oauth";
 import {
@@ -28,6 +29,20 @@ export async function GET(req: NextRequest) {
 
   try {
     const status = await getStravaConnectionStatus(auth.userId, auth.organizationId);
+    const config = getStravaOAuthConfigStatus();
+
+    if (!config.configured) {
+      return NextResponse.json({
+        data: {
+          ...status,
+          integrationConfigured: false,
+          unavailableReason: "strava_client_not_configured",
+          missingConfig: config.missing,
+          authorizeUrl: null,
+        },
+      });
+    }
+
     const state = createStravaOAuthState(auth.userId, auth.organizationId);
     const authorizeUrl = buildStravaAuthorizeUrl(state);
 

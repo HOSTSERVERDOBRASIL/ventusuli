@@ -89,21 +89,32 @@ export async function createAuthenticatedSetupChallenge(params: {
   const { rawToken, tokenHash } = createChallengeToken();
   const secret = generateTotpSecret();
 
-  await prisma.authChallenge.create({
-    data: {
-      user_id: params.userId,
-      organization_id: params.organizationId,
-      purpose: "MFA_SETUP",
-      token_hash: tokenHash,
-      primary_method: MfaMethod.TOTP,
-      available_methods: [MfaMethod.TOTP],
-      temp_totp_secret: secret,
-      expires_at: new Date(Date.now() + 10 * 60 * 1000),
-      metadata: {
-        createdByRole: params.role,
-        maskedEmail: maskEmail(params.email),
+  await prisma.$transaction(async (tx) => {
+    await tx.authChallenge.updateMany({
+      where: {
+        user_id: params.userId,
+        purpose: "MFA_SETUP",
+        consumed_at: null,
       },
-    },
+      data: { consumed_at: new Date() },
+    });
+
+    await tx.authChallenge.create({
+      data: {
+        user_id: params.userId,
+        organization_id: params.organizationId,
+        purpose: "MFA_SETUP",
+        token_hash: tokenHash,
+        primary_method: MfaMethod.TOTP,
+        available_methods: [MfaMethod.TOTP],
+        temp_totp_secret: secret,
+        expires_at: new Date(Date.now() + 10 * 60 * 1000),
+        metadata: {
+          createdByRole: params.role,
+          maskedEmail: maskEmail(params.email),
+        },
+      },
+    });
   });
 
   return buildMfaSetupPayload({

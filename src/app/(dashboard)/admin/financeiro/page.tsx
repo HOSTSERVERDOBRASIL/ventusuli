@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { AlertTriangle, Copy, Download, QrCode, RefreshCw } from "lucide-react";
@@ -98,15 +99,38 @@ const WORKSPACE_LABELS: Record<FinanceWorkspace, string> = {
   ledger: "Contas e recebimentos",
 };
 
-const ENTERPRISE_FINANCE_AREAS = [
-  { label: "Receitas", href: "#finance-cashbook" },
-  { label: "Despesas", href: "#finance-cashbook" },
-  { label: "Inscricoes", href: "#finance-charges" },
-  { label: "Fotos", href: "/admin/fotos" },
-  { label: "Patrocinadores", href: "/admin/patrocinadores" },
-  { label: "Repasses", href: "#finance-ledger" },
-  { label: "Relatorios", href: "#finance-overview" },
-];
+const WORKSPACE_DESCRIPTIONS: Record<FinanceWorkspace, string> = {
+  overview: "Indicadores, caixa, DRE e inadimplencia.",
+  charges: "Fila de cobrancas, PIX e conciliacao.",
+  cashbook: "Entradas e saidas baixadas no caixa.",
+  ledger: "Titulos a receber, a pagar e recebimentos.",
+};
+
+const WORKSPACE_HEADERS: Record<FinanceWorkspace, { title: string; subtitle: string }> = {
+  overview: {
+    title: "Financeiro",
+    subtitle: "Painel gerencial com caixa, resultado, inadimplencia e indicadores do periodo.",
+  },
+  charges: {
+    title: "Cobrancas",
+    subtitle: "Fluxo operacional de cobrancas PIX, vencimentos, baixa manual e conciliacao.",
+  },
+  cashbook: {
+    title: "Livro-caixa",
+    subtitle: "Lancamentos de entradas e saidas, saldo do periodo e movimentos baixados.",
+  },
+  ledger: {
+    title: "Contas e recebimentos",
+    subtitle: "Titulos a pagar, contas a receber, recebimentos conciliados e baixas.",
+  },
+};
+
+const WORKSPACE_ROUTES: Record<FinanceWorkspace, string> = {
+  overview: "/admin/financeiro",
+  charges: "/admin/financeiro/cobrancas",
+  cashbook: "/admin/financeiro/caixa",
+  ledger: "/admin/financeiro/contas",
+};
 
 function paymentTone(status: PaymentRow["status"]): "positive" | "warning" | "danger" | "neutral" {
   if (status === "PAID") return "positive";
@@ -173,10 +197,20 @@ function revenueModeLabel(mode: FinanceProfileSettings["revenueMode"]): string {
   return "Receita mista";
 }
 
+function workspaceFromPath(pathname: string): FinanceWorkspace {
+  if (pathname.endsWith("/cobrancas")) return "charges";
+  if (pathname.endsWith("/caixa")) return "cashbook";
+  if (pathname.endsWith("/contas")) return "ledger";
+  return "overview";
+}
+
 export default function AdminFinanceiroPage() {
   const { accessToken } = useAuthToken();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const [organizationSettings, setOrganizationSettings] = useState<OrganizationSettings | null>(null);
+  const routeWorkspace = useMemo(() => workspaceFromPath(pathname), [pathname]);
+  const [activeWorkspace, setActiveWorkspace] = useState<FinanceWorkspace>(routeWorkspace);
 
   const [period, setPeriod] = useState<"MONTH" | "YEAR" | "CUSTOM">("MONTH");
   const [status, setStatus] = useState<"ALL" | "PENDING" | "PAID" | "EXPIRED" | "CANCELLED">("ALL");
@@ -228,6 +262,10 @@ export default function AdminFinanceiroPage() {
   const [savingEntry, setSavingEntry] = useState(false);
   const [runningRecurring, setRunningRecurring] = useState(false);
   const [recurringMonthKey, setRecurringMonthKey] = useState(todayIso.slice(0, 7));
+
+  useEffect(() => {
+    setActiveWorkspace(routeWorkspace);
+  }, [routeWorkspace]);
 
   useEffect(() => {
     let cancelled = false;
@@ -283,6 +321,9 @@ export default function AdminFinanceiroPage() {
 
     setAthlete(athleteParam ?? "");
     setEventName(eventParam ?? "");
+    if (statusParam || dueParam || athleteParam || eventParam) {
+      setActiveWorkspace("charges");
+    }
   }, [searchParams]);
 
   const filteredPaymentsSummary = useMemo<PaymentSummary>(
@@ -593,6 +634,7 @@ export default function AdminFinanceiroPage() {
   const financeCostCenterOptions = financeProfile?.costCenters ?? [];
   const financePaymentMethodOptions = financeProfile?.paymentMethods ?? [];
   const financeQuickNotes = financeProfile?.quickNotes ?? [];
+  const workspaceHeader = WORKSPACE_HEADERS[activeWorkspace];
 
   const applyQuickTemplate = (
     template: Partial<{
@@ -1160,8 +1202,8 @@ export default function AdminFinanceiroPage() {
   return (
     <div className="space-y-6 text-white">
       <PageHeader
-        title="Financeiro e conciliacao"
-        subtitle="Centro operacional de cobrancas PIX com fila de trabalho, conciliacao e historico."
+        title={workspaceHeader.title}
+        subtitle={workspaceHeader.subtitle}
         actions={
           <div className="flex gap-2">
             <ActionButton intent="secondary" onClick={() => void loadPayments()}>
@@ -1205,26 +1247,22 @@ export default function AdminFinanceiroPage() {
             </ActionButton>
           </div>
         ) : null}
-        <div className="flex flex-wrap gap-2">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {(Object.keys(WORKSPACE_LABELS) as FinanceWorkspace[]).map((key) => (
-            <a
+            <Link
               key={key}
-              href={`#finance-${key}`}
-              className="inline-flex h-10 items-center rounded-lg border border-white/10 bg-white/[0.03] px-4 text-sm font-medium text-white/70 transition hover:border-[#1E90FF]/60 hover:bg-[#1E90FF]/10 hover:text-white"
+              href={WORKSPACE_ROUTES[key]}
+              className={`rounded-xl border px-4 py-3 text-left transition ${
+                activeWorkspace === key
+                  ? "border-[#1E90FF]/70 bg-[#1E90FF]/12 text-white"
+                  : "border-white/10 bg-white/[0.03] text-white/70 hover:border-[#1E90FF]/50 hover:bg-white/[0.06] hover:text-white"
+              }`}
             >
-              {WORKSPACE_LABELS[key]}
-            </a>
-          ))}
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {ENTERPRISE_FINANCE_AREAS.map((area) => (
-            <a
-              key={area.label}
-              href={area.href}
-              className="inline-flex h-8 items-center rounded-full border border-white/10 bg-[#0b1d33] px-3 text-xs font-medium text-white/55 transition hover:border-[#F5A623]/50 hover:text-white"
-            >
-              {area.label}
-            </a>
+              <span className="block text-sm font-semibold">{WORKSPACE_LABELS[key]}</span>
+              <span className="mt-1 block text-xs leading-5 text-white/45">
+                {WORKSPACE_DESCRIPTIONS[key]}
+              </span>
+            </Link>
           ))}
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -1235,6 +1273,7 @@ export default function AdminFinanceiroPage() {
         </div>
       </SectionCard>
 
+      {activeWorkspace === "overview" ? (
       <div id="finance-overview" className="space-y-6">
           {financeProfile ? (
             <SectionCard
@@ -1496,7 +1535,9 @@ export default function AdminFinanceiroPage() {
             </div>
           </SectionCard>
       </div>
+      ) : null}
 
+      {activeWorkspace === "cashbook" ? (
       <div id="finance-cashbook">
         <SectionCard
           title="Livro-caixa"
@@ -1827,7 +1868,9 @@ export default function AdminFinanceiroPage() {
         </div>
       </SectionCard>
       </div>
+      ) : null}
 
+      {activeWorkspace === "charges" ? (
       <div id="finance-charges" className="space-y-6">
       <SectionCard title="Filtros operacionais" description="Periodo, status, atleta, prova e vencimento">
         {errorMessage ? (
@@ -1950,7 +1993,9 @@ export default function AdminFinanceiroPage() {
         )}
       </SectionCard>
       </div>
+      ) : null}
 
+      {activeWorkspace === "ledger" ? (
       <div id="finance-ledger" className="space-y-6">
           <SectionCard
             title="Contas a pagar e receber"
@@ -2090,6 +2135,7 @@ export default function AdminFinanceiroPage() {
             )}
           </SectionCard>
       </div>
+      ) : null}
 
       <Modal
         open={Boolean(selectedPaymentId)}

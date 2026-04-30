@@ -6,7 +6,10 @@ export interface StravaConnectionStatus {
   scopes: string[];
   expiresAt: string | null;
   lastSyncAt: string | null;
-  authorizeUrl?: string;
+  integrationConfigured?: boolean;
+  unavailableReason?: string | null;
+  missingConfig?: string[];
+  authorizeUrl?: string | null;
 }
 
 export interface StravaSyncResult {
@@ -75,6 +78,12 @@ export async function getStravaConnectUrl(accessToken?: string | null): Promise<
 
   const payload = (await response.json()) as ApiResponse<StravaConnectionStatus>;
   if (!payload.data.authorizeUrl) {
+    if (payload.data.unavailableReason === "strava_client_not_configured") {
+      throw new Error(
+        "Strava nao configurado no servidor. Configure STRAVA_CLIENT_ID e STRAVA_CLIENT_SECRET.",
+      );
+    }
+
     throw new Error("URL de autorizacao nao retornada pelo backend.");
   }
 

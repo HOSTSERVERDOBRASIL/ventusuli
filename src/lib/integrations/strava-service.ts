@@ -18,6 +18,9 @@ export interface StravaConnectionStatus {
   scopes: string[];
   expiresAt: string | null;
   lastSyncAt: string | null;
+  integrationConfigured?: boolean;
+  unavailableReason?: string | null;
+  missingConfig?: string[];
 }
 
 export interface StravaSyncResult {

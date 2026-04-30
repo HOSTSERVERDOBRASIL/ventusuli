@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Copy, Link2, PlugZap, RefreshCcw, Unplug, UserCircle2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { useAuthToken } from "@/components/auth/AuthTokenProvider";
+import { MfaSecurityPanel } from "@/components/auth/MfaSecurityPanel";
 import { ActionButton } from "@/components/system/action-button";
 import { LoadingState } from "@/components/system/loading-state";
 import { PageHeader } from "@/components/system/page-header";
@@ -134,6 +135,9 @@ export default function ConfiguracoesContaPage() {
   const inviteUrl = lastInvite
     ? `${typeof window !== "undefined" ? window.location.origin : ""}/register/atleta?inviteToken=${lastInvite.token}`
     : "";
+  const stravaUnavailable =
+    stravaStatus?.integrationConfigured === false ||
+    stravaStatus?.unavailableReason === "strava_client_not_configured";
 
   const handleCreateInvite = async () => {
     if (!isAthlete) return;
@@ -192,6 +196,8 @@ export default function ConfiguracoesContaPage() {
           </ActionButton>
         </div>
       </SectionCard>
+
+      <MfaSecurityPanel />
 
       {isAthlete ? (
         <SectionCard
@@ -276,6 +282,11 @@ export default function ConfiguracoesContaPage() {
                       : "Ainda nao sincronizado"}
                   </p>
                 </div>
+              ) : stravaUnavailable ? (
+                <p className="mt-2 text-xs text-amber-200">
+                  Strava ainda nao esta configurado no servidor. Configure STRAVA_CLIENT_ID e
+                  STRAVA_CLIENT_SECRET para liberar a conexao individual de cada atleta.
+                </p>
               ) : null}
             </div>
 
@@ -304,9 +315,16 @@ export default function ConfiguracoesContaPage() {
                   </ActionButton>
                 </>
               ) : (
-                <ActionButton onClick={() => void handleConnectStrava()} disabled={connecting}>
+                <ActionButton
+                  onClick={() => void handleConnectStrava()}
+                  disabled={connecting || stravaUnavailable}
+                >
                   <PlugZap className="mr-1.5 h-3.5 w-3.5" />
-                  {connecting ? "Redirecionando..." : "Conectar com Strava"}
+                  {stravaUnavailable
+                    ? "Strava indisponivel"
+                    : connecting
+                      ? "Redirecionando..."
+                      : "Conectar com Strava"}
                 </ActionButton>
               )}
             </div>

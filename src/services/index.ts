@@ -5,6 +5,7 @@ export * from "./community-service";
 export * from "./dashboard-service";
 export * from "./events-service";
 export * from "./financial-service";
+export * from "./mfa-service";
 export * from "./notice-service";
 export * from "./organization-service";
 export * from "./payment-service";

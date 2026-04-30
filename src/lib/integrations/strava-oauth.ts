@@ -27,6 +27,17 @@ export function stravaRedirectUri(): string {
   return process.env.STRAVA_REDIRECT_URI ?? `${appBaseUrl()}/api/integrations/strava/callback`;
 }
 
+export function getStravaOAuthConfigStatus(): { configured: boolean; missing: string[] } {
+  const missing = ["STRAVA_CLIENT_ID", "STRAVA_CLIENT_SECRET"].filter(
+    (key) => !process.env[key],
+  );
+
+  return {
+    configured: missing.length === 0,
+    missing,
+  };
+}
+
 export function createStravaOAuthState(userId: string, organizationId: string): string {
   const secret = requireJwtSecret();
   const nonce = crypto.randomUUID();
@@ -54,17 +65,13 @@ export function verifyStravaOAuthState(state: string): StravaOAuthStatePayload |
 }
 
 export function buildStravaAuthorizeUrl(state: string): string {
-  const clientId = process.env.STRAVA_CLIENT_ID;
-  if (!clientId) {
-    const query = new URLSearchParams({
-      unavailable: "strava_client_not_configured",
-      state,
-    });
-    return `${appBaseUrl()}/api/integrations/strava/connect?${query.toString()}`;
+  const config = getStravaOAuthConfigStatus();
+  if (!config.configured) {
+    throw new Error(`Strava OAuth not configured: ${config.missing.join(", ")}.`);
   }
 
   const query = new URLSearchParams({
-    client_id: clientId,
+    client_id: process.env.STRAVA_CLIENT_ID as string,
     redirect_uri: stravaRedirectUri(),
     response_type: "code",
     approval_prompt: "auto",

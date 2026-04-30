@@ -7,6 +7,7 @@ import {
   StravaIntegrationError,
   syncStravaActivities,
 } from "@/lib/integrations/strava-service";
+import { getStravaOAuthConfigStatus } from "@/lib/integrations/strava-oauth";
 
 function canUse(role: UserRole): boolean {
   return role === UserRole.ATHLETE;
@@ -20,7 +21,15 @@ export async function GET(req: NextRequest) {
 
   try {
     const status = await getStravaConnectionStatus(auth.userId, auth.organizationId);
-    return NextResponse.json({ data: status });
+    const config = getStravaOAuthConfigStatus();
+    return NextResponse.json({
+      data: {
+        ...status,
+        integrationConfigured: config.configured,
+        unavailableReason: config.configured ? null : "strava_client_not_configured",
+        missingConfig: config.missing,
+      },
+    });
   } catch (error) {
     if (error instanceof StravaIntegrationError) {
       return apiError("INTERNAL_ERROR", error.message, error.statusCode);
@@ -38,6 +47,15 @@ export async function POST(req: NextRequest) {
     return apiError("FORBIDDEN", "Apenas atletas podem sincronizar Strava.", 403);
 
   try {
+    const config = getStravaOAuthConfigStatus();
+    if (!config.configured) {
+      return apiError(
+        "INTERNAL_ERROR",
+        "Strava nao configurado no servidor. Configure STRAVA_CLIENT_ID e STRAVA_CLIENT_SECRET.",
+        503,
+      );
+    }
+
     const result = await syncStravaActivities(auth.userId, auth.organizationId, false);
     return NextResponse.json({ data: result });
   } catch (syncError) {

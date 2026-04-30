@@ -4,6 +4,7 @@ import { ChangeEvent, useEffect, useState } from "react";
 import { Copy, Link2, Plus, Power, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuthToken } from "@/components/auth/AuthTokenProvider";
+import { MfaSecurityPanel } from "@/components/auth/MfaSecurityPanel";
 import { ActionButton } from "@/components/system/action-button";
 import { EmptyState } from "@/components/system/empty-state";
 import { LoadingState } from "@/components/system/loading-state";
@@ -347,6 +348,8 @@ export default function AdminConfiguracoesPage() {
         />
       ) : (
         <>
+          <MfaSecurityPanel />
+
           <SectionCard
             title="Identidade da marca"
             description="Nome, slug, logo e cor principal da assessoria."
