@@ -4,7 +4,11 @@ import { Toaster } from "sonner";
 import { AuthTokenProvider } from "@/components/auth/AuthTokenProvider";
 import "./globals.css";
 
-const sora = Sora({ subsets: ["latin"], weight: ["400", "600", "700", "800"] });
+const sora = Sora({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: {

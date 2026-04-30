@@ -66,9 +66,9 @@ export function ForgotPasswordForm() {
       title="Recupere seu acesso"
       description="Informe seu email para receber o link de redefinicao e retomar sua jornada."
     >
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="space-y-2">
-          <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300" htmlFor="email">
+          <label className="text-sm font-medium text-slate-100" htmlFor="email">
             E-mail
           </label>
           <div className="relative">
@@ -78,7 +78,7 @@ export function ForgotPasswordForm() {
               type="email"
               placeholder="voce@assessoria.com"
               autoComplete="email"
-              className="h-16 rounded-2xl border-white/12 bg-white/6 pl-12 text-white placeholder:text-slate-400 focus-visible:ring-[#f7b529]"
+              className="h-14 rounded-xl border-white/12 bg-white/6 pl-12 text-white placeholder:text-slate-400 focus-visible:ring-[#f7b529]"
               {...register("email")}
             />
           </div>
@@ -88,7 +88,7 @@ export function ForgotPasswordForm() {
         <Button
           type="submit"
           disabled={isSubmitting}
-          className="h-16 w-full rounded-2xl bg-[#f7b529] text-base font-bold text-[#091223] hover:bg-[#ffbf3e]"
+          className="h-14 w-full rounded-xl bg-[#f7b529] text-base font-semibold text-[#091223] hover:bg-[#ffbf3e]"
         >
           {isSubmitting ? (
             <span className="flex items-center gap-2">

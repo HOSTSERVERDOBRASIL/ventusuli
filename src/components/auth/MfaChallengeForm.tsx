@@ -370,7 +370,7 @@ export function MfaChallengeForm() {
         ) : null}
 
         <div className="space-y-2">
-          <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">
+          <label className="text-sm font-medium text-slate-100">
             {method === "RECOVERY_CODE" ? "Recovery code" : "Codigo de verificacao"}
           </label>
           <Input
@@ -424,7 +424,7 @@ export function MfaChallengeForm() {
             type="button"
             disabled={submitting || (!code.trim() && method !== "RECOVERY_CODE")}
             onClick={() => void handleVerify()}
-            className="h-14 rounded-2xl bg-[#f7b529] text-base font-bold text-[#091223] hover:bg-[#ffbf3e]"
+            className="h-14 rounded-xl bg-[#f7b529] text-base font-semibold text-[#091223] hover:bg-[#ffbf3e]"
           >
             {submitting ? (
               <span className="flex items-center gap-2">

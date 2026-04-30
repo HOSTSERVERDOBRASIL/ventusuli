@@ -84,7 +84,7 @@ export function ResetPasswordForm() {
           <div className="rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
             Link de recuperacao invalido.
           </div>
-          <Button asChild className="h-14 w-full rounded-2xl bg-[#f7b529] text-[#091223] hover:bg-[#ffbf3e]">
+          <Button asChild className="h-14 w-full rounded-xl bg-[#f7b529] font-semibold text-[#091223] hover:bg-[#ffbf3e]">
             <Link href="/forgot-password">Solicitar novo link</Link>
           </Button>
         </div>
@@ -97,13 +97,13 @@ export function ResetPasswordForm() {
       title="Defina sua nova senha"
       description="Crie uma nova credencial forte para voltar ao Ventu Suli com seguranca."
     >
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <input type="hidden" {...register("token")} />
 
         <div className="space-y-2">
           <label
             htmlFor="password"
-            className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300"
+            className="text-sm font-medium text-slate-100"
           >
             Nova senha
           </label>
@@ -114,7 +114,7 @@ export function ResetPasswordForm() {
               type={showPassword ? "text" : "password"}
               placeholder="Nova senha"
               autoComplete="new-password"
-              className="h-16 rounded-2xl border-white/12 bg-white/6 pl-12 pr-11 text-white placeholder:text-slate-400 focus-visible:ring-[#f7b529]"
+              className="h-14 rounded-xl border-white/12 bg-white/6 pl-12 pr-11 text-white placeholder:text-slate-400 focus-visible:ring-[#f7b529]"
               {...register("password")}
             />
             <button
@@ -132,7 +132,7 @@ export function ResetPasswordForm() {
         <div className="space-y-2">
           <label
             htmlFor="confirmPassword"
-            className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300"
+            className="text-sm font-medium text-slate-100"
           >
             Confirmar nova senha
           </label>
@@ -143,7 +143,7 @@ export function ResetPasswordForm() {
               type={showConfirmPassword ? "text" : "password"}
               placeholder="Confirme a nova senha"
               autoComplete="new-password"
-              className="h-16 rounded-2xl border-white/12 bg-white/6 pl-12 pr-11 text-white placeholder:text-slate-400 focus-visible:ring-[#f7b529]"
+              className="h-14 rounded-xl border-white/12 bg-white/6 pl-12 pr-11 text-white placeholder:text-slate-400 focus-visible:ring-[#f7b529]"
               {...register("confirmPassword")}
             />
             <button
@@ -163,7 +163,7 @@ export function ResetPasswordForm() {
         <Button
           type="submit"
           disabled={isSubmitting}
-          className="h-16 w-full rounded-2xl bg-[#f7b529] text-base font-bold text-[#091223] hover:bg-[#ffbf3e]"
+          className="h-14 w-full rounded-xl bg-[#f7b529] text-base font-semibold text-[#091223] hover:bg-[#ffbf3e]"
         >
           {isSubmitting ? (
             <span className="flex items-center gap-2">

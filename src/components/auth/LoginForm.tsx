@@ -1,23 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  ArrowRight,
-  CheckCircle2,
-  ClipboardList,
-  Eye,
-  EyeOff,
-  Loader2,
-  LockKeyhole,
-  Mail,
-  ShieldCheck,
-  Sparkles,
-  UserRound,
-  Zap,
-} from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Loader2, LockKeyhole, Mail } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -61,76 +48,6 @@ type LoginErrorResponse = {
 };
 
 type PlatformOrTenantAdminRole = "SUPER_ADMIN" | "ADMIN" | "FINANCE";
-type DemoProfile = "admin" | "coach" | "athlete";
-
-const demoProfiles: Array<{
-  id: DemoProfile;
-  label: string;
-  role: string;
-  email: string;
-  password: string;
-  description: string;
-}> = [
-  {
-    id: "admin",
-    label: "Gestão",
-    role: "Admin",
-    email: "admin@ventu.demo",
-    password: "Demo@1234",
-    description: "Operação, financeiro, pontos e eventos.",
-  },
-  {
-    id: "coach",
-    label: "Coach",
-    role: "Treinador",
-    email: "coach@ventu.demo",
-    password: "Demo@1234",
-    description: "Treinos, atletas, IA e feedbacks.",
-  },
-  {
-    id: "athlete",
-    label: "Atleta",
-    role: "Atleta",
-    email: "atleta@ventu.demo",
-    password: "Atleta@1234",
-    description: "Evolução, inscrições, treinos e comunidade.",
-  },
-];
-
-const accessInsightByProfile = {
-  admin: {
-    title: "Painel de gestão detectado",
-    description:
-      "Depois do login, a plataforma leva você para operação, financeiro e visão da assessoria.",
-    destination: "Admin",
-    guard: "MFA e permissões",
-  },
-  coach: {
-    title: "Área do treinador pronta",
-    description:
-      "O acesso prioriza atletas, planos de treino, recomendações e acompanhamento de carga.",
-    destination: "Coach",
-    guard: "Treinos e feedbacks",
-  },
-  athlete: {
-    title: "Jornada do atleta preparada",
-    description: "Você entra direto em evolução, treinos, provas, recompensas e comunidade.",
-    destination: "Atleta",
-    guard: "Perfil e convite",
-  },
-  finance: {
-    title: "Fluxo financeiro reconhecido",
-    description: "A entrada leva para cobranças, recorrências, lançamentos e conciliação.",
-    destination: "Financeiro",
-    guard: "Acesso restrito",
-  },
-  generic: {
-    title: "Entrada inteligente",
-    description: "O sistema identifica seu papel após autenticar e envia para o painel correto.",
-    destination: "Automático",
-    guard: "Sessão segura",
-  },
-};
 
 function resolvePostLoginPath(
   role: string,
@@ -170,20 +87,6 @@ function resolvePostLoginPath(
   return "/";
 }
 
-function resolveAccessInsight(email: string, selectedProfile: DemoProfile) {
-  const normalized = email.trim().toLowerCase();
-  if (!normalized) return accessInsightByProfile[selectedProfile];
-  if (normalized.includes("coach") || normalized.includes("trein"))
-    return accessInsightByProfile.coach;
-  if (normalized.includes("finance")) return accessInsightByProfile.finance;
-  if (normalized.includes("atleta") || normalized.includes("athlete")) {
-    return accessInsightByProfile.athlete;
-  }
-  if (normalized.includes("admin") || normalized.includes("gestao"))
-    return accessInsightByProfile.admin;
-  return accessInsightByProfile.generic;
-}
-
 function SocialButton({
   label,
   children,
@@ -197,7 +100,7 @@ function SocialButton({
     <button
       type="button"
       onClick={onClick}
-      className="flex h-[4.65rem] items-center justify-center rounded-lg border border-white/12 bg-white/[0.045] px-4 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition hover:border-white/30 hover:bg-white/[0.08]"
+      className="flex h-[4.65rem] items-center justify-center rounded-lg border border-white/14 bg-white/[0.045] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition hover:border-white/30 hover:bg-white/[0.08]"
       aria-label={`Entrar com ${label}`}
       title={label}
     >
@@ -259,7 +162,6 @@ export function LoginForm() {
   const { setAuthSession } = useAuthToken();
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
-  const [selectedProfile, setSelectedProfile] = useState<DemoProfile>("admin");
   const reason = searchParams.get("reason");
 
   useEffect(() => {
@@ -275,8 +177,6 @@ export function LoginForm() {
   const publicAdminRegistrationEnabled =
     process.env.NODE_ENV !== "production" &&
     process.env.NEXT_PUBLIC_PUBLIC_ADMIN_REGISTRATION_ENABLED === "true";
-  const demoUiEnabled =
-    process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_DEMO_MODE === "true";
   const registrationHref = publicAdminRegistrationEnabled
     ? "/register/assessoria"
     : "/register/atleta";
@@ -284,8 +184,6 @@ export function LoginForm() {
   const {
     register,
     handleSubmit,
-    setValue,
-    watch,
     formState: { errors, isSubmitting, isValid },
   } = useForm<z.input<typeof loginSchema>, unknown, LoginInput>({
     resolver: zodResolver(loginSchema),
@@ -297,29 +195,6 @@ export function LoginForm() {
       rememberMe: true,
     },
   });
-
-  const emailValue = watch("email") ?? "";
-  const passwordValue = watch("password") ?? "";
-  const rememberMe = watch("rememberMe") ?? true;
-  const emailLooksValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue.trim());
-  const accessInsight = useMemo(
-    () => resolveAccessInsight(emailValue, selectedProfile),
-    [emailValue, selectedProfile],
-  );
-  const readinessItems = [
-    { label: "E-mail válido", active: emailLooksValid },
-    { label: "Senha 8+", active: passwordValue.length >= 8 },
-    { label: rememberMe ? "Sessão lembrada" : "Sessão única", active: true },
-  ];
-
-  const fillDemoCredentials = (profileId: DemoProfile) => {
-    const profile = demoProfiles.find((item) => item.id === profileId);
-    if (!profile) return;
-
-    setSelectedProfile(profileId);
-    setValue("email", profile.email, { shouldDirty: true, shouldValidate: true });
-    setValue("password", profile.password, { shouldDirty: true, shouldValidate: true });
-  };
 
   const onSubmit = async (data: LoginInput) => {
     setError(null);
@@ -418,73 +293,18 @@ export function LoginForm() {
         </>
       }
     >
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
-        <section className="rounded-xl border border-white/12 bg-white/[0.045] p-3">
-          <div className="flex items-start gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#f7b529] text-[#071225]">
-              <UserRound className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-white">{accessInsight.title}</p>
-              <p className="mt-1 text-sm leading-5 text-slate-300">{accessInsight.description}</p>
-            </div>
-          </div>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <div className="rounded-lg border border-white/10 bg-[#071225]/64 px-3 py-1.5">
-              <p className="text-[0.68rem] font-bold uppercase text-slate-400">Destino</p>
-              <p className="text-sm font-semibold text-white">{accessInsight.destination}</p>
-            </div>
-            <div className="rounded-lg border border-white/10 bg-[#071225]/64 px-3 py-1.5">
-              <p className="text-[0.68rem] font-bold uppercase text-slate-400">Proteção</p>
-              <p className="text-sm font-semibold text-white">{accessInsight.guard}</p>
-            </div>
-          </div>
-        </section>
-
-        {demoUiEnabled ? (
-          <section className="rounded-xl border border-[#f7b529]/22 bg-[#f7b529]/8 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-[#f7b529]" />
-                <p className="text-sm font-semibold text-white">Acesso rápido de demonstração</p>
-              </div>
-              <span className="rounded-full bg-[#f7b529]/14 px-2.5 py-1 text-[0.68rem] font-bold uppercase text-[#ffd27a]">
-                Demo
-              </span>
-            </div>
-            <div className="mt-3 grid gap-2 sm:grid-cols-3">
-              {demoProfiles.map((profile) => (
-                <button
-                  key={profile.id}
-                  type="button"
-                  onClick={() => fillDemoCredentials(profile.id)}
-                  className={`rounded-lg border px-3 py-3 text-left transition ${
-                    selectedProfile === profile.id
-                      ? "border-[#f7b529]/60 bg-[#f7b529]/12"
-                      : "border-white/10 bg-white/[0.035] hover:border-white/24"
-                  }`}
-                >
-                  <span className="flex items-center gap-2 text-sm font-bold text-white">
-                    <ClipboardList className="h-4 w-4 text-[#f7b529]" />
-                    {profile.label}
-                  </span>
-                  <span className="mt-1 block text-[0.72rem] leading-4 text-slate-300">
-                    {profile.description}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-3" noValidate>
         {error ? (
-          <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+          <div
+            className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-100"
+            role="alert"
+          >
             {error}
           </div>
         ) : null}
 
         <div className="space-y-2">
-          <Label htmlFor="email" className="text-xs font-bold uppercase text-slate-100">
+          <Label htmlFor="email" className="text-sm font-medium text-slate-100">
             E-mail
           </Label>
           <div className="relative">
@@ -494,15 +314,21 @@ export function LoginForm() {
               type="email"
               placeholder="seu@email.com"
               autoComplete="email"
+              aria-invalid={Boolean(errors.email)}
+              aria-describedby={errors.email ? "email-error" : undefined}
               className="h-12 rounded-lg border-white/18 bg-white/[0.055] pl-12 text-base text-white placeholder:text-slate-400 focus-visible:ring-[#f7b529] sm:h-[3.25rem]"
               {...register("email")}
             />
           </div>
-          {errors.email ? <p className="text-xs text-amber-300">{errors.email.message}</p> : null}
+          {errors.email ? (
+            <p id="email-error" className="text-xs text-amber-300">
+              {errors.email.message}
+            </p>
+          ) : null}
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="password" className="text-xs font-bold uppercase text-slate-100">
+          <Label htmlFor="password" className="text-sm font-medium text-slate-100">
             Senha
           </Label>
           <div className="relative">
@@ -512,6 +338,8 @@ export function LoginForm() {
               type={showPassword ? "text" : "password"}
               placeholder="••••••••"
               autoComplete="current-password"
+              aria-invalid={Boolean(errors.password)}
+              aria-describedby={errors.password ? "password-error" : undefined}
               className="h-12 rounded-lg border-white/18 bg-white/[0.055] pl-12 pr-12 text-base text-white placeholder:text-slate-300 focus-visible:ring-[#f7b529] sm:h-[3.25rem]"
               {...register("password")}
             />
@@ -525,24 +353,10 @@ export function LoginForm() {
             </button>
           </div>
           {errors.password ? (
-            <p className="text-xs text-amber-300">{errors.password.message}</p>
+            <p id="password-error" className="text-xs text-amber-300">
+              {errors.password.message}
+            </p>
           ) : null}
-        </div>
-
-        <div className="grid gap-2 sm:grid-cols-3">
-          {readinessItems.map((item) => (
-            <div
-              key={item.label}
-              className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-semibold ${
-                item.active
-                  ? "border-emerald-400/24 bg-emerald-400/10 text-emerald-100"
-                  : "border-white/10 bg-white/[0.035] text-slate-400"
-              }`}
-            >
-              {item.active ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Zap className="h-3.5 w-3.5" />}
-              {item.label}
-            </div>
-          ))}
         </div>
 
         <div className="flex flex-col gap-2 text-sm text-slate-100 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
@@ -565,7 +379,7 @@ export function LoginForm() {
         <Button
           type="submit"
           disabled={isSubmitting || !isValid}
-          className="h-[3.25rem] w-full rounded-lg bg-[#f7b529] px-5 text-base font-black text-[#06101f] shadow-[0_16px_42px_rgba(247,181,41,0.34)] hover:bg-[#ffbf3e] disabled:opacity-55 sm:h-14"
+          className="h-[3.25rem] w-full rounded-lg bg-[#f7b529] px-5 text-base font-semibold text-[#06101f] shadow-[0_14px_34px_rgba(247,181,41,0.28)] hover:bg-[#ffbf3e] disabled:opacity-55 sm:h-14"
         >
           {isSubmitting ? (
             <span className="flex items-center justify-center gap-2 text-center">
@@ -574,7 +388,7 @@ export function LoginForm() {
             </span>
           ) : (
             <span className="flex items-center justify-center gap-2 text-center leading-5 sm:gap-3">
-              <span>{isValid ? "ACESSAR MINHA EVOLUÇÃO" : "PREENCHA PARA CONTINUAR"}</span>
+              <span>{isValid ? "Acessar minha evolução" : "Preencha para continuar"}</span>
               <ArrowRight className="h-5 w-5" />
             </span>
           )}
@@ -584,10 +398,10 @@ export function LoginForm() {
           <span className="relative z-10 bg-[#050d1b] px-4 text-sm text-slate-200">
             ou continue com
           </span>
-          <div className="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-white/10" />
+          <div className="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-white/12" />
         </div>
 
-        <div className="hidden gap-3">
+        <div className="hidden grid-cols-3 gap-3">
           <SocialButton label="Google" onClick={() => notifySocialLogin("Google")}>
             <GoogleIcon />
           </SocialButton>
@@ -597,16 +411,6 @@ export function LoginForm() {
           <SocialButton label="Facebook" onClick={() => notifySocialLogin("Facebook")}>
             <FacebookIcon />
           </SocialButton>
-        </div>
-
-        <div className="rounded-xl border border-white/10 bg-white/[0.035] p-2.5">
-          <div className="flex items-start gap-2.5 text-sm leading-5 text-slate-300">
-            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
-            <p>
-              A sessão usa token seguro, respeita permissões por papel e aciona MFA quando a conta
-              exige verificação adicional.
-            </p>
-          </div>
         </div>
 
         <p className="flex flex-wrap items-center justify-center gap-2 text-base text-slate-100">
