@@ -73,7 +73,7 @@ export function AuthShell({
   description: React.ReactNode;
 }) {
   return (
-    <div className="relative min-h-svh overflow-x-hidden bg-[#030817] text-white">
+    <div className="relative min-h-svh overflow-x-hidden bg-[#030817] text-white lg:h-svh lg:overflow-hidden">
       <Image
         src="/auth/floripa-bridge-hero.webp"
         alt="Ponte Hercílio Luz em Florianópolis ao entardecer"
@@ -83,31 +83,31 @@ export function AuthShell({
       />
       <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(2,8,23,0.9)_0%,rgba(2,8,23,0.58)_38%,rgba(2,8,23,0.24)_58%,rgba(2,8,23,0.86)_100%),linear-gradient(180deg,rgba(2,8,23,0.08)_0%,rgba(2,8,23,0.78)_100%)]" />
 
-      <div className="relative z-10 flex min-h-svh px-5 py-5 sm:px-6 lg:px-10 lg:py-7 xl:px-14">
-        <div className="grid w-full items-center gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(30rem,0.74fr)]">
-          <section className="hidden min-h-[calc(100svh-3.5rem)] flex-col justify-between gap-7 lg:flex">
-            <div className="grid items-center gap-7 xl:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="relative z-10 flex min-h-svh px-5 py-5 sm:px-6 lg:h-svh lg:min-h-0 lg:px-8 lg:py-4 xl:px-12">
+        <div className="grid w-full min-h-0 items-center gap-6 lg:grid-cols-[minmax(0,1.08fr)_minmax(28rem,0.72fr)]">
+          <section className="hidden h-full min-h-0 flex-col justify-center overflow-hidden lg:flex">
+            <div className="grid min-h-0 items-center gap-6 xl:grid-cols-[minmax(0,1fr)_19rem]">
               <div className="max-w-[38rem]">
                 <Image
                   src="/auth/ventu-suli-logo.png"
                   alt="Logo Ventu Suli"
                   width={280}
                   height={280}
-                  className="h-auto w-44 xl:w-52"
+                  className="h-auto w-36 xl:w-44"
                 />
 
-                <h1 className="mt-3 max-w-[11ch] text-[2.7rem] font-semibold leading-[0.94] text-white xl:text-[3.55rem]">
+                <h1 className="mt-3 max-w-[11ch] text-[2.45rem] font-semibold leading-[0.94] text-white xl:text-[3.2rem]">
                   Transforme treinos em <span className="text-[#f7b529]">evolução real.</span>
                 </h1>
-                <p className="mt-4 max-w-[30rem] text-base leading-7 text-slate-50/95 xl:text-lg">
+                <p className="mt-3 max-w-[30rem] text-base leading-7 text-slate-50/95">
                   Conecte dados, disciplina e propósito para alcançar sua melhor versão.
                 </p>
 
-                <div className="mt-5 grid max-w-[33rem] grid-cols-3 gap-2">
+                <div className="mt-4 grid max-w-[33rem] grid-cols-3 gap-2">
                   {platformStats.map((stat) => (
                     <div
                       key={stat.label}
-                      className="rounded-xl border border-white/14 bg-[#061225]/70 px-3 py-3 shadow-[0_14px_40px_rgba(0,0,0,0.22)] backdrop-blur-sm"
+                      className="rounded-xl border border-white/14 bg-[#061225]/70 px-3 py-2.5 shadow-[0_14px_40px_rgba(0,0,0,0.22)] backdrop-blur-sm"
                     >
                       <p className="text-xl font-black text-[#f7b529]">{stat.value}</p>
                       <p className="mt-1 text-[0.7rem] font-semibold uppercase leading-4 text-slate-100/80">
@@ -117,7 +117,7 @@ export function AuthShell({
                   ))}
                 </div>
 
-                <div className="mt-5 space-y-3">
+                <div className="mt-4 space-y-3">
                   {valuePoints.map(
                     ({ icon: Icon, title: pointTitle, description: pointDescription }) => (
                       <div key={pointTitle} className="flex items-start gap-4">
@@ -135,9 +135,9 @@ export function AuthShell({
                   )}
                 </div>
 
-                <div className="mt-6 flex items-start gap-4 text-white/95">
+                <div className="mt-5 flex items-start gap-4 text-white/95">
                   <Quote className="mt-1 h-8 w-8 shrink-0 fill-[#f7b529] text-[#f7b529]" />
-                  <p className="max-w-[25rem] text-xl font-medium leading-tight xl:text-2xl">
+                  <p className="max-w-[25rem] text-xl font-medium leading-tight">
                     Disciplina constrói o que motivação{" "}
                     <span className="text-[#f7b529]">não sustenta.</span>
                   </p>
@@ -145,7 +145,7 @@ export function AuthShell({
               </div>
 
               <aside className="hidden space-y-4 xl:block">
-                <div className="rounded-[1.4rem] border border-white/18 bg-[#050d1c]/78 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.36)] backdrop-blur-xl">
+                <div className="rounded-[1.4rem] border border-white/18 bg-[#050d1c]/78 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.36)] backdrop-blur-xl">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs font-bold uppercase text-[#f7b529]">
@@ -153,12 +153,12 @@ export function AuthShell({
                       </p>
                       <p className="mt-1 text-lg font-semibold text-white">Semana 4/8</p>
                     </div>
-                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#f7b529] text-[#071225]">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f7b529] text-[#071225]">
                       <Sparkles className="h-5 w-5" />
                     </div>
                   </div>
 
-                  <div className="mt-5 rounded-xl border border-white/10 bg-white/[0.045] p-4">
+                  <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.045] p-3.5">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-slate-300">Risco de fadiga</span>
                       <span className="font-semibold text-emerald-300">baixo</span>
@@ -171,7 +171,7 @@ export function AuthShell({
                     </p>
                   </div>
 
-                  <div className="mt-4 space-y-3">
+                  <div className="mt-3 space-y-2.5">
                     {todayPlan.map(({ icon: Icon, label, value }) => (
                       <div
                         key={label}
@@ -188,14 +188,14 @@ export function AuthShell({
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-2xl border border-white/14 bg-[#061225]/78 p-4 backdrop-blur-xl">
+                  <div className="rounded-2xl border border-white/14 bg-[#061225]/78 p-3.5 backdrop-blur-xl">
                     <BarChart3 className="h-5 w-5 text-[#f7b529]" />
                     <p className="mt-3 text-2xl font-black text-white">42K</p>
                     <p className="mt-1 text-xs leading-4 text-slate-300">
                       meta principal monitorada
                     </p>
                   </div>
-                  <div className="rounded-2xl border border-white/14 bg-[#061225]/78 p-4 backdrop-blur-xl">
+                  <div className="rounded-2xl border border-white/14 bg-[#061225]/78 p-3.5 backdrop-blur-xl">
                     <ShieldCheck className="h-5 w-5 text-emerald-300" />
                     <p className="mt-3 text-2xl font-black text-white">MFA</p>
                     <p className="mt-1 text-xs leading-4 text-slate-300">
@@ -206,7 +206,7 @@ export function AuthShell({
               </aside>
             </div>
 
-            <div className="grid max-w-[56rem] grid-cols-3 gap-3 xl:gap-4">
+            <div className="hidden">
               {showcaseCards.map((card) => (
                 <div
                   key={card.title}
@@ -236,8 +236,8 @@ export function AuthShell({
             </div>
           </section>
 
-          <section className="flex min-h-[calc(100svh-2.5rem)] items-center justify-center lg:min-h-[calc(100svh-3.5rem)] lg:justify-end">
-            <div className="relative z-10 w-full max-w-[35rem]">
+          <section className="flex min-h-[calc(100svh-2.5rem)] items-center justify-center lg:h-full lg:min-h-0 lg:justify-end">
+            <div className="relative z-10 w-full max-w-[34rem]">
               <div className="mb-3 flex items-center justify-between sm:mb-5 lg:hidden">
                 <Link href="/login" className="flex items-center gap-3">
                   <Image
@@ -272,8 +272,8 @@ export function AuthShell({
                 ))}
               </div>
 
-              <div className="rounded-[1.55rem] border border-white/25 bg-[linear-gradient(180deg,rgba(7,13,27,0.97),rgba(2,9,19,0.94))] p-5 shadow-[0_28px_90px_rgba(0,0,0,0.58)] backdrop-blur-xl sm:rounded-[1.7rem] sm:p-7 lg:px-9 lg:py-8">
-                <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+              <div className="rounded-[1.45rem] border border-white/25 bg-[linear-gradient(180deg,rgba(7,13,27,0.97),rgba(2,9,19,0.94))] p-5 shadow-[0_28px_90px_rgba(0,0,0,0.58)] backdrop-blur-xl sm:rounded-[1.6rem] sm:p-6 lg:px-7 lg:py-5">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                   <span className="inline-flex items-center gap-2 rounded-full border border-emerald-400/24 bg-emerald-400/10 px-3 py-1.5 text-xs font-semibold text-emerald-100">
                     <CheckCircle2 className="h-4 w-4" />
                     Sistema online
@@ -284,11 +284,13 @@ export function AuthShell({
                   </span>
                 </div>
 
-                <div className="mb-6">
-                  <h2 className="text-[1.9rem] font-semibold leading-tight text-white sm:text-[2.05rem]">
+                <div className="mb-4">
+                  <h2 className="text-[1.75rem] font-semibold leading-tight text-white sm:text-[1.95rem]">
                     {title}
                   </h2>
-                  <p className="mt-3 max-w-lg text-base leading-7 text-slate-100">{description}</p>
+                  <p className="mt-2 max-w-lg text-sm leading-6 text-slate-100 sm:text-base">
+                    {description}
+                  </p>
                 </div>
                 {children}
               </div>

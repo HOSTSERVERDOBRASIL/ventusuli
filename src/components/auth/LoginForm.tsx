@@ -418,25 +418,25 @@ export function LoginForm() {
         </>
       }
     >
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-        <section className="rounded-xl border border-white/12 bg-white/[0.045] p-4">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
+        <section className="rounded-xl border border-white/12 bg-white/[0.045] p-3">
           <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#f7b529] text-[#071225]">
-              <UserRound className="h-5 w-5" />
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#f7b529] text-[#071225]">
+              <UserRound className="h-4 w-4" />
             </div>
             <div className="min-w-0">
               <p className="text-sm font-semibold text-white">{accessInsight.title}</p>
               <p className="mt-1 text-sm leading-5 text-slate-300">{accessInsight.description}</p>
             </div>
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <div className="rounded-lg border border-white/10 bg-[#071225]/64 px-3 py-2">
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="rounded-lg border border-white/10 bg-[#071225]/64 px-3 py-1.5">
               <p className="text-[0.68rem] font-bold uppercase text-slate-400">Destino</p>
-              <p className="mt-1 text-sm font-semibold text-white">{accessInsight.destination}</p>
+              <p className="text-sm font-semibold text-white">{accessInsight.destination}</p>
             </div>
-            <div className="rounded-lg border border-white/10 bg-[#071225]/64 px-3 py-2">
+            <div className="rounded-lg border border-white/10 bg-[#071225]/64 px-3 py-1.5">
               <p className="text-[0.68rem] font-bold uppercase text-slate-400">Proteção</p>
-              <p className="mt-1 text-sm font-semibold text-white">{accessInsight.guard}</p>
+              <p className="text-sm font-semibold text-white">{accessInsight.guard}</p>
             </div>
           </div>
         </section>
@@ -494,7 +494,7 @@ export function LoginForm() {
               type="email"
               placeholder="seu@email.com"
               autoComplete="email"
-              className="h-16 rounded-lg border-white/18 bg-white/[0.055] pl-12 text-base text-white placeholder:text-slate-400 focus-visible:ring-[#f7b529]"
+              className="h-12 rounded-lg border-white/18 bg-white/[0.055] pl-12 text-base text-white placeholder:text-slate-400 focus-visible:ring-[#f7b529] sm:h-[3.25rem]"
               {...register("email")}
             />
           </div>
@@ -512,7 +512,7 @@ export function LoginForm() {
               type={showPassword ? "text" : "password"}
               placeholder="••••••••"
               autoComplete="current-password"
-              className="h-16 rounded-lg border-white/18 bg-white/[0.055] pl-12 pr-12 text-base text-white placeholder:text-slate-300 focus-visible:ring-[#f7b529]"
+              className="h-12 rounded-lg border-white/18 bg-white/[0.055] pl-12 pr-12 text-base text-white placeholder:text-slate-300 focus-visible:ring-[#f7b529] sm:h-[3.25rem]"
               {...register("password")}
             />
             <button
@@ -533,13 +533,13 @@ export function LoginForm() {
           {readinessItems.map((item) => (
             <div
               key={item.label}
-              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold ${
+              className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-semibold ${
                 item.active
                   ? "border-emerald-400/24 bg-emerald-400/10 text-emerald-100"
                   : "border-white/10 bg-white/[0.035] text-slate-400"
               }`}
             >
-              {item.active ? <CheckCircle2 className="h-4 w-4" /> : <Zap className="h-4 w-4" />}
+              {item.active ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Zap className="h-3.5 w-3.5" />}
               {item.label}
             </div>
           ))}
@@ -565,7 +565,7 @@ export function LoginForm() {
         <Button
           type="submit"
           disabled={isSubmitting || !isValid}
-          className="h-16 w-full rounded-lg bg-[#f7b529] px-5 text-base font-black text-[#06101f] shadow-[0_16px_42px_rgba(247,181,41,0.34)] hover:bg-[#ffbf3e] disabled:opacity-55"
+          className="h-[3.25rem] w-full rounded-lg bg-[#f7b529] px-5 text-base font-black text-[#06101f] shadow-[0_16px_42px_rgba(247,181,41,0.34)] hover:bg-[#ffbf3e] disabled:opacity-55 sm:h-14"
         >
           {isSubmitting ? (
             <span className="flex items-center justify-center gap-2 text-center">
@@ -580,14 +580,14 @@ export function LoginForm() {
           )}
         </Button>
 
-        <div className="relative hidden py-2 text-center sm:block">
+        <div className="relative hidden py-1 text-center">
           <span className="relative z-10 bg-[#050d1b] px-4 text-sm text-slate-200">
             ou continue com
           </span>
           <div className="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-white/10" />
         </div>
 
-        <div className="hidden gap-3 sm:grid sm:grid-cols-3">
+        <div className="hidden gap-3">
           <SocialButton label="Google" onClick={() => notifySocialLogin("Google")}>
             <GoogleIcon />
           </SocialButton>
@@ -599,8 +599,8 @@ export function LoginForm() {
           </SocialButton>
         </div>
 
-        <div className="rounded-xl border border-white/10 bg-white/[0.035] p-3">
-          <div className="flex items-start gap-3 text-sm text-slate-300">
+        <div className="rounded-xl border border-white/10 bg-white/[0.035] p-2.5">
+          <div className="flex items-start gap-2.5 text-sm leading-5 text-slate-300">
             <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
             <p>
               A sessão usa token seguro, respeita permissões por papel e aciona MFA quando a conta
@@ -609,7 +609,7 @@ export function LoginForm() {
           </div>
         </div>
 
-        <p className="flex flex-wrap items-center justify-center gap-2 pt-1 text-base text-slate-100 sm:text-lg">
+        <p className="flex flex-wrap items-center justify-center gap-2 text-base text-slate-100">
           Ainda não tem conta?
           <Link
             href={registrationHref}
