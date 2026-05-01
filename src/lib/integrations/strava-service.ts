@@ -6,6 +6,7 @@ import {
   StravaActivity,
   StravaTokenResponse,
 } from "@/lib/integrations/strava-client";
+import { getStravaOAuthConfigurationIssue } from "@/lib/integrations/strava-oauth";
 import { logIntegration, logWarn } from "@/lib/logger";
 
 const STRAVA_SOURCE = "STRAVA";
@@ -14,6 +15,9 @@ const MAX_PAGES_PER_SYNC = 20;
 
 export interface StravaConnectionStatus {
   connected: boolean;
+  state: "disconnected" | "connecting" | "connected" | "expired";
+  unavailable?: "strava_client_not_configured";
+  message?: string;
   stravaAthleteId: string | null;
   scopes: string[];
   expiresAt: string | null;
@@ -42,6 +46,18 @@ function toPaceSecondsPerKm(distanceM: number | undefined, movingTimeS: number |
   const km = distanceM / 1000;
   const pace = movingTimeS / km;
   return new Prisma.Decimal(Number(pace.toFixed(2)));
+}
+
+function normalizeScopes(scope: string | undefined, fallback: string[] = []): string[] {
+  if (!scope) return fallback;
+  return scope
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function stravaConfigurationMessage(): string {
+  return "Configure STRAVA_CLIENT_ID e STRAVA_CLIENT_SECRET para habilitar o OAuth do Strava.";
 }
 
 function toActivityCreateInput(
@@ -103,6 +119,7 @@ export async function getStravaConnectionStatus(
   organizationId: string,
 ): Promise<StravaConnectionStatus> {
   await assertAthleteContext(userId, organizationId);
+  const configurationIssue = getStravaOAuthConfigurationIssue();
 
   const connection = await prisma.stravaConnection.findFirst({
     where: {
@@ -120,6 +137,13 @@ export async function getStravaConnectionStatus(
   if (!connection) {
     return {
       connected: false,
+      state: "disconnected",
+      ...(configurationIssue
+        ? {
+            unavailable: configurationIssue,
+            message: stravaConfigurationMessage(),
+          }
+        : {}),
       stravaAthleteId: null,
       scopes: [],
       expiresAt: null,
@@ -127,8 +151,17 @@ export async function getStravaConnectionStatus(
     };
   }
 
+  const expired = connection.expires_at.getTime() <= Date.now();
+
   return {
     connected: true,
+    state: expired ? "expired" : "connected",
+    ...(configurationIssue
+      ? {
+          unavailable: configurationIssue,
+          message: stravaConfigurationMessage(),
+        }
+      : {}),
     stravaAthleteId: connection.strava_athlete_id,
     scopes: connection.scopes,
     expiresAt: connection.expires_at.toISOString(),
@@ -144,10 +177,7 @@ export async function upsertStravaConnectionFromToken(
   await assertAthleteContext(userId, organizationId);
 
   const expiresAt = new Date(token.expires_at * 1000);
-  const scopes = token.scope
-    .split(",")
-    .map((scope) => scope.trim())
-    .filter(Boolean);
+  const scopes = normalizeScopes(token.scope);
 
   await prisma.stravaConnection.upsert({
     where: {
@@ -209,10 +239,7 @@ async function ensureValidAccessToken(
       access_token: refreshed.access_token,
       refresh_token: refreshed.refresh_token,
       expires_at: new Date(refreshed.expires_at * 1000),
-      scopes: refreshed.scope
-        .split(",")
-        .map((scope) => scope.trim())
-        .filter(Boolean),
+      scopes: normalizeScopes(refreshed.scope, connection.scopes),
     },
     select: {
       access_token: true,

@@ -20,6 +20,16 @@ interface TopbarProps {
   onMobileMenuOpen: () => void;
 }
 
+function initialsFromName(name?: string | null): string {
+  if (!name?.trim()) return "U";
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
 export function Topbar({ user, onMobileMenuOpen }: TopbarProps) {
   const { clearAccessToken, userRoles, organization, currentUser } = useAuthToken();
   const router = useRouter();
@@ -43,8 +53,9 @@ export function Topbar({ user, onMobileMenuOpen }: TopbarProps) {
   const onlyPlatform = userRoles.includes(UserRole.SUPER_ADMIN) && !userRoles.includes(UserRole.ATHLETE);
   const profileHref = onlyPlatform ? "/super-admin" : "/perfil";
   const profileLabel = onlyPlatform ? "Plataforma" : "Meu perfil";
-  const displayName = currentUser?.name ?? user?.name ?? "Usuario";
-  const displayInitial = displayName[0]?.toUpperCase() ?? "U";
+  const displayName = currentUser?.name ?? user?.name ?? "Usuário";
+  const displayInitials = initialsFromName(displayName);
+  const avatarUrl = currentUser?.avatar_url ?? user?.image ?? null;
 
   const handleLogout = async () => {
     clearAccessToken();
@@ -107,7 +118,7 @@ export function Topbar({ user, onMobileMenuOpen }: TopbarProps) {
                   autoFocus
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Buscar pÃ¡gina..."
+                  placeholder="Buscar página..."
                   className="w-full rounded-lg border border-white/[0.12] bg-white/[0.05] px-3 py-2 text-[13px] text-white outline-none placeholder:text-white/30 focus:border-[#1E90FF] focus:ring-1 focus:ring-[#1E90FF]/20"
                 />
               </div>
@@ -127,7 +138,7 @@ export function Topbar({ user, onMobileMenuOpen }: TopbarProps) {
                     </Link>
                   ))
                 ) : (
-                  <p className="px-4 py-2 text-[13px] text-white/30">Nenhuma pÃ¡gina encontrada.</p>
+                  <p className="px-4 py-2 text-[13px] text-white/30">Nenhuma página encontrada.</p>
                 )}
               </div>
             </div>
@@ -137,8 +148,8 @@ export function Topbar({ user, onMobileMenuOpen }: TopbarProps) {
         {/* Notifications */}
         <button
           type="button"
-          aria-label="NotificaÃ§Ãµes"
-          onClick={() => toast.info("Sem novas notificaÃ§Ãµes no momento.")}
+          aria-label="Notificações"
+          onClick={() => toast.info("Sem novas notificações no momento.")}
           className="relative flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.07] text-white/55 transition hover:bg-white/[0.05]"
         >
           <Bell className="h-4 w-4" />
@@ -152,14 +163,14 @@ export function Topbar({ user, onMobileMenuOpen }: TopbarProps) {
           className="flex h-9 items-center gap-2 rounded-lg border border-white/[0.07] bg-white/[0.03] px-2.5 text-[13px] text-white/70 transition hover:bg-white/[0.07] hover:text-white"
         >
           <div className="flex h-5 w-5 items-center justify-center overflow-hidden rounded-full bg-[#1E90FF]/20 text-[10px] font-bold text-white">
-            {currentUser?.avatar_url ? (
+            {avatarUrl ? (
               <img
-                src={currentUser.avatar_url}
-                alt="Avatar do usuÃ¡rio"
+                src={avatarUrl}
+                alt="Avatar do usuário"
                 className="h-full w-full object-cover"
               />
             ) : (
-              <>{displayInitial}</>
+              <>{displayInitials}</>
             )}
           </div>
           <span className="hidden min-w-0 sm:block">

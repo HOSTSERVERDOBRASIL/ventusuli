@@ -81,6 +81,7 @@ export async function POST(req: NextRequest) {
       id: true,
       name: true,
       email: true,
+      avatar_url: true,
       role: true,
       organization_id: true,
       athlete_profile: {
@@ -183,6 +184,7 @@ export async function POST(req: NextRequest) {
         id: userRecord.id,
         name: userRecord.name,
         email: userRecord.email,
+        avatar_url: userRecord.avatar_url,
         role,
         roles,
       },

@@ -2,6 +2,9 @@
 
 export interface StravaConnectionStatus {
   connected: boolean;
+  state: "disconnected" | "connecting" | "connected" | "expired";
+  unavailable?: "strava_client_not_configured";
+  message?: string;
   stravaAthleteId: string | null;
   scopes: string[];
   expiresAt: string | null;
@@ -75,7 +78,7 @@ export async function getStravaConnectUrl(accessToken?: string | null): Promise<
 
   const payload = (await response.json()) as ApiResponse<StravaConnectionStatus>;
   if (!payload.data.authorizeUrl) {
-    throw new Error("URL de autorizacao nao retornada pelo backend.");
+    throw new Error(payload.data.message ?? "URL de autorizacao nao retornada pelo backend.");
   }
 
   return payload.data.authorizeUrl;

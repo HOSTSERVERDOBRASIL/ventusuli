@@ -78,7 +78,7 @@ export default function NovoAtletaPage() {
     <div className="space-y-6 text-white">
       <PageHeader
         title="Novo atleta"
-        subtitle="Cadastre atletas vinculados a sua assessoria em modo rapido ou completo."
+        subtitle="Cadastre atletas vinculados à sua assessoria em modo rápido ou completo."
         actions={
           <ActionButton asChild intent="secondary">
             <Link href="/admin/atletas">
@@ -91,7 +91,7 @@ export default function NovoAtletaPage() {
 
       <SectionCard
         title="Modo de cadastro"
-        description="Escolha entre pre-cadastro rapido e cadastro completo"
+        description="Escolha entre pré-cadastro rápido e cadastro completo"
       >
         <div className="grid gap-3 md:grid-cols-2">
           <button
@@ -103,7 +103,7 @@ export default function NovoAtletaPage() {
             }
             onClick={() => setMode("QUICK")}
           >
-            <p className="text-sm font-semibold text-white">Pre-cadastro rapido</p>
+            <p className="text-sm font-semibold text-white">Pré-cadastro rápido</p>
             <p className="mt-1 text-xs text-slate-300">
               Apenas nome e email para inserir atleta rapidamente.
             </p>
@@ -120,13 +120,13 @@ export default function NovoAtletaPage() {
           >
             <p className="text-sm font-semibold text-white">Cadastro completo</p>
             <p className="mt-1 text-xs text-slate-300">
-              Inclui dados de perfil para operacao esportiva e financeira.
+              Inclui dados de perfil para operação esportiva e financeira.
             </p>
           </button>
         </div>
       </SectionCard>
 
-      <SectionCard title="Dados do atleta" description="Informacoes obrigatorias e complementares">
+      <SectionCard title="Dados do atleta" description="Informações obrigatórias e complementares">
         <form
           className="space-y-4"
           onSubmit={async (event) => {
@@ -262,10 +262,10 @@ export default function NovoAtletaPage() {
                   onChange={(event) => setForm((prev) => ({ ...prev, gender: event.target.value }))}
                   className="border-white/15 bg-[#0F2743] text-white"
                 >
-                  <option value="">Nao informado</option>
+                  <option value="">Não informado</option>
                   <option value="F">Feminino</option>
                   <option value="M">Masculino</option>
-                  <option value="NB">Nao-binario</option>
+                  <option value="NB">Não-binário</option>
                 </Select>
               </div>
 
@@ -284,7 +284,7 @@ export default function NovoAtletaPage() {
             </div>
           ) : (
             <p className="text-xs text-slate-300">
-              No pre-cadastro rapido, o perfil sera criado com dados minimos e pode ser
+              No pré-cadastro rápido, o perfil será criado com dados mínimos e pode ser
               complementado depois.
             </p>
           )}

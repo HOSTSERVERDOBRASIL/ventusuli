@@ -5,6 +5,7 @@ import { getAuthContext } from "@/lib/request-auth";
 import {
   buildStravaAuthorizeUrl,
   createStravaOAuthState,
+  isStravaOAuthConfigured,
   STRAVA_STATE_COOKIE,
 } from "@/lib/integrations/strava-oauth";
 import {
@@ -28,6 +29,10 @@ export async function GET(req: NextRequest) {
 
   try {
     const status = await getStravaConnectionStatus(auth.userId, auth.organizationId);
+    if (!isStravaOAuthConfigured()) {
+      return NextResponse.json({ data: status });
+    }
+
     const state = createStravaOAuthState(auth.userId, auth.organizationId);
     const authorizeUrl = buildStravaAuthorizeUrl(state);
 

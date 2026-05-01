@@ -2,6 +2,8 @@
 import jwt from "jsonwebtoken";
 
 export const STRAVA_STATE_COOKIE = "vs_strava_oauth_state";
+export const STRAVA_REQUIRED_SCOPES = ["read", "activity:read"] as const;
+export const STRAVA_CLIENT_NOT_CONFIGURED = "strava_client_not_configured";
 
 interface StravaOAuthStatePayload {
   sub: string;
@@ -25,6 +27,14 @@ function appBaseUrl(): string {
 
 export function stravaRedirectUri(): string {
   return process.env.STRAVA_REDIRECT_URI ?? `${appBaseUrl()}/api/integrations/strava/callback`;
+}
+
+export function isStravaOAuthConfigured(): boolean {
+  return Boolean(process.env.STRAVA_CLIENT_ID && process.env.STRAVA_CLIENT_SECRET);
+}
+
+export function getStravaOAuthConfigurationIssue(): typeof STRAVA_CLIENT_NOT_CONFIGURED | null {
+  return isStravaOAuthConfigured() ? null : STRAVA_CLIENT_NOT_CONFIGURED;
 }
 
 export function createStravaOAuthState(userId: string, organizationId: string): string {
@@ -55,12 +65,8 @@ export function verifyStravaOAuthState(state: string): StravaOAuthStatePayload |
 
 export function buildStravaAuthorizeUrl(state: string): string {
   const clientId = process.env.STRAVA_CLIENT_ID;
-  if (!clientId) {
-    const query = new URLSearchParams({
-      unavailable: "strava_client_not_configured",
-      state,
-    });
-    return `${appBaseUrl()}/api/integrations/strava/connect?${query.toString()}`;
+  if (!clientId || !process.env.STRAVA_CLIENT_SECRET) {
+    throw new Error("Strava OAuth client is not configured.");
   }
 
   const query = new URLSearchParams({
@@ -68,7 +74,7 @@ export function buildStravaAuthorizeUrl(state: string): string {
     redirect_uri: stravaRedirectUri(),
     response_type: "code",
     approval_prompt: "auto",
-    scope: "read,activity:read_all",
+    scope: STRAVA_REQUIRED_SCOPES.join(","),
     state,
   });
 

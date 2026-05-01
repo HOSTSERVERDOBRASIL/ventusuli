@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Copy, Link2, PlugZap, RefreshCcw, Unplug, UserCircle2, UserPlus } from "lucide-react";
+import { AlertTriangle, Copy, Link2, PlugZap, RefreshCcw, Unplug, UserCircle2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { useAuthToken } from "@/components/auth/AuthTokenProvider";
 import { ActionButton } from "@/components/system/action-button";
 import { LoadingState } from "@/components/system/loading-state";
 import { PageHeader } from "@/components/system/page-header";
 import { SectionCard } from "@/components/system/section-card";
+import { StatusBadge } from "@/components/system/status-badge";
 import { createInvite, OrgInvite } from "@/services/organization-service";
 import {
   disconnectStrava,
@@ -18,6 +19,13 @@ import {
   syncStrava,
 } from "@/services/strava-service";
 import { UserRole } from "@/types";
+
+function stravaStatusLabel(status: StravaConnectionStatus | null): string {
+  if (status?.unavailable) return "Configuracao pendente";
+  if (status?.state === "expired") return "Token expirado";
+  if (status?.connected) return "Conectado";
+  return "Nao conectado";
+}
 
 export default function ConfiguracoesContaPage() {
   const { accessToken, userRole } = useAuthToken();
@@ -31,6 +39,7 @@ export default function ConfiguracoesContaPage() {
   const [lastInvite, setLastInvite] = useState<OrgInvite | null>(null);
 
   const isAthlete = userRole === UserRole.ATHLETE;
+  const stravaUnavailable = Boolean(stravaStatus?.unavailable);
 
   const loadStatus = async () => {
     if (!isAthlete) {
@@ -255,10 +264,24 @@ export default function ConfiguracoesContaPage() {
               </div>
             ) : null}
             <div className="rounded-xl border border-[#24486f] bg-[#0f233d] p-4">
-              <p className="text-xs uppercase tracking-wide text-[#8eb0dc]">Status da conexao</p>
-              <p className="mt-1 text-lg font-semibold text-white">
-                {stravaStatus?.connected ? "Conectado" : "Nao conectado"}
-              </p>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-[#8eb0dc]">Status da conexao</p>
+                  <p className="mt-1 text-lg font-semibold text-white">
+                    {stravaStatusLabel(stravaStatus)}
+                  </p>
+                </div>
+                <StatusBadge
+                  tone={stravaStatus?.connected ? "positive" : stravaUnavailable ? "warning" : "neutral"}
+                  label={stravaStatus?.state ?? "disconnected"}
+                />
+              </div>
+              {stravaStatus?.message ? (
+                <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-200" />
+                  <span>{stravaStatus.message}</span>
+                </div>
+              ) : null}
               {stravaStatus?.connected ? (
                 <div className="mt-2 space-y-1 text-xs text-[#8eb0dc]">
                   <p>
@@ -268,6 +291,12 @@ export default function ConfiguracoesContaPage() {
                   <p>
                     Scopes:{" "}
                     {stravaStatus.scopes.length ? stravaStatus.scopes.join(", ") : "Nao informado"}
+                  </p>
+                  <p>
+                    Expira em:{" "}
+                    {stravaStatus.expiresAt
+                      ? new Date(stravaStatus.expiresAt).toLocaleString("pt-BR")
+                      : "Nao informado"}
                   </p>
                   <p>
                     Ultimo sync:{" "}
@@ -304,9 +333,16 @@ export default function ConfiguracoesContaPage() {
                   </ActionButton>
                 </>
               ) : (
-                <ActionButton onClick={() => void handleConnectStrava()} disabled={connecting}>
+                <ActionButton
+                  onClick={() => void handleConnectStrava()}
+                  disabled={connecting || stravaUnavailable}
+                >
                   <PlugZap className="mr-1.5 h-3.5 w-3.5" />
-                  {connecting ? "Redirecionando..." : "Conectar com Strava"}
+                  {stravaUnavailable
+                    ? "Conexao indisponivel"
+                    : connecting
+                      ? "Redirecionando..."
+                      : "Conectar com Strava"}
                 </ActionButton>
               )}
             </div>

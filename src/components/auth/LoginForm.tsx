@@ -33,6 +33,7 @@ interface LoginSuccessResponse {
     id: string;
     name: string;
     email: string;
+    avatar_url?: string | null;
     role: string;
     roles?: string[];
   };
@@ -207,6 +208,13 @@ export function LoginForm() {
         token: payload.accessToken,
         role: (payload.user.role as UserRole) ?? null,
         roles: payload.user.roles?.map((role) => role as UserRole),
+        user: {
+          id: payload.user.id,
+          name: payload.user.name,
+          email: payload.user.email,
+          avatar_url: payload.user.avatar_url ?? null,
+        },
+        profile: payload.profile ?? null,
       });
 
       toast.success("Login realizado com sucesso.");

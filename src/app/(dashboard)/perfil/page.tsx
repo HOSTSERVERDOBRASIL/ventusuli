@@ -88,6 +88,16 @@ function labelClass() {
   return "block text-xs uppercase tracking-wide text-[#8eb0dc] mb-1";
 }
 
+function initialsFromName(name?: string | null): string {
+  if (!name?.trim()) return "A";
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
 export default function PerfilPage() {
   const { accessToken, userRole, organization, currentUser, refreshSession } = useAuthToken();
   const [identity, setIdentity] = useState<AthleteIdentity | null>(null);
@@ -377,7 +387,7 @@ export default function PerfilPage() {
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-xl font-bold text-[#8eb0dc]">
-                    {identity.name[0]?.toUpperCase() ?? "A"}
+                    {initialsFromName(identity.name)}
                   </div>
                 )}
               </div>

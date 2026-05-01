@@ -33,12 +33,19 @@ interface AuthTokenContextValue {
   userRoles: UserRole[];
   currentUser: SessionUser | null;
   organization: SessionUser["organization"] | null;
-  /** null = nÃ£o determinado ainda; true/false = resultado da sessÃ£o */
+  /** null = não determinado ainda; true/false = resultado da sessão */
   hasCpf: boolean | null;
   hydrated: boolean;
   setAccessToken: (token: string | null) => void;
   setUserRole: (role: UserRole | null) => void;
-  setAuthSession: (session: { token: string | null; role: UserRole | null; roles?: UserRole[] }) => void;
+  setAuthSession: (session: {
+    token: string | null;
+    role: UserRole | null;
+    roles?: UserRole[];
+    user?: Partial<SessionUser> | null;
+    profile?: SessionUser["profile"];
+    organization?: SessionUser["organization"] | null;
+  }) => void;
   clearAccessToken: () => void;
   refreshSession: () => Promise<boolean>;
 }
@@ -152,7 +159,7 @@ export function AuthTokenProvider({ children }: { children: React.ReactNode }) {
             setHasCpf(user.profile?.hasCpf ?? true);
           }
 
-          // Guard: ATHLETE sem CPF â†’ redirecionar para onboarding se necessÃ¡rio.
+          // Guard: ATHLETE sem CPF -> redirecionar para onboarding se necessário.
           if (
             !cancelled &&
             user.role === UserRole.ATHLETE &&
@@ -176,7 +183,7 @@ export function AuthTokenProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        // Primeira tentativa falhou â€” tentar renovar refresh token.
+        // Primeira tentativa falhou, tentar renovar refresh token.
         const refreshed = await refreshAccessToken();
         if (!refreshed) {
           if (!cancelled) {
@@ -258,10 +265,26 @@ export function AuthTokenProvider({ children }: { children: React.ReactNode }) {
       hydrated,
       setAccessToken: (token) => setAccessTokenState(token),
       setUserRole: (role) => setUserRoleState(role),
-      setAuthSession: ({ token, role, roles }) => {
+      setAuthSession: ({ token, role, roles, user, profile, organization: nextOrganization }) => {
         setAccessTokenState(token);
         setUserRoleState(role);
-        setUserRolesState(roles?.length ? roles : role ? [role] : []);
+        const nextRoles = roles?.length ? roles : role ? [role] : [];
+        setUserRolesState(nextRoles);
+        if (user && role) {
+          setCurrentUser({
+            id: user.id ?? "",
+            role,
+            roles: nextRoles,
+            organization_id: user.organization_id ?? "",
+            name: user.name ?? null,
+            email: user.email ?? null,
+            avatar_url: user.avatar_url ?? null,
+            profile: profile ?? user.profile ?? null,
+            organization: nextOrganization ?? user.organization ?? null,
+          });
+          setOrganization(nextOrganization ?? user.organization ?? null);
+          setHasCpf((profile ?? user.profile)?.hasCpf ?? true);
+        }
       },
       clearAccessToken: () => {
         setAccessTokenState(null);

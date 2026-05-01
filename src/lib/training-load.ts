@@ -72,16 +72,11 @@ export const TRAINING_LOAD_METHODOLOGY: TrainingLoadMethodology = {
   painAlertThreshold: 6,
   overloadIncreaseThresholdPercent: 30,
   borgScale: [
-    { value: 0, label: "nenhuma" },
-    { value: 0.5, label: "muito, muito leve" },
     { value: 1, label: "muito leve" },
     { value: 2, label: "leve" },
     { value: 3, label: "moderada" },
-    { value: 4, label: "pouco intensa" },
-    { value: 5, label: "intensa" },
-    { value: 7, label: "muito intensa" },
-    { value: 9, label: "muito, muito intensa" },
-    { value: 10, label: "maxima" },
+    { value: 4, label: "intensa" },
+    { value: 5, label: "maxima" },
   ],
   paceZones: [
     { zone: "Z1", label: "Regenerativo", paceRange: "8:45 - 7:50 min/km" },
@@ -208,7 +203,7 @@ function classifyWeek(
   if ((week.averagePain ?? 0) >= TRAINING_LOAD_METHODOLOGY.painAlertThreshold) {
     alertLevel = "HIGH";
     alertReason = "Dor media elevada na semana.";
-  } else if ((week.averageEffort ?? 0) >= 8) {
+  } else if ((week.averageEffort ?? 0) >= 4.5) {
     alertLevel = "HIGH";
     alertReason = "Esforco medio muito alto.";
   } else if (

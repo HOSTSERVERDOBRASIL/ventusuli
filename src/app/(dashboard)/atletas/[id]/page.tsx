@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
@@ -33,15 +33,34 @@ import { AthleteDetail, ServiceEvent } from "@/services/types";
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
 function toneFromStatus(status: string): "positive" | "warning" | "danger" | "neutral" {
-  if (status === "PAID" || status === "CONFIRMED" || status === "PUBLISHED") return "positive";
-  if (status === "PENDING" || status === "PENDING_PAYMENT" || status === "DRAFT") return "warning";
-  if (status === "CANCELLED" || status === "EXPIRED") return "danger";
+  if (status === "PAID" || status === "CONFIRMED" || status === "PUBLISHED" || status === "ACTIVE")
+    return "positive";
+  if (status === "PENDING" || status === "PENDING_PAYMENT" || status === "DRAFT" || status === "PENDING_APPROVAL")
+    return "warning";
+  if (status === "CANCELLED" || status === "EXPIRED" || status === "REJECTED" || status === "BLOCKED")
+    return "danger";
   return "neutral";
+}
+
+function athleteStatusLabel(status: AthleteDetail["profile"]["athleteStatus"]): string {
+  if (status === "ACTIVE") return "Ativo";
+  if (status === "PENDING_APPROVAL") return "Pendente";
+  if (status === "REJECTED") return "Rejeitado";
+  return "Bloqueado";
+}
+
+function initialsFromName(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 }
 
 export default function AtletaDetalhePage() {
   const params = useParams<{ id: string }>();
-  const searchParams = useSearchParams();
   const { accessToken } = useAuthToken();
 
   const [loading, setLoading] = useState(true);
@@ -131,10 +150,10 @@ export default function AtletaDetalhePage() {
         </div>
       ),
     },
-    { key: "distance", header: "Distancia", cell: (row) => row.distance.label },
+    { key: "distance", header: "Distância", cell: (row) => row.distance.label },
     {
       key: "registrationStatus",
-      header: "Inscricao",
+      header: "Inscrição",
       cell: (row) => <StatusBadge tone={toneFromStatus(row.status)} label={row.status} />,
       className: "min-w-[130px]",
     },
@@ -163,7 +182,12 @@ export default function AtletaDetalhePage() {
   }
 
   if (!athlete) {
-    return <EmptyState title="Atleta nao encontrado" description="Nao foi possivel carregar os dados do atleta." />;
+    return (
+      <EmptyState
+        title="Atleta não encontrado"
+        description="Não foi possível carregar os dados do atleta."
+      />
+    );
   }
 
   return (
@@ -185,8 +209,49 @@ export default function AtletaDetalhePage() {
         }
       />
 
+      <section className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-[linear-gradient(180deg,#152a45,#0f2138)] p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-4">
+          {athlete.avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={athlete.avatarUrl}
+              alt={`Foto de ${athlete.name}`}
+              className="h-20 w-20 rounded-full border border-white/10 object-cover"
+            />
+          ) : (
+            <div className="flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-full border border-white/10 bg-[#0F2743] text-2xl font-bold text-[#F5A623]">
+              {initialsFromName(athlete.name)}
+            </div>
+          )}
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">
+              Nome completo
+            </p>
+            <h2 className="mt-1 break-words text-2xl font-bold text-white">{athlete.name}</h2>
+            <p className="mt-1 break-words text-sm text-slate-300">{athlete.email}</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2 sm:justify-end">
+          <StatusBadge
+            tone={toneFromStatus(athlete.profile.athleteStatus)}
+            label={athleteStatusLabel(athlete.profile.athleteStatus)}
+          />
+          <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-semibold text-slate-200">
+            {athlete.profile.memberNumber ?? "Sem matrícula"}
+          </span>
+          {(athlete.profile.city || athlete.profile.state) ? (
+            <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-semibold text-slate-200">
+              {[athlete.profile.city, athlete.profile.state].filter(Boolean).join(" - ")}
+            </span>
+          ) : null}
+        </div>
+      </section>
+
       {athlete.profile.athleteStatus === "PENDING_APPROVAL" && (
-        <div className="flex items-center justify-between gap-4 rounded-xl border border-amber-400/40 bg-amber-400/10 p-4">
+        <div
+          id="athlete-approval"
+          className="flex items-center justify-between gap-4 rounded-xl border border-amber-400/40 bg-amber-400/10 p-4"
+        >
           <div>
             <p className="font-semibold text-amber-200">Cadastro aguardando aprovação</p>
             <p className="mt-0.5 text-sm text-amber-300/80">
@@ -246,7 +311,7 @@ export default function AtletaDetalhePage() {
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-xl border border-white/10 bg-[#0f233d] p-3">
-          <p className="text-xs uppercase tracking-wide text-slate-300">Inscricoes</p>
+          <p className="text-xs uppercase tracking-wide text-slate-300">Inscrições</p>
           <p className="mt-2 text-2xl font-bold text-white">{athlete.summary.registrationsCount}</p>
         </div>
         <div className="rounded-xl border border-white/10 bg-[#0f233d] p-3">
@@ -258,7 +323,7 @@ export default function AtletaDetalhePage() {
           <p className="mt-2 text-2xl font-bold text-white">{BRL.format(athlete.summary.paidAmountCents / 100)}</p>
         </div>
         <div className="rounded-xl border border-white/10 bg-[#0f233d] p-3">
-          <p className="text-xs uppercase tracking-wide text-slate-300">Proxima prova</p>
+          <p className="text-xs uppercase tracking-wide text-slate-300">Próxima prova</p>
           <p className="mt-2 text-sm font-semibold text-white">{athlete.summary.nextEventName ?? "Sem prova futura"}</p>
           {athlete.summary.nextEventDate ? (
             <p className="text-xs text-slate-300">{format(new Date(athlete.summary.nextEventDate), "dd/MM/yyyy", { locale: ptBR })}</p>
@@ -267,6 +332,7 @@ export default function AtletaDetalhePage() {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
+        <div id="athlete-edit">
         <SectionCard title="Editar atleta" description="Atualize dados principais do corredor">
           <div className="grid gap-3 md:grid-cols-2">
             <Input value={editName} onChange={(event) => setEditName(event.target.value)} placeholder="Nome" className="border-white/15 bg-[#0F2743] text-white" />
@@ -299,10 +365,11 @@ export default function AtletaDetalhePage() {
                 }
               }}
             >
-              Salvar alteracoes
+              Salvar alterações
             </ActionButton>
           </div>
         </SectionCard>
+        </div>
 
         <SectionCard title="Inscrever em prova" description="Crie nova inscricao para o atleta">
           <div className="grid gap-3 md:grid-cols-2">
@@ -329,7 +396,7 @@ export default function AtletaDetalhePage() {
               onChange={(event) => setSelectedDistanceId(event.target.value)}
               className="border-white/15 bg-[#0F2743] text-white"
             >
-              <option value="">Selecione a distancia</option>
+              <option value="">Selecione a distância</option>
               {(selectedEvent?.distances ?? []).map((distance) => (
                 <option key={distance.id} value={distance.id}>
                   {distance.label} - {BRL.format(distance.price_cents / 100)}
@@ -361,7 +428,7 @@ export default function AtletaDetalhePage() {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <SectionCard title="Cobrar" description="Gere ou atualize cobranca para inscricoes nao pagas">
+        <SectionCard title="Cobrar" description="Gere ou atualize cobrança para inscrições não pagas">
           <div className="grid gap-3 md:grid-cols-[1fr_auto]">
             <Select
               value={selectedRegistrationToCharge}
@@ -383,7 +450,7 @@ export default function AtletaDetalhePage() {
                   toast.success("Cobranca gerada com sucesso.");
                   await loadData();
                 } catch (error) {
-                  toast.error(error instanceof Error ? error.message : "Falha ao gerar cobranca.");
+                  toast.error(error instanceof Error ? error.message : "Falha ao gerar cobrança.");
                 }
               }}
             >
@@ -392,12 +459,12 @@ export default function AtletaDetalhePage() {
           </div>
         </SectionCard>
 
-        <SectionCard title="Observacao interna" description="Registre contexto de atendimento e acompanhamento">
+        <SectionCard title="Observação interna" description="Registre contexto de atendimento e acompanhamento">
           <Textarea
             value={internalNote}
             onChange={(event) => setInternalNote(event.target.value)}
             className="min-h-28 border-white/15 bg-[#0F2743] text-white"
-            placeholder="Escreva observacoes internas sobre o atleta..."
+            placeholder="Escreva observações internas sobre o atleta..."
           />
           <div className="mt-3">
             <ActionButton
@@ -407,27 +474,23 @@ export default function AtletaDetalhePage() {
                   toast.success("Observacao interna salva.");
                   await loadData();
                 } catch (error) {
-                  toast.error(error instanceof Error ? error.message : "Falha ao salvar observacao.");
+                  toast.error(error instanceof Error ? error.message : "Falha ao salvar observação.");
                 }
               }}
             >
-              Salvar observacao
+              Salvar observação
             </ActionButton>
           </div>
         </SectionCard>
       </div>
 
-      <SectionCard title="Historico" description="Inscricoes e pagamentos do atleta">
+      <SectionCard title="Histórico" description="Inscrições e pagamentos do atleta">
         {athlete.registrations.length === 0 ? (
-          <EmptyState title="Sem historico" description="Este atleta ainda nao possui inscricoes registradas." />
+          <EmptyState title="Sem histórico" description="Este atleta ainda não possui inscrições registradas." />
         ) : (
           <DataTable columns={historyColumns} data={athlete.registrations} getRowKey={(row) => row.id} />
         )}
       </SectionCard>
-
-      {searchParams.get("action") ? (
-        <p className="text-xs text-slate-400">Atalho rapido selecionado: {searchParams.get("action")}</p>
-      ) : null}
     </div>
   );
 }

@@ -372,13 +372,17 @@ export interface CollectiveRegistrationSimulationResult {
 export interface DashboardLoadInput {
   accessToken?: string | null;
   userRole?: UserRole | null;
+  rankingPeriod?: DashboardRankingPeriod;
 }
+
+export type DashboardRankingPeriod = "30d" | "90d" | "year";
 
 export type AthleteCrmStatus = "PENDING_APPROVAL" | "ACTIVE" | "REJECTED" | "BLOCKED";
 export type AthleteFinancialSituation = "EM_DIA" | "PENDENTE" | "SEM_HISTORICO";
 
 export interface AthleteListRow {
   id: string;
+  avatarUrl?: string | null;
   memberNumber: string | null;
   memberSequence: number | null;
   memberSince: string | null;
@@ -521,6 +525,7 @@ export interface AthleteDetail {
   id: string;
   name: string;
   email: string;
+  avatarUrl?: string | null;
   role: string;
   profile: {
     cpf: string | null;

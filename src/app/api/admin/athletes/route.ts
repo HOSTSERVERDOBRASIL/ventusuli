@@ -223,6 +223,7 @@ function buildAthleteRow(
       : null,
     name: user.name,
     email: user.email,
+    avatarUrl: user.avatar_url ?? null,
     status: athleteStatus,
     approvalPending: athleteStatus === "PENDING_APPROVAL",
     signupSource: user.athlete_profile?.signup_source ?? null,

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Copy, Download, RefreshCw, UserPlus, Users } from "lucide-react";
 import { toast } from "sonner";
 import { AthletesCrmTable } from "@/components/athletes/athletes-crm-table";
@@ -66,8 +67,22 @@ const EMPTY_INVITE_SUMMARY: AdminAthleteInviteSummary = {
 type AthleteStatusFilter = "ALL" | "PENDING_APPROVAL" | "ACTIVE" | "REJECTED" | "BLOCKED";
 type AthletesTab = "overview" | "pipeline" | "invites" | "reports";
 
+function parseStatusFilter(value: string | null): AthleteStatusFilter {
+  if (
+    value === "PENDING_APPROVAL" ||
+    value === "ACTIVE" ||
+    value === "REJECTED" ||
+    value === "BLOCKED"
+  ) {
+    return value;
+  }
+
+  return "ALL";
+}
+
 export default function AdminAtletasPage() {
   const { accessToken } = useAuthToken();
+  const searchParams = useSearchParams();
 
   const [rows, setRows] = useState<AthleteListRow[]>([]);
   const [summary, setSummary] = useState<AthletesListSummary>(EMPTY_SUMMARY);
@@ -78,8 +93,10 @@ export default function AdminAtletasPage() {
   const [loadingAthletes, setLoadingAthletes] = useState(true);
   const [loadingInvites, setLoadingInvites] = useState(true);
 
-  const [status, setStatus] = useState<AthleteStatusFilter>("ALL");
-  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState<AthleteStatusFilter>(() =>
+    parseStatusFilter(searchParams.get("status")),
+  );
+  const [query, setQuery] = useState(() => searchParams.get("q") ?? "");
 
   const [inviteLabel, setInviteLabel] = useState("");
   const [inviteReusable, setInviteReusable] = useState(false);
@@ -105,8 +122,8 @@ export default function AdminAtletasPage() {
       {
         key: "overview",
         label: "Painel",
-        audience: "Gestao",
-        description: "Resumo da base, politicas e situacao dos associados.",
+        audience: "Gestão",
+        description: "Resumo da base, políticas e situação dos associados.",
         icon: Users,
         metricLabel: "Associados",
         metricValue: summary.totalAthletes,
@@ -114,9 +131,9 @@ export default function AdminAtletasPage() {
       },
       {
         key: "pipeline",
-        label: "Fila",
-        audience: "Operacao",
-        description: "Aprovacoes, bloqueios, busca e lista operacional.",
+        label: "Gerenciar",
+        audience: "Secretaria",
+        description: "Listagem, cadastro, edição e aprovações dos atletas.",
         icon: RefreshCw,
         metricLabel: "Pendentes",
         metricValue: summary.pendingApproval,
@@ -134,11 +151,11 @@ export default function AdminAtletasPage() {
       },
       {
         key: "reports",
-        label: "Relatorios",
+        label: "Relatórios",
         audience: "Diretoria",
-        description: "Matriculas, origem de cadastro e exportacao CSV.",
+        description: "Matrículas, origem de cadastro e exportação CSV.",
         icon: Download,
-        metricLabel: "Sem matricula",
+        metricLabel: "Sem matrícula",
         metricValue: summary.missingMemberNumber ?? 0,
         metricTone: (summary.missingMemberNumber ?? 0) > 0 ? "warning" : "positive",
       },
@@ -163,7 +180,7 @@ export default function AdminAtletasPage() {
     } catch (error) {
       setRows([]);
       setSummary(EMPTY_SUMMARY);
-      toast.error(error instanceof Error ? error.message : "Falha ao carregar atletas.");
+        toast.error(error instanceof Error ? error.message : "Falha ao carregar atletas.");
     } finally {
       setLoadingAthletes(false);
     }
@@ -226,7 +243,7 @@ export default function AdminAtletasPage() {
         },
       );
 
-      if (!response.ok) throw new Error("Nao foi possivel exportar associados.");
+      if (!response.ok) throw new Error("Não foi possível exportar associados.");
 
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
@@ -237,7 +254,7 @@ export default function AdminAtletasPage() {
       anchor.click();
       anchor.remove();
       URL.revokeObjectURL(url);
-      toast.success("Relatorio de associados exportado.");
+      toast.success("Relatório de associados exportado.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Falha ao exportar associados.");
     }
@@ -246,8 +263,8 @@ export default function AdminAtletasPage() {
   return (
     <div className="space-y-6 text-white">
       <PageHeader
-        title="Gestao de atletas associados"
-        subtitle="Convide atletas associados, acompanhe pendentes e opere aprovacoes com controle por assessoria."
+        title="Gestão de atletas associados"
+        subtitle="Cadastre, liste, edite e acompanhe aprovações de atletas por assessoria."
         actions={
           <div className="flex items-center gap-2">
             <ActionButton asChild>
@@ -259,7 +276,7 @@ export default function AdminAtletasPage() {
             <ActionButton asChild intent="secondary">
               <Link href="/admin/configuracoes">
                 <Users className="mr-2 h-4 w-4" />
-                Politicas da assessoria
+                Políticas da assessoria
               </Link>
             </ActionButton>
           </div>
@@ -268,7 +285,7 @@ export default function AdminAtletasPage() {
 
       <SectionCard
         title="Modulo de associados"
-        description="Separe gestao, fila operacional, convites e relatorios em abas."
+        description="Separe gestão, gerenciamento operacional, convites e relatórios em abas."
       >
         <ModuleTabs
           tabs={tabs}
@@ -289,7 +306,7 @@ export default function AdminAtletasPage() {
             <p className="mt-2 text-sm font-semibold text-white">/{policy.slug || "assessoria"}</p>
           </div>
           <div className="rounded-xl border border-white/10 bg-[#0F2743] p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-300">Auto cadastro por slug</p>
+            <p className="text-xs uppercase tracking-wide text-slate-300">Autocadastro por slug</p>
             <div className="mt-2">
               <StatusBadge
                 tone={policy.allowAthleteSelfSignup ? "positive" : "warning"}
@@ -298,11 +315,11 @@ export default function AdminAtletasPage() {
             </div>
           </div>
           <div className="rounded-xl border border-white/10 bg-[#0F2743] p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-300">Aprovacao manual</p>
+            <p className="text-xs uppercase tracking-wide text-slate-300">Aprovação manual</p>
             <div className="mt-2">
               <StatusBadge
                 tone={policy.requireAthleteApproval ? "warning" : "positive"}
-                label={policy.requireAthleteApproval ? "Obrigatoria" : "Nao obrigatoria"}
+                label={policy.requireAthleteApproval ? "Obrigatória" : "Não obrigatória"}
               />
             </div>
           </div>
@@ -315,8 +332,8 @@ export default function AdminAtletasPage() {
 
       <SectionCard
         className={activeTab === "reports" ? undefined : "hidden"}
-        title="Relatorio de associados"
-        description="Controle de matriculas e origem de entrada dos atletas"
+        title="Relatório de associados"
+        description="Controle de matrículas e origem de entrada dos atletas"
       >
         <div className="mb-3 flex justify-end">
           <ActionButton intent="secondary" onClick={() => void exportAssociates()}>
@@ -326,13 +343,13 @@ export default function AdminAtletasPage() {
         </div>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <div className="rounded-xl border border-white/10 bg-[#0F2743] p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-300">Com matricula</p>
+            <p className="text-xs uppercase tracking-wide text-slate-300">Com matrícula</p>
             <p className="mt-2 text-2xl font-semibold text-white">
               {summary.withMemberNumber ?? 0}
             </p>
           </div>
           <div className="rounded-xl border border-white/10 bg-[#0F2743] p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-300">Sem matricula</p>
+            <p className="text-xs uppercase tracking-wide text-slate-300">Sem matrícula</p>
             <p className="mt-2 text-2xl font-semibold text-white">
               {summary.missingMemberNumber ?? 0}
             </p>
@@ -354,10 +371,39 @@ export default function AdminAtletasPage() {
 
       <SectionCard
         className={activeTab === "pipeline" ? undefined : "hidden"}
-        title="Fila operacional"
-        description="Listagens por status com acoes de aprovacao, rejeicao e bloqueio"
+        title="Gerenciamento de atletas"
+        description="Listagem principal com foto, cadastro, edição, aprovação e ações rápidas."
       >
         <div className="space-y-4">
+          <div className="flex flex-col gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-white">Lista gerencial da assessoria</p>
+              <p className="mt-1 text-xs text-slate-300">
+                Encontre o atleta pela foto, nome completo, e-mail ou matrícula e acesse edição,
+                financeiro e aprovações pela própria linha da tabela.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <ActionButton asChild size="sm">
+                <Link href="/admin/atletas/novo">
+                  <UserPlus className="mr-2 h-3.5 w-3.5" />
+                  Cadastrar atleta
+                </Link>
+              </ActionButton>
+              <ActionButton
+                size="sm"
+                intent="secondary"
+                onClick={() => setStatus("PENDING_APPROVAL")}
+              >
+                Ver pendentes
+              </ActionButton>
+              <ActionButton size="sm" intent="secondary" onClick={() => void exportAssociates()}>
+                <Download className="mr-2 h-3.5 w-3.5" />
+                Exportar
+              </ActionButton>
+            </div>
+          </div>
+
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             {statusCards.map((item) => (
               <button
@@ -380,7 +426,7 @@ export default function AdminAtletasPage() {
             <Input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Buscar por nome ou email"
+              placeholder="Buscar por nome, e-mail ou matrícula"
               className="border-white/[0.1] bg-white/[0.05] text-white placeholder:text-white/30"
             />
             <ActionButton intent="secondary" onClick={() => void refreshAthletes()}>
@@ -394,7 +440,7 @@ export default function AdminAtletasPage() {
           ) : rows.length === 0 ? (
             <EmptyState
               title="Nenhum atleta associado encontrado"
-              description="Ajuste filtros ou convide novos atletas associados."
+              description="Ajuste filtros ou cadastre novos atletas associados."
             />
           ) : (
             <>
@@ -501,7 +547,7 @@ export default function AdminAtletasPage() {
 
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
             <div className="space-y-2 xl:col-span-2">
-              <Label htmlFor="invite-label">Rotulo</Label>
+              <Label htmlFor="invite-label">Rótulo</Label>
               <Input
                 id="invite-label"
                 value={inviteLabel}
@@ -520,12 +566,12 @@ export default function AdminAtletasPage() {
                 className="border-white/15 bg-[#0F2743] text-white"
               >
                 <option value="LIMITED">Limitado por uso</option>
-                <option value="REUSABLE">Reutilizavel</option>
+                <option value="REUSABLE">Reutilizável</option>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="invite-max-uses">Maximo de usos</Label>
+              <Label htmlFor="invite-max-uses">Máximo de usos</Label>
               <Input
                 id="invite-max-uses"
                 type="number"
@@ -559,7 +605,7 @@ export default function AdminAtletasPage() {
                   !Number.isInteger(parsedMaxUses) ||
                   parsedMaxUses < 1
                 ) {
-                  toast.error("Informe um mÃ¡ximo de usos vÃ¡lido (inteiro maior ou igual a 1).");
+                  toast.error("Informe um máximo de usos válido (inteiro maior ou igual a 1).");
                   return;
                 }
               }
@@ -567,11 +613,11 @@ export default function AdminAtletasPage() {
               if (inviteExpiresAt) {
                 const expiryDate = new Date(inviteExpiresAt);
                 if (Number.isNaN(expiryDate.getTime())) {
-                  toast.error("Data de expiraÃ§Ã£o invÃ¡lida.");
+                  toast.error("Data de expiração inválida.");
                   return;
                 }
                 if (expiryDate.getTime() <= Date.now()) {
-                  toast.error("A data de expiraÃ§Ã£o precisa ser futura.");
+                  toast.error("A data de expiração precisa ser futura.");
                   return;
                 }
               }
@@ -619,7 +665,7 @@ export default function AdminAtletasPage() {
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <p className="text-sm font-semibold text-white">
-                        {invite.label ?? "Convite sem rotulo"}
+                        {invite.label ?? "Convite sem rótulo"}
                       </p>
                       <p className="text-xs text-slate-300">Token: {invite.token}</p>
                       <p className="mt-1 text-xs text-slate-400">
@@ -654,7 +700,7 @@ export default function AdminAtletasPage() {
                       Expira:{" "}
                       {invite.expiresAt
                         ? new Date(invite.expiresAt).toLocaleString("pt-BR")
-                        : "sem expiracao"}
+                        : "sem expiração"}
                     </p>
                     <p>
                       Aceito por:{" "}
@@ -677,7 +723,7 @@ export default function AdminAtletasPage() {
                           await navigator.clipboard.writeText(invite.signupUrl);
                           toast.success("Link de convite copiado.");
                         } catch {
-                          toast.error("Nao foi possivel copiar o link.");
+                          toast.error("Não foi possível copiar o link.");
                         }
                       }}
                     >

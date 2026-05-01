@@ -9,6 +9,8 @@ import {
 } from "@/lib/dashboard/types";
 import { formatPace, roundTwo } from "@/lib/dashboard/calculations";
 
+export type RankingPeriod = "30d" | "90d" | "year";
+
 interface SummaryRow {
   km_year: number | null;
   km_30d: number | null;
@@ -78,6 +80,12 @@ function currentYearBounds(now: Date): { start: Date; end: Date; weeksElapsed: n
   const elapsedDays = Math.floor((now.getTime() - start.getTime()) / 86_400_000) + 1;
   const weeksElapsed = Math.max(1, Math.ceil(elapsedDays / 7));
   return { start, end, weeksElapsed };
+}
+
+function rankingPeriodStart(now: Date, period: RankingPeriod): Date {
+  if (period === "30d") return new Date(now.getTime() - 30 * 86_400_000);
+  if (period === "year") return currentYearBounds(now).start;
+  return new Date(now.getTime() - 90 * 86_400_000);
 }
 
 export async function hasStravaConnection(prisma: PrismaClient, userId: string, organizationId: string): Promise<boolean> {
@@ -237,8 +245,14 @@ export async function getPersonalRecords(prisma: PrismaClient, userId: string, o
   return items.filter((item): item is PersonalRecordItem => Boolean(item));
 }
 
-export async function getGroupRanking(prisma: PrismaClient, organizationId: string, userId: string, now: Date): Promise<RankingSnapshot> {
-  const periodStart = new Date(now.getTime() - 90 * 86_400_000);
+export async function getGroupRanking(
+  prisma: PrismaClient,
+  organizationId: string,
+  userId: string,
+  now: Date,
+  period: RankingPeriod = "90d",
+): Promise<RankingSnapshot> {
+  const periodStart = rankingPeriodStart(now, period);
 
   const rows = await prisma.$queryRaw<RankingRow[]>`
     SELECT

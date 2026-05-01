@@ -5,10 +5,10 @@ import {
   ClipboardList,
   Coins,
   Dumbbell,
+  Footprints,
   Gift,
   Handshake,
   Heart,
-  LayoutDashboard,
   TrendingUp,
   Trophy,
   Wallet,
@@ -19,8 +19,8 @@ import type { NavItem } from "@/components/layout/navigation/types";
 export const athleteNavItems: NavItem[] = [
   {
     href: "/",
-    label: "Dashboard",
-    icon: LayoutDashboard,
+    label: "Atleta",
+    icon: Footprints,
     roles: [...ROLE_GROUPS.athlete],
     policy: "ATHLETE_AREA",
     section: "home",

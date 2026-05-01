@@ -30,6 +30,7 @@ interface MfaVerifyResponse {
     id: string;
     name: string;
     email: string;
+    avatar_url?: string | null;
     role: string;
     roles?: string[];
   };
@@ -122,8 +123,8 @@ export function MfaChallengeForm() {
           const message =
             payload && typeof payload === "object" && "error" in payload
               ? ((payload as { error?: { message?: string } }).error?.message ??
-                "Nao foi possivel carregar o setup MFA.")
-              : "Nao foi possivel carregar o setup MFA.";
+                "Não foi possível carregar o setup MFA.")
+              : "Não foi possível carregar o setup MFA.";
           if (!cancelled) {
             setError(message);
           }
@@ -134,7 +135,7 @@ export function MfaChallengeForm() {
           setSetupData(payload);
         }
       } catch {
-        if (!cancelled) setError("Erro de conexao ao preparar o MFA.");
+        if (!cancelled) setError("Erro de conexão ao preparar o MFA.");
       } finally {
         if (!cancelled) setLoadingSetup(false);
       }
@@ -172,8 +173,8 @@ export function MfaChallengeForm() {
           const message =
             payload && typeof payload === "object" && "error" in payload
               ? ((payload as { error?: { message?: string } }).error?.message ??
-                "Nao foi possivel validar o codigo.")
-              : "Nao foi possivel validar o codigo.";
+                "Não foi possível validar o código.")
+              : "Não foi possível validar o código.";
           setError(message);
           toast.error(message);
           return;
@@ -183,6 +184,13 @@ export function MfaChallengeForm() {
         token: payload.access_token,
         role: (payload.user.role as UserRole) ?? null,
         roles: payload.user.roles?.map((role) => role as UserRole),
+        user: {
+          id: payload.user.id,
+          name: payload.user.name,
+          email: payload.user.email,
+          avatar_url: payload.user.avatar_url ?? null,
+        },
+        profile: payload.profile ?? null,
       });
 
       if (payload.recovery_codes?.length) {
@@ -206,7 +214,7 @@ export function MfaChallengeForm() {
         router.push(destination);
       }
     } catch {
-      const message = "Erro de conexao. Tente novamente.";
+      const message = "Erro de conexão. Tente novamente.";
       setError(message);
       toast.error(message);
     } finally {
@@ -233,7 +241,7 @@ export function MfaChallengeForm() {
       };
 
       if (!response.ok) {
-        const message = payload.error?.message ?? "Nao foi possivel reenviar o codigo.";
+        const message = payload.error?.message ?? "Não foi possível reenviar o código.";
         setError(message);
         toast.error(message);
         return;
@@ -242,9 +250,9 @@ export function MfaChallengeForm() {
       setMethod("EMAIL_OTP");
       setCode("");
       setDebugEmailCode(payload.debug_code ?? null);
-      toast.success(payload.message ?? "Codigo enviado para o email cadastrado.");
+      toast.success(payload.message ?? "Código enviado para o e-mail cadastrado.");
     } catch {
-      const message = "Erro de conexao ao reenviar o codigo.";
+      const message = "Erro de conexão ao reenviar o código.";
       setError(message);
       toast.error(message);
     }
@@ -256,7 +264,7 @@ export function MfaChallengeForm() {
       description={
         setupRequired
           ? "Ative o autenticador para proteger sua conta antes de concluir o acesso."
-          : "Digite o codigo para continuar sua jornada com seguranca."
+          : "Digite o código para continuar sua jornada com segurança."
       }
     >
       {error ? (
@@ -300,8 +308,8 @@ export function MfaChallengeForm() {
                 </div>
               </div>
               <div className="rounded-2xl border border-[#f7b529]/20 bg-[#f7b529]/8 p-4 text-sm leading-6 text-slate-200">
-                <p className="font-semibold text-white">Ultimo passo</p>
-                <p>Digite o codigo de 6 digitos gerado pelo autenticador para concluir a ativacao.</p>
+                <p className="font-semibold text-white">Último passo</p>
+                <p>Digite o código de 6 dígitos gerado pelo autenticador para concluir a ativação.</p>
               </div>
             </div>
           ) : null}
@@ -311,11 +319,11 @@ export function MfaChallengeForm() {
       <div className="space-y-5">
         {!setupRequired ? (
           <div className="rounded-[1.4rem] border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
-            <p className="font-semibold text-white">Acesso em verificacao</p>
+            <p className="font-semibold text-white">Acesso em verificação</p>
             <p className="mt-1">
               {method === "EMAIL_OTP"
-                ? `Insira o codigo enviado para ${maskedEmail || "seu email cadastrado"}.`
-                : "Digite o codigo do seu app autenticador para continuar."}
+                ? `Insira o código enviado para ${maskedEmail || "seu e-mail cadastrado"}.`
+                : "Digite o código do seu app autenticador para continuar."}
             </p>
           </div>
         ) : null}
@@ -347,7 +355,7 @@ export function MfaChallengeForm() {
                     : "border border-white/12 bg-white/5 text-slate-300"
                 }`}
               >
-                Codigo por email
+                Código por e-mail
               </button>
             ) : null}
             {canUseRecovery ? (
@@ -371,9 +379,10 @@ export function MfaChallengeForm() {
 
         <div className="space-y-2">
           <label className="text-sm font-medium text-slate-100">
-            {method === "RECOVERY_CODE" ? "Recovery code" : "Codigo de verificacao"}
+            {method === "RECOVERY_CODE" ? "Recovery code" : "Código de verificação"}
           </label>
           <Input
+            type="text"
             value={code}
             onChange={(event) => {
               const nextValue =
@@ -386,16 +395,17 @@ export function MfaChallengeForm() {
               }
             }}
             autoFocus
+            autoComplete={method === "RECOVERY_CODE" ? "off" : "one-time-code"}
             inputMode={method === "RECOVERY_CODE" ? "text" : "numeric"}
             maxLength={method === "RECOVERY_CODE" ? 16 : 6}
             placeholder={method === "RECOVERY_CODE" ? "ABCD-1234" : "000000"}
-            className="h-16 rounded-2xl border-white/12 bg-white/6 text-center font-mono text-2xl tracking-[0.32em] text-white placeholder:tracking-normal placeholder:text-slate-500 focus-visible:ring-[#f7b529]"
+            className="h-16 rounded-2xl border-white/12 bg-[#08101e] text-center font-mono text-3xl font-bold text-white caret-[#f7b529] placeholder:text-slate-500 focus-visible:ring-[#f7b529]"
           />
         </div>
 
         {debugEmailCode ? (
           <div className="rounded-2xl border border-[#f7b529]/20 bg-[#f7b529]/8 px-4 py-3 text-sm text-slate-200">
-            Ambiente de desenvolvimento. Codigo enviado:{" "}
+            Ambiente de desenvolvimento. Código enviado:{" "}
             <span className="font-mono font-semibold text-white">{debugEmailCode}</span>
           </div>
         ) : null}
@@ -404,7 +414,7 @@ export function MfaChallengeForm() {
           <div className="rounded-[1.6rem] border border-emerald-500/25 bg-emerald-500/10 p-5">
             <p className="text-base font-semibold text-white">Recovery codes gerados</p>
             <p className="mt-2 text-sm leading-6 text-emerald-50/90">
-              Estes codigos aparecem uma unica vez. Guarde-os em local seguro.
+              Estes códigos aparecem uma única vez. Guarde-os em local seguro.
             </p>
             <div className="mt-4 grid gap-2 sm:grid-cols-2">
               {recoveryCodes.map((recoveryCode) => (
@@ -433,7 +443,7 @@ export function MfaChallengeForm() {
               </span>
             ) : (
               <span className="flex items-center gap-3">
-                Verificar codigo
+                Verificar código
                 <ArrowRight className="h-5 w-5" />
               </span>
             )}
@@ -447,7 +457,7 @@ export function MfaChallengeForm() {
               className="h-14 rounded-2xl border-white/12 bg-white/5 text-base text-white hover:bg-white/10"
             >
               <Mail className="mr-2 h-4 w-4" />
-              Reenviar por email
+              Reenviar por e-mail
             </Button>
           ) : (
             <Button

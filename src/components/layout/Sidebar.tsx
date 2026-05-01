@@ -132,18 +132,14 @@ export function Sidebar() {
         <div className="flex items-center gap-2.5 rounded-xl border border-white/[0.07] bg-white/[0.03] p-2.5">
           <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#1E90FF]/20 text-[11px] font-bold text-white">
             {currentUser?.avatar_url ? (
-              <img
-                src={currentUser.avatar_url}
-                alt="Avatar do usuario"
-                className="h-full w-full object-cover"
-              />
+              <img src={currentUser.avatar_url} alt="Avatar do usuário" className="h-full w-full object-cover" />
             ) : (
               <>{initialsFromName(currentUser?.name)}</>
             )}
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-[12px] font-semibold text-white">
-              {currentUser?.name ?? "Usuario"}
+              {currentUser?.name ?? "Usuário"}
             </p>
             <p className="text-[10px] text-white/35">{rolesLabel(userRoles)}</p>
           </div>

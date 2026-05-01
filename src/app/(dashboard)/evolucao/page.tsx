@@ -36,7 +36,19 @@ import { PageHeader } from "@/components/system/page-header";
 import { SectionCard } from "@/components/system/section-card";
 import { StatusBadge } from "@/components/system/status-badge";
 import { getDashboardData } from "@/services/dashboard-service";
-import { DashboardData } from "@/services/types";
+import { DashboardData, type DashboardRankingPeriod } from "@/services/types";
+
+const RANKING_PERIOD_OPTIONS: Array<{ value: DashboardRankingPeriod; label: string }> = [
+  { value: "30d", label: "30 dias" },
+  { value: "90d", label: "90 dias" },
+  { value: "year", label: "Ano" },
+];
+
+const RANKING_PERIOD_LABEL: Record<DashboardRankingPeriod, string> = {
+  "30d": "ultimos 30 dias",
+  "90d": "ultimos 90 dias",
+  year: "ano atual",
+};
 
 const HIGHLIGHT_ICON = {
   completed: Trophy,
@@ -69,6 +81,7 @@ export default function EvolucaoPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [rankingPeriod, setRankingPeriod] = useState<DashboardRankingPeriod>("90d");
 
   useEffect(() => {
     let cancelled = false;
@@ -76,7 +89,7 @@ export default function EvolucaoPage() {
       setLoading(true);
       setError(null);
       try {
-        const result = await getDashboardData({ accessToken, userRole });
+        const result = await getDashboardData({ accessToken, userRole, rankingPeriod });
         if (!cancelled) setData(result.data);
       } catch (loadError) {
         if (!cancelled) {
@@ -91,7 +104,7 @@ export default function EvolucaoPage() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken, userRole, reloadKey]);
+  }, [accessToken, userRole, rankingPeriod, reloadKey]);
 
   const experience = data?.experience;
   const warnings = data?.dataWarnings ?? [];
@@ -112,6 +125,27 @@ export default function EvolucaoPage() {
         title="Evolucao e Ranking"
         subtitle="Indicadores esportivos, recordes pessoais e posicionamento no grupo."
       />
+
+      <div className="flex flex-wrap gap-2" aria-label="Filtro de periodo do ranking">
+        {RANKING_PERIOD_OPTIONS.map((option) => {
+          const active = rankingPeriod === option.value;
+
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setRankingPeriod(option.value)}
+              className={`rounded-lg border px-3 py-2 text-sm font-semibold transition ${
+                active
+                  ? "border-[#F5A623]/60 bg-[#F5A623]/12 text-white"
+                  : "border-white/10 bg-white/[0.03] text-white/55 hover:border-sky-300/40 hover:text-white"
+              }`}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
 
       {loading ? (
         <LoadingState lines={6} />
@@ -323,7 +357,7 @@ export default function EvolucaoPage() {
 
             <SectionCard
               title="Ranking do grupo"
-              description="Posicionamento competitivo da assessoria"
+              description={`Periodo: ${RANKING_PERIOD_LABEL[rankingPeriod]}`}
             >
               {experience.groupRanking ? (
                 <div className="space-y-3">

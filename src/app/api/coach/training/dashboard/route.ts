@@ -152,7 +152,7 @@ export async function GET(req: NextRequest) {
         overloadRiskAthletes: priorityAthletes.filter(
           (athlete) =>
             athlete.recentPainAlerts > 0 ||
-            (athlete.averageEffort ?? 0) >= 8 ||
+            (athlete.averageEffort ?? 0) >= 4.5 ||
             athlete.loadAlertLevel !== "OK",
         ).length,
         pendingRecommendations: recommendations.filter((item) => item.status === "PENDING").length,

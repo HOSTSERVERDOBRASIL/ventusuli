@@ -6,7 +6,7 @@ import { getAuthContext } from "@/lib/request-auth";
 
 const feedbackSchema = z.object({
   completedFlag: z.enum(["COMPLETED", "PARTIAL", "MISSED"]),
-  perceivedEffort: z.number().int().min(1).max(10).optional().nullable(),
+  perceivedEffort: z.number().int().min(1).max(5).optional().nullable(),
   painLevel: z.number().int().min(0).max(10).optional().nullable(),
   painArea: z.string().trim().max(120).optional().nullable(),
   discomfortNotes: z.string().trim().max(600).optional().nullable(),
@@ -120,13 +120,13 @@ export async function POST(
             summary: "Dor elevada registrada. Considere reduzir carga e revisar a sessao seguinte.",
             rationale: "Dor >= 7 aciona alerta de seguranca para o coach.",
           }
-        : (perceivedEffort ?? 0) >= 9
+        : (perceivedEffort ?? 0) >= 5
           ? {
               type: "LOAD_REDUCTION",
               summary: "Esforco muito alto. Sugestao: reduzir intensidade ou inserir descanso adicional.",
-              rationale: "RPE alto sem margem de recuperacao aumenta risco de sobrecarga.",
+              rationale: "RPE 5/5 sem margem de recuperacao aumenta risco de sobrecarga.",
             }
-          : parsed.data.completedFlag === "COMPLETED" && (perceivedEffort ?? 0) <= 5
+          : parsed.data.completedFlag === "COMPLETED" && (perceivedEffort ?? 0) <= 2
             ? {
                 type: "PROGRESSION",
                 summary: "Sessao bem tolerada. IA sugere progressao gradual na proxima semana.",

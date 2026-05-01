@@ -22,6 +22,16 @@ function statusLabel(status: AthleteListRow["status"]): string {
   return "BLOQUEADO";
 }
 
+function initialsFromName(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
 function financialTone(
   f: AthleteListRow["financialSituation"],
 ): "positive" | "warning" | "neutral" {
@@ -30,15 +40,15 @@ function financialTone(
   return "neutral";
 }
 
-function IconBtn({
+function ActionLink({
   href,
   icon: Icon,
-  title,
+  label,
   variant = "default",
 }: {
   href: string;
   icon: React.ElementType;
-  title: string;
+  label: string;
   variant?: "default" | "warning" | "success";
 }) {
   const styles = {
@@ -51,11 +61,12 @@ function IconBtn({
   return (
     <Link
       href={href}
-      title={title}
-      aria-label={title}
-      className={`inline-flex h-7 w-7 items-center justify-center rounded-lg transition ${styles[variant]}`}
+      title={label}
+      aria-label={label}
+      className={`inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition ${styles[variant]}`}
     >
       <Icon className="h-3.5 w-3.5 flex-shrink-0" />
+      <span>{label}</span>
     </Link>
   );
 }
@@ -73,27 +84,41 @@ export function AthletesCrmTable({
     {
       key: "athlete",
       header: managedAthleteLabel(),
-      className: "min-w-[210px]",
+      className: "min-w-[280px]",
       cell: (row) => (
-        <div>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <p className="font-semibold text-white">{row.name}</p>
-            {row.approvalPending && (
-              <span className="rounded-full border border-[#F4C542]/40 bg-[#F4C542]/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[#F4C542]">
-                Aprovacao pendente
-              </span>
-            )}
-          </div>
-          <p className="mt-0.5 text-[11px] text-white/40">{row.email}</p>
-          <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#8eb0dc]">
-            {row.memberNumber ?? "Sem matricula"}
-          </p>
-          {row.invitedByName ? (
-            <p className="mt-0.5 text-[10px] text-white/35">
-              Convite: {row.invitedByName}
-              {row.invitedByMemberNumber ? ` (${row.invitedByMemberNumber})` : ""}
+        <div className="flex items-center gap-3">
+          {row.avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={row.avatarUrl}
+              alt={`Foto de ${row.name}`}
+              className="h-11 w-11 rounded-full border border-white/10 object-cover"
+            />
+          ) : (
+            <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border border-white/10 bg-[#0F2743] text-sm font-bold text-[#F5A623]">
+              {initialsFromName(row.name)}
+            </div>
+          )}
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <p className="font-semibold text-white">{row.name}</p>
+              {row.approvalPending && (
+                <span className="rounded-full border border-[#F4C542]/40 bg-[#F4C542]/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[#F4C542]">
+                  Aprovação pendente
+                </span>
+              )}
+            </div>
+            <p className="mt-0.5 text-[11px] text-white/40">{row.email}</p>
+            <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#8eb0dc]">
+              {row.memberNumber ?? "Sem matrícula"}
             </p>
-          ) : null}
+            {row.invitedByName ? (
+              <p className="mt-0.5 text-[10px] text-white/35">
+                Convite: {row.invitedByName}
+                {row.invitedByMemberNumber ? ` (${row.invitedByMemberNumber})` : ""}
+              </p>
+            ) : null}
+          </div>
         </div>
       ),
     },
@@ -105,7 +130,7 @@ export function AthletesCrmTable({
     },
     {
       key: "next",
-      header: "Proxima prova",
+      header: "Próxima prova",
       className: "min-w-[160px]",
       cell: (row) =>
         row.nextEventDate ? (
@@ -115,7 +140,7 @@ export function AthletesCrmTable({
             </p>
             <p className="mt-0.5 text-[10px] text-white/40">
               {format(new Date(row.nextEventDate), "dd/MM/yyyy", { locale: ptBR })}
-              {" Â· "}
+              {" · "}
               {row.registrationsCount} inscr.
             </p>
           </div>
@@ -150,27 +175,27 @@ export function AthletesCrmTable({
 
   const actionColumn: DataTableColumn<AthleteListRow> = {
     key: "actions",
-    header: "Acoes",
-    className: "min-w-[120px]",
+    header: "Ações",
+    className: "min-w-[260px]",
     cell: (row) => (
-      <div className="flex flex-nowrap items-center gap-1">
-        <IconBtn href={`${basePath}/${row.id}`} icon={FileText} title="Ver historico" />
-        <IconBtn
-          href={`${basePath}/${row.id}?action=edit`}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <ActionLink href={`${basePath}/${row.id}`} icon={FileText} label="Ver" />
+        <ActionLink
+          href={`${basePath}/${row.id}#athlete-edit`}
           icon={UserRoundPen}
-          title="Editar atleta"
+          label="Editar"
         />
-        <IconBtn
+        <ActionLink
           href={`/admin/financeiro?status=PENDING&athlete=${encodeURIComponent(row.name)}`}
           icon={BellRing}
-          title="Ver cobrancas pendentes"
+          label="Financeiro"
           variant="warning"
         />
         {row.approvalPending ? (
-          <IconBtn
-            href={`${basePath}/${row.id}?action=approve`}
+          <ActionLink
+            href={`${basePath}/${row.id}#athlete-approval`}
             icon={ShieldCheck}
-            title="Aprovar atleta"
+            label="Aprovar"
             variant="success"
           />
         ) : null}

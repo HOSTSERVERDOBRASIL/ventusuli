@@ -6,6 +6,10 @@ import {
   CalendarDays,
   ClipboardCheck,
   HeartPulse,
+  MessageSquareText,
+  PauseCircle,
+  PlayCircle,
+  RotateCcw,
   Send,
   Target,
   Timer,
@@ -95,6 +99,8 @@ type FeedbackFormState = {
   actualHeartRate: string;
 };
 
+type TrainingTab = "today" | "feedback" | "progress" | "upcoming";
+
 const EMPTY_FORM: FeedbackFormState = {
   completedFlag: "COMPLETED",
   perceivedEffort: "",
@@ -170,6 +176,19 @@ function formatKm(valueM: number): string {
   return `${(valueM / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} km`;
 }
 
+function formatTimer(totalSeconds: number): string {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return [hours, minutes, seconds].map((value) => String(value).padStart(2, "0")).join(":");
+}
+
+function sessionDurationEstimate(session: TrainingSessionSummary | null): number | null {
+  if (!session) return null;
+  const total = session.exercises.reduce((sum, exercise) => sum + (exercise.durationMinutes ?? 0), 0);
+  return total > 0 ? total : null;
+}
+
 function createFormState(feedback: TrainingSessionFeedback | null | undefined): FeedbackFormState {
   if (!feedback) return EMPTY_FORM;
   return {
@@ -237,6 +256,10 @@ export default function AthleteTreinosPage() {
   const [dashboard, setDashboard] = useState<AthleteTrainingDashboard>(EMPTY_DASHBOARD);
   const [selectedSessionId, setSelectedSessionId] = useState<string>("");
   const [form, setForm] = useState<FeedbackFormState>(EMPTY_FORM);
+  const [activeTab, setActiveTab] = useState<TrainingTab>("today");
+  const [workoutStarted, setWorkoutStarted] = useState(false);
+  const [timerRunning, setTimerRunning] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -281,7 +304,20 @@ export default function AthleteTreinosPage() {
 
   useEffect(() => {
     setForm(createFormState(selectedSession?.feedback));
+    setWorkoutStarted(false);
+    setTimerRunning(false);
+    setElapsedSeconds(0);
   }, [selectedSessionId, selectedSession?.feedback]);
+
+  useEffect(() => {
+    if (!timerRunning) return;
+
+    const id = window.setInterval(() => {
+      setElapsedSeconds((current) => current + 1);
+    }, 1000);
+
+    return () => window.clearInterval(id);
+  }, [timerRunning]);
 
   const plannedSessions = useMemo(
     () =>
@@ -291,6 +327,54 @@ export default function AthleteTreinosPage() {
       ) ?? 0,
     [dashboard.currentPlan],
   );
+
+  const selectedDurationEstimate = sessionDurationEstimate(selectedSession);
+  const completedUpcomingSessions = allSessions.filter((session) => session.status === "COMPLETED").length;
+  const tabItems = useMemo(
+    () => [
+      {
+        key: "today" as const,
+        label: "Treino do Dia",
+        description: selectedSession ? selectedSession.title : "Sem sessao",
+        icon: Timer,
+      },
+      {
+        key: "feedback" as const,
+        label: "Feedback",
+        description: selectedSession?.feedback ? "Enviado" : "Pendente",
+        icon: MessageSquareText,
+      },
+      {
+        key: "progress" as const,
+        label: "Progresso do Ciclo",
+        description: `${dashboard.loadControl.currentWeek.totalLoad} carga`,
+        icon: TrendingUp,
+      },
+      {
+        key: "upcoming" as const,
+        label: "Proximas Sessoes",
+        description: `${completedUpcomingSessions}/${allSessions.length} concluidas`,
+        icon: CalendarDays,
+      },
+    ],
+    [
+      allSessions.length,
+      completedUpcomingSessions,
+      dashboard.loadControl.currentWeek.totalLoad,
+      selectedSession,
+    ],
+  );
+
+  const handleStartWorkout = () => {
+    setWorkoutStarted(true);
+    setTimerRunning(true);
+  };
+
+  const handleResetTimer = () => {
+    setWorkoutStarted(false);
+    setTimerRunning(false);
+    setElapsedSeconds(0);
+  };
 
   const handleSubmit = async () => {
     if (!selectedSession) {
@@ -365,6 +449,37 @@ export default function AthleteTreinosPage() {
             />
           </div>
 
+          <div className="grid gap-2 md:grid-cols-4" role="tablist" aria-label="Modulos de treino">
+            {tabItems.map((tab) => {
+              const Icon = tab.icon;
+              const active = activeTab === tab.key;
+
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`min-h-[88px] rounded-xl border p-3 text-left transition ${
+                    active
+                      ? "border-[#F5A623]/60 bg-[#F5A623]/10 text-white"
+                      : "border-white/10 bg-white/[0.03] text-white/65 hover:border-sky-300/40 hover:text-white"
+                  }`}
+                >
+                  <div className="flex min-w-0 items-center justify-between gap-2">
+                    <Icon className="h-4 w-4 text-sky-200" />
+                    <span className="min-w-0 max-w-[140px] truncate text-[11px] uppercase tracking-[0.1em] text-white/35">
+                      {tab.description}
+                    </span>
+                  </div>
+                  <p className="mt-3 text-sm font-semibold">{tab.label}</p>
+                </button>
+              );
+            })}
+          </div>
+
+          {activeTab === "progress" ? (
           <SectionCard
             title="Controle de carga"
             description="Carga calculada com duracao em minutos multiplicada pelo esforco percebido."
@@ -422,8 +537,10 @@ export default function AthleteTreinosPage() {
               </div>
             </div>
           </SectionCard>
+          ) : null}
 
-          <div className="grid gap-4 2xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)]">
+          {activeTab === "today" ? (
+          <div className="grid gap-4">
             <SectionCard
               title="Treino do dia"
               description={
@@ -457,6 +574,50 @@ export default function AthleteTreinosPage() {
                         Coach: {selectedSession.coachNotes}
                       </p>
                     ) : null}
+                    <div className="mt-4 flex flex-col gap-3 rounded-xl border border-white/10 bg-[#08182b] p-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.12em] text-slate-400">
+                          Timer de execucao
+                        </p>
+                        <p className="mt-1 font-mono text-3xl font-bold text-white">
+                          {formatTimer(elapsedSeconds)}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-400">
+                          {selectedDurationEstimate
+                            ? `Planejado: ${selectedDurationEstimate} min`
+                            : "Sem tempo planejado"}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {!workoutStarted ? (
+                          <ActionButton onClick={handleStartWorkout}>
+                            <PlayCircle className="mr-2 h-4 w-4" />
+                            Iniciar treino
+                          </ActionButton>
+                        ) : (
+                          <ActionButton
+                            intent="secondary"
+                            onClick={() => setTimerRunning((current) => !current)}
+                          >
+                            {timerRunning ? (
+                              <>
+                                <PauseCircle className="mr-2 h-4 w-4" />
+                                Pausar
+                              </>
+                            ) : (
+                              <>
+                                <PlayCircle className="mr-2 h-4 w-4" />
+                                Retomar
+                              </>
+                            )}
+                          </ActionButton>
+                        )}
+                        <ActionButton intent="secondary" onClick={handleResetTimer}>
+                          <RotateCcw className="mr-2 h-4 w-4" />
+                          Zerar
+                        </ActionButton>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="space-y-3">
@@ -511,7 +672,11 @@ export default function AthleteTreinosPage() {
                 </div>
               )}
             </SectionCard>
+          </div>
+          ) : null}
 
+          {activeTab === "feedback" ? (
+          <div className="grid gap-4">
             <SectionCard title="Registrar feedback" description="Retorno da sessao para revisao tecnica.">
               {!selectedSession ? (
                 <EmptyState
@@ -552,11 +717,11 @@ export default function AthleteTreinosPage() {
                           <option value="MISSED">Nao realizado</option>
                         </Select>
                       </FormField>
-                      <FormField label="RPE 1-10">
+                      <FormField label="RPE 1-5">
                         <Input
                           type="number"
                           min={1}
-                          max={10}
+                          max={5}
                           value={form.perceivedEffort}
                           onChange={(event) =>
                             setForm((current) => ({
@@ -696,7 +861,9 @@ export default function AthleteTreinosPage() {
               )}
             </SectionCard>
           </div>
+          ) : null}
 
+          {activeTab === "progress" ? (
           <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_minmax(340px,0.95fr)]">
             <SectionCard
               title="Progresso do ciclo"
@@ -854,6 +1021,53 @@ export default function AthleteTreinosPage() {
               </div>
             </SectionCard>
           </div>
+          ) : null}
+
+          {activeTab === "upcoming" ? (
+            <SectionCard title="Proximas sessoes" description="Agenda do ciclo com status planejado e concluido.">
+              {allSessions.length === 0 ? (
+                <EmptyState
+                  title="Sem sessoes futuras"
+                  description="Quando o treinador publicar o ciclo, as proximas sessoes aparecerao aqui."
+                />
+              ) : (
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {allSessions.map((session) => (
+                    <button
+                      key={session.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedSessionId(session.id);
+                        setActiveTab("today");
+                      }}
+                      className="min-h-[128px] rounded-xl border border-white/10 bg-[#0f233d] p-4 text-left transition hover:border-sky-300/40"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-white">
+                            {session.title}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-400">
+                            {formatDate(session.scheduledDate)}
+                          </p>
+                        </div>
+                        <StatusBadge
+                          tone={workoutStatusTone(session.status)}
+                          label={workoutStatusLabel(session.status)}
+                        />
+                      </div>
+                      <p className="mt-3 line-clamp-2 text-sm text-slate-300">
+                        {session.objective ?? "Objetivo nao detalhado."}
+                      </p>
+                      <p className="mt-3 text-xs text-slate-400">
+                        {session.exercises.length} exercicio(s)
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </SectionCard>
+          ) : null}
         </>
       )}
     </div>

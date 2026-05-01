@@ -4,7 +4,7 @@
   refresh_token: string;
   expires_at: number;
   expires_in: number;
-  scope: string;
+  scope?: string;
   athlete: {
     id: number;
     username?: string | null;
@@ -27,7 +27,7 @@ export interface StravaActivity {
   start_date: string;
 }
 
-const STRAVA_TOKEN_URL = "https://www.strava.com/api/v3/oauth/token";
+const STRAVA_TOKEN_URL = "https://www.strava.com/oauth/token";
 const STRAVA_ACTIVITIES_URL = "https://www.strava.com/api/v3/athlete/activities";
 
 function stravaCredentials() {

@@ -205,6 +205,7 @@ export async function POST(req: NextRequest) {
         id: true,
         name: true,
         email: true,
+        avatar_url: true,
         role: true,
         organization_id: true,
         athlete_profile: {
@@ -239,6 +240,7 @@ export async function POST(req: NextRequest) {
           id: demoUser.id,
           name: demoUser.name,
           email: demoUser.email,
+          avatar_url: demoUser.avatar_url,
           role: demoUser.role,
           roles: buildEffectiveRoles({
             primaryRole: demoUser.role as UserRole,
@@ -270,6 +272,7 @@ export async function POST(req: NextRequest) {
       id: true,
       name: true,
       email: true,
+      avatar_url: true,
       password_hash: true,
       role: true,
       organization_id: true,
@@ -360,7 +363,7 @@ export async function POST(req: NextRequest) {
   });
 
   const responseBody = {
-    user: { id: user.id, name: user.name, email: user.email, role, roles },
+    user: { id: user.id, name: user.name, email: user.email, avatar_url: user.avatar_url, role, roles },
     profile: { hasCpf },
     organization: user.organization
       ? {

@@ -9,6 +9,7 @@ import {
   getPersonalRecords,
   hasActivities,
   hasStravaConnection,
+  type RankingPeriod,
 } from "@/lib/dashboard/activity-analytics";
 import {
   buildAchievements,
@@ -84,6 +85,11 @@ export interface DashboardAthleteResponse {
 type PaymentStatus = "PENDING" | "PAID" | "EXPIRED" | "REFUNDED" | "CANCELLED";
 type NumericLike = number | bigint | { toString(): string };
 type RegistrationApiStatus = "INTERESTED" | "PENDING_PAYMENT" | "CONFIRMED" | "CANCELLED";
+
+function parseRankingPeriod(value: string | null): RankingPeriod {
+  if (value === "30d" || value === "90d" || value === "year") return value;
+  return "90d";
+}
 
 function getYearBounds(now: Date) {
   const year = now.getUTCFullYear();
@@ -313,6 +319,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const now = new Date();
+    const rankingPeriod = parseRankingPeriod(req.nextUrl.searchParams.get("period"));
     const { start, end } = getYearBounds(now);
     const calendarEnd = new Date(now);
     calendarEnd.setMonth(calendarEnd.getMonth() + 3);
@@ -510,7 +517,7 @@ export async function GET(req: NextRequest) {
           getEvolutionSeries(prisma, auth.userId, auth.orgId, now),
           getDistanceDistribution(prisma, auth.userId, auth.orgId, now),
           getPersonalRecords(prisma, auth.userId, auth.orgId),
-          getGroupRanking(prisma, auth.orgId, auth.userId, now),
+          getGroupRanking(prisma, auth.orgId, auth.userId, now, rankingPeriod),
         ]);
 
       experience = buildActivityExperience({
