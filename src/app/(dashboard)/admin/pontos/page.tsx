@@ -2,12 +2,14 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import { BarChart3, FileBarChart2, Medal, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { ActionButton } from "@/components/system/action-button";
 import { DataTable, type DataTableColumn } from "@/components/system/data-table";
 import { EmptyState } from "@/components/system/empty-state";
 import { LoadingState } from "@/components/system/loading-state";
 import { MetricCard } from "@/components/system/metric-card";
+import { ModuleTabs, type ModuleTabItem } from "@/components/system/module-tabs";
 import { PageHeader } from "@/components/system/page-header";
 import { SectionCard } from "@/components/system/section-card";
 
@@ -124,6 +126,7 @@ interface AthleteOption {
 
 type ActivityTemplate = "ASSESSORIA" | "PROVA" | "BONUS";
 type ManualAdjustmentType = "CREDIT" | "DEBIT" | "ADJUSTMENT";
+type PointsTab = "overview" | "activities" | "rules" | "reports";
 
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const DATETIME = new Intl.DateTimeFormat("pt-BR", {
@@ -295,6 +298,7 @@ export default function AdminPontosPage() {
     reason: "",
   });
   const [submittingManualAdjustment, setSubmittingManualAdjustment] = useState(false);
+  const [activeTab, setActiveTab] = useState<PointsTab>("overview");
 
   const loadEntries = useCallback(async () => {
     const params = new URLSearchParams({
@@ -801,6 +805,51 @@ export default function AdminPontosPage() {
     () => approvedEntries.reduce((sum, entry) => sum + entry.points, 0),
     [approvedEntries],
   );
+  const tabs = useMemo<ModuleTabItem<PointsTab>[]>(
+    () => [
+      {
+        key: "overview",
+        label: "Painel",
+        audience: "Gestao",
+        description: "Emissao, resgates, expiracao e saldo ativo.",
+        icon: BarChart3,
+        metricLabel: "Emitidos",
+        metricValue: `${report?.totalPointsIssued ?? 0} pts`,
+        metricTone: "info",
+      },
+      {
+        key: "activities",
+        label: "Atividades",
+        audience: "Operacao",
+        description: "Cadastro, lancamentos, bonificacoes e aprovacao.",
+        icon: Medal,
+        metricLabel: "Pendentes",
+        metricValue: pendingEntries.length,
+        metricTone: pendingEntries.length > 0 ? "warning" : "positive",
+      },
+      {
+        key: "rules",
+        label: "Regras",
+        audience: "Configuracao",
+        description: "Politica, automacoes, recorrencia e pontos por prova.",
+        icon: Settings,
+        metricLabel: "Regras",
+        metricValue: rules.length,
+        metricTone: rules.length > 0 ? "positive" : "neutral",
+      },
+      {
+        key: "reports",
+        label: "Relatorios",
+        audience: "Auditoria",
+        description: "Origens, movimentos, resgates e avisos de expiracao.",
+        icon: FileBarChart2,
+        metricLabel: "Movimentos",
+        metricValue: report?.recentMovements.length ?? 0,
+        metricTone: "info",
+      },
+    ],
+    [pendingEntries.length, report?.recentMovements.length, report?.totalPointsIssued, rules.length],
+  );
 
   return (
     <div className="space-y-6">
@@ -867,7 +916,21 @@ export default function AdminPontosPage() {
         <LoadingState lines={6} />
       ) : (
         <>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <SectionCard
+            title="Modulo de pontos"
+            description="Separe acompanhamento, atividades, regras e auditoria em abas."
+          >
+            <ModuleTabs
+              tabs={tabs}
+              activeTab={activeTab}
+              onChange={setActiveTab}
+              columnsClassName="md:grid-cols-4"
+            />
+          </SectionCard>
+
+          <div
+            className={activeTab === "overview" ? "grid gap-3 sm:grid-cols-2 xl:grid-cols-3" : "hidden"}
+          >
             <MetricCard label="Pontos emitidos" value={`${report.totalPointsIssued} pts`} tone="highlight" />
             <MetricCard label="Pontos resgatados" value={`${report.totalPointsRedeemed} pts`} />
             <MetricCard label="Pontos expirados" value={`${report.totalPointsExpired} pts`} />
@@ -876,6 +939,7 @@ export default function AdminPontosPage() {
           </div>
 
           <SectionCard
+            className={activeTab === "activities" ? undefined : "hidden"}
             title="Aprovacao por atividade"
             description="Pontue provas, atividades da assessoria e bonificacoes complementares com revisao antes da liberacao."
           >
@@ -1129,6 +1193,7 @@ export default function AdminPontosPage() {
           </SectionCard>
 
           <SectionCard
+            className={activeTab === "activities" ? undefined : "hidden"}
             title="Fila de aprovacao"
             description="Revise solicitacoes dos usuarios e lancamentos administrativos antes de liberar os pontos no saldo."
             action={
@@ -1211,191 +1276,193 @@ export default function AdminPontosPage() {
             )}
           </SectionCard>
 
-          {policy ? (
-            <SectionCard
-              title="Politica de pontos"
-              description="Regras oficiais exibidas aos atletas e usadas nos calculos de desconto"
-            >
-              <div className="grid gap-3 md:grid-cols-[180px_180px_1fr]">
-                <label className="space-y-1 text-sm text-slate-200">
-                  <span className="text-xs uppercase tracking-wide text-slate-400">Valor do ponto</span>
-                  <div className="flex items-center rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2">
-                    <span className="text-slate-400">R$</span>
-                    <input
-                      type="number"
-                      min={1}
-                      value={policy.pointValueCents}
+          <div className={activeTab === "rules" ? "space-y-6" : "hidden"}>
+            {policy ? (
+              <SectionCard
+                title="Politica de pontos"
+                description="Regras oficiais exibidas aos atletas e usadas nos calculos de desconto"
+              >
+                <div className="grid gap-3 md:grid-cols-[180px_180px_1fr]">
+                  <label className="space-y-1 text-sm text-slate-200">
+                    <span className="text-xs uppercase tracking-wide text-slate-400">Valor do ponto</span>
+                    <div className="flex items-center rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2">
+                      <span className="text-slate-400">R$</span>
+                      <input
+                        type="number"
+                        min={1}
+                        value={policy.pointValueCents}
+                        onChange={(event) =>
+                          setPolicy((prev) => (prev ? { ...prev, pointValueCents: Number(event.target.value) } : prev))
+                        }
+                        className="ml-2 w-full bg-transparent text-sm text-white outline-none"
+                      />
+                      <span className="text-xs text-slate-400">centavos</span>
+                    </div>
+                  </label>
+                  <label className="space-y-1 text-sm text-slate-200">
+                    <span className="text-xs uppercase tracking-wide text-slate-400">Validade</span>
+                    <div className="flex items-center rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2">
+                      <input
+                        type="number"
+                        min={1}
+                        value={policy.expirationMonths}
+                        onChange={(event) =>
+                          setPolicy((prev) => (prev ? { ...prev, expirationMonths: Number(event.target.value) } : prev))
+                        }
+                        className="w-full bg-transparent text-sm text-white outline-none"
+                      />
+                      <span className="text-xs text-slate-400">meses</span>
+                    </div>
+                  </label>
+                  <label className="space-y-1 text-sm text-slate-200">
+                    <span className="text-xs uppercase tracking-wide text-slate-400">Texto para o atleta</span>
+                    <textarea
+                      value={policy.athletePolicyText}
                       onChange={(event) =>
-                        setPolicy((prev) => (prev ? { ...prev, pointValueCents: Number(event.target.value) } : prev))
+                        setPolicy((prev) => (prev ? { ...prev, athletePolicyText: event.target.value } : prev))
                       }
-                      className="ml-2 w-full bg-transparent text-sm text-white outline-none"
+                      className="min-h-[86px] w-full rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white outline-none"
                     />
-                    <span className="text-xs text-slate-400">centavos</span>
-                  </div>
-                </label>
-                <label className="space-y-1 text-sm text-slate-200">
-                  <span className="text-xs uppercase tracking-wide text-slate-400">Validade</span>
-                  <div className="flex items-center rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2">
-                    <input
-                      type="number"
-                      min={1}
-                      value={policy.expirationMonths}
-                      onChange={(event) =>
-                        setPolicy((prev) => (prev ? { ...prev, expirationMonths: Number(event.target.value) } : prev))
-                      }
-                      className="w-full bg-transparent text-sm text-white outline-none"
-                    />
-                    <span className="text-xs text-slate-400">meses</span>
-                  </div>
-                </label>
-                <label className="space-y-1 text-sm text-slate-200">
-                  <span className="text-xs uppercase tracking-wide text-slate-400">Texto para o atleta</span>
-                  <textarea
-                    value={policy.athletePolicyText}
-                    onChange={(event) =>
-                      setPolicy((prev) => (prev ? { ...prev, athletePolicyText: event.target.value } : prev))
-                    }
-                    className="min-h-[86px] w-full rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white outline-none"
-                  />
-                </label>
-              </div>
-              <div className="mt-3">
-                <ActionButton disabled={savingPolicy} onClick={() => void savePolicy()}>
-                  {savingPolicy ? "Salvando..." : "Salvar politica"}
-                </ActionButton>
-              </div>
-            </SectionCard>
-          ) : null}
+                  </label>
+                </div>
+                <div className="mt-3">
+                  <ActionButton disabled={savingPolicy} onClick={() => void savePolicy()}>
+                    {savingPolicy ? "Salvando..." : "Salvar politica"}
+                  </ActionButton>
+                </div>
+              </SectionCard>
+            ) : null}
 
-          <SectionCard
-            title="Automacoes"
-            description="Dispare recorrencia mensal/trimestral e expiracao quando necessario"
-          >
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="space-y-2 rounded-xl border border-white/10 bg-[#0c1f35] p-3">
-                <p className="text-sm text-slate-200">Processar recorrencia</p>
-                <div className="flex gap-2">
-                  <input
-                    type="number"
-                    min={1}
-                    max={12}
-                    value={recurrenceMonth}
-                    onChange={(event) => setRecurrenceMonth(Number(event.target.value))}
-                    className="w-24 rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white"
-                  />
-                  <input
-                    type="number"
-                    min={2000}
-                    max={2100}
-                    value={recurrenceYear}
-                    onChange={(event) => setRecurrenceYear(Number(event.target.value))}
-                    className="w-28 rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white"
-                  />
-                  <ActionButton disabled={processingRecurrence} onClick={() => void runRecurrence()}>
-                    {processingRecurrence ? "Processando..." : "Processar"}
+            <SectionCard
+              title="Automacoes"
+              description="Dispare recorrencia mensal/trimestral e expiracao quando necessario"
+            >
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-2 rounded-xl border border-white/10 bg-[#0c1f35] p-3">
+                  <p className="text-sm text-slate-200">Processar recorrencia</p>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      min={1}
+                      max={12}
+                      value={recurrenceMonth}
+                      onChange={(event) => setRecurrenceMonth(Number(event.target.value))}
+                      className="w-24 rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white"
+                    />
+                    <input
+                      type="number"
+                      min={2000}
+                      max={2100}
+                      value={recurrenceYear}
+                      onChange={(event) => setRecurrenceYear(Number(event.target.value))}
+                      className="w-28 rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white"
+                    />
+                    <ActionButton disabled={processingRecurrence} onClick={() => void runRecurrence()}>
+                      {processingRecurrence ? "Processando..." : "Processar"}
+                    </ActionButton>
+                  </div>
+                </div>
+                <div className="space-y-2 rounded-xl border border-white/10 bg-[#0c1f35] p-3">
+                  <p className="text-sm text-slate-200">Processar expiracao</p>
+                  <ActionButton
+                    intent="secondary"
+                    disabled={processingExpiration}
+                    onClick={() => void runExpiration()}
+                  >
+                    {processingExpiration ? "Processando..." : "Rodar expiracao agora"}
                   </ActionButton>
                 </div>
               </div>
-              <div className="space-y-2 rounded-xl border border-white/10 bg-[#0c1f35] p-3">
-                <p className="text-sm text-slate-200">Processar expiracao</p>
-                <ActionButton
-                  intent="secondary"
-                  disabled={processingExpiration}
-                  onClick={() => void runExpiration()}
+            </SectionCard>
+
+            <SectionCard title="Pontos por prova" description="Configure quantos pontos cada prova gera para associados">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+                <select
+                  value={ruleForm.eventId}
+                  onChange={(event) => setRuleForm((prev) => ({ ...prev, eventId: event.target.value }))}
+                  className="rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white xl:col-span-2"
                 >
-                  {processingExpiration ? "Processando..." : "Rodar expiracao agora"}
+                  <option value="">Regra padrao da assessoria</option>
+                  {events.map((event) => (
+                    <option key={event.id} value={event.id}>
+                      {event.name}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  min={0}
+                  value={ruleForm.basePoints}
+                  onChange={(event) => setRuleForm((prev) => ({ ...prev, basePoints: Number(event.target.value) }))}
+                  className="rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white"
+                  placeholder="Participacao"
+                />
+                <input
+                  type="number"
+                  min={0}
+                  value={ruleForm.earlySignupBonus}
+                  onChange={(event) =>
+                    setRuleForm((prev) => ({ ...prev, earlySignupBonus: Number(event.target.value) }))
+                  }
+                  className="rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white"
+                  placeholder="Inscricao antecipada"
+                />
+                <input
+                  type="number"
+                  min={0}
+                  value={ruleForm.earlyPaymentBonus}
+                  onChange={(event) =>
+                    setRuleForm((prev) => ({ ...prev, earlyPaymentBonus: Number(event.target.value) }))
+                  }
+                  className="rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white"
+                  placeholder="Pagamento antecipado"
+                />
+                <input
+                  type="number"
+                  min={0}
+                  value={ruleForm.campaignBonus}
+                  onChange={(event) =>
+                    setRuleForm((prev) => ({ ...prev, campaignBonus: Number(event.target.value) }))
+                  }
+                  className="rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white"
+                  placeholder="Bonus campanha"
+                />
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <label className="flex items-center gap-2 text-sm text-slate-200">
+                  <input
+                    type="checkbox"
+                    checked={ruleForm.active}
+                    onChange={(event) => setRuleForm((prev) => ({ ...prev, active: event.target.checked }))}
+                  />
+                  Regra ativa
+                </label>
+                <ActionButton disabled={savingRule} onClick={() => void saveRule()}>
+                  {savingRule ? "Salvando..." : "Salvar regra"}
                 </ActionButton>
               </div>
-            </div>
-          </SectionCard>
 
-          <SectionCard title="Pontos por prova" description="Configure quantos pontos cada prova gera para associados">
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-              <select
-                value={ruleForm.eventId}
-                onChange={(event) => setRuleForm((prev) => ({ ...prev, eventId: event.target.value }))}
-                className="rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white xl:col-span-2"
-              >
-                <option value="">Regra padrao da assessoria</option>
-                {events.map((event) => (
-                  <option key={event.id} value={event.id}>
-                    {event.name}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="number"
-                min={0}
-                value={ruleForm.basePoints}
-                onChange={(event) => setRuleForm((prev) => ({ ...prev, basePoints: Number(event.target.value) }))}
-                className="rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white"
-                placeholder="Participacao"
-              />
-              <input
-                type="number"
-                min={0}
-                value={ruleForm.earlySignupBonus}
-                onChange={(event) =>
-                  setRuleForm((prev) => ({ ...prev, earlySignupBonus: Number(event.target.value) }))
-                }
-                className="rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white"
-                placeholder="Inscricao antecipada"
-              />
-              <input
-                type="number"
-                min={0}
-                value={ruleForm.earlyPaymentBonus}
-                onChange={(event) =>
-                  setRuleForm((prev) => ({ ...prev, earlyPaymentBonus: Number(event.target.value) }))
-                }
-                className="rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white"
-                placeholder="Pagamento antecipado"
-              />
-              <input
-                type="number"
-                min={0}
-                value={ruleForm.campaignBonus}
-                onChange={(event) =>
-                  setRuleForm((prev) => ({ ...prev, campaignBonus: Number(event.target.value) }))
-                }
-                className="rounded-lg border border-white/15 bg-[#0b1d33] px-3 py-2 text-sm text-white"
-                placeholder="Bonus campanha"
-              />
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <label className="flex items-center gap-2 text-sm text-slate-200">
-                <input
-                  type="checkbox"
-                  checked={ruleForm.active}
-                  onChange={(event) => setRuleForm((prev) => ({ ...prev, active: event.target.checked }))}
-                />
-                Regra ativa
-              </label>
-              <ActionButton disabled={savingRule} onClick={() => void saveRule()}>
-                {savingRule ? "Salvando..." : "Salvar regra"}
-              </ActionButton>
-            </div>
+              <div className="mt-4 grid gap-2">
+                {rules.length === 0 ? (
+                  <EmptyState title="Sem regras configuradas" description="O sistema usa o padrao: 10 pontos por participacao." />
+                ) : (
+                  rules.map((rule) => {
+                    const event = events.find((item) => item.id === rule.eventId);
+                    return (
+                      <div key={rule.id} className="rounded-xl border border-white/10 bg-[#0c1f35] p-3 text-sm text-slate-200">
+                        <p className="font-semibold text-white">{event?.name ?? "Regra padrao da assessoria"}</p>
+                        <p className="mt-1 text-xs text-slate-300">
+                          Participacao: {rule.basePoints} pts | Inscricao antecipada: {rule.earlySignupBonus} pts | Pagamento antecipado: {rule.earlyPaymentBonus} pts | Campanha: {rule.campaignBonus} pts
+                        </p>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </SectionCard>
+          </div>
 
-            <div className="mt-4 grid gap-2">
-              {rules.length === 0 ? (
-                <EmptyState title="Sem regras configuradas" description="O sistema usa o padrao: 10 pontos por participacao." />
-              ) : (
-                rules.map((rule) => {
-                  const event = events.find((item) => item.id === rule.eventId);
-                  return (
-                    <div key={rule.id} className="rounded-xl border border-white/10 bg-[#0c1f35] p-3 text-sm text-slate-200">
-                      <p className="font-semibold text-white">{event?.name ?? "Regra padrao da assessoria"}</p>
-                      <p className="mt-1 text-xs text-slate-300">
-                        Participacao: {rule.basePoints} pts | Inscricao antecipada: {rule.earlySignupBonus} pts | Pagamento antecipado: {rule.earlyPaymentBonus} pts | Campanha: {rule.campaignBonus} pts
-                      </p>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </SectionCard>
-
-          <div className="grid gap-4 xl:grid-cols-2">
+          <div className={activeTab === "reports" ? "grid gap-4 xl:grid-cols-2" : "hidden"}>
             <SectionCard title="Pontos por origem" description="Distribuicao de creditos, debitos e expiracoes">
               {report.pointsBySource.length === 0 ? (
                 <EmptyState title="Sem movimentos" description="Nenhuma movimentacao no periodo filtrado." />
@@ -1413,7 +1480,7 @@ export default function AdminPontosPage() {
             </SectionCard>
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-2">
+          <div className={activeTab === "reports" ? "grid gap-4 xl:grid-cols-2" : "hidden"}>
             <SectionCard title="Resgates por categoria" description="Performance comercial por classe de recompensa">
               {report.redemptionsByCategory.length === 0 ? (
                 <EmptyState title="Sem dados" description="Nenhum resgate no periodo selecionado." />
@@ -1431,7 +1498,11 @@ export default function AdminPontosPage() {
             </SectionCard>
           </div>
 
-          <SectionCard title="Avisos de expiracao" description="Atletas associados com pontos prestes a expirar (30 dias)">
+          <SectionCard
+            className={activeTab === "reports" ? undefined : "hidden"}
+            title="Avisos de expiracao"
+            description="Atletas associados com pontos prestes a expirar (30 dias)"
+          >
             {warnings.length === 0 ? (
               <EmptyState title="Sem avisos" description="Nenhum usuario com expiracao proxima." />
             ) : (

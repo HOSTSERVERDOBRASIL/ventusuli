@@ -1,8 +1,12 @@
+﻿"use client";
+
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Camera, Download, Image, ShieldCheck, UploadCloud } from "lucide-react";
 import { ActionButton } from "@/components/system/action-button";
 import { EmptyState } from "@/components/system/empty-state";
 import { MetricCard } from "@/components/system/metric-card";
+import { ModuleTabs, type ModuleTabItem } from "@/components/system/module-tabs";
 import { PageHeader } from "@/components/system/page-header";
 import { SectionCard } from "@/components/system/section-card";
 
@@ -13,7 +17,46 @@ const pipeline = [
   "Download assinado",
 ];
 
+type PhotosTab = "overview" | "galleries" | "pricing";
+
 export default function AdminFotosPage() {
+  const [activeTab, setActiveTab] = useState<PhotosTab>("overview");
+  const tabs = useMemo<ModuleTabItem<PhotosTab>[]>(
+    () => [
+      {
+        key: "overview",
+        label: "Painel",
+        audience: "Gestao",
+        description: "Galerias, publicacoes, downloads e pendencias.",
+        icon: Image,
+        metricLabel: "Galerias",
+        metricValue: 0,
+        metricTone: "neutral",
+      },
+      {
+        key: "galleries",
+        label: "Galerias",
+        audience: "Operacao",
+        description: "Organizacao por prova e pipeline de arquivos.",
+        icon: Camera,
+        metricLabel: "Fotos",
+        metricValue: 0,
+        metricTone: "neutral",
+      },
+      {
+        key: "pricing",
+        label: "Vendas",
+        audience: "Comercial",
+        description: "Precificacao, pontos, pacotes e desbloqueios.",
+        icon: Download,
+        metricLabel: "Downloads",
+        metricValue: 0,
+        metricTone: "neutral",
+      },
+    ],
+    [],
+  );
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -26,14 +69,26 @@ export default function AdminFotosPage() {
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-4">
+      <SectionCard
+        title="Modulo de fotos"
+        description="Separe indicadores, galerias e regras comerciais em abas."
+      >
+        <ModuleTabs
+          tabs={tabs}
+          activeTab={activeTab}
+          onChange={setActiveTab}
+          columnsClassName="md:grid-cols-3"
+        />
+      </SectionCard>
+
+      <div className={activeTab === "overview" ? "grid gap-3 sm:grid-cols-4" : "hidden"}>
         <MetricCard label="Galerias" value="0" icon={Image} tone="highlight" />
         <MetricCard label="Fotos publicadas" value="0" icon={Camera} />
         <MetricCard label="Downloads liberados" value="0" icon={Download} />
         <MetricCard label="Pendentes" value="0" icon={UploadCloud} />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+      <div className={activeTab === "galleries" ? "grid gap-4 xl:grid-cols-[1.2fr_0.8fr]" : "hidden"}>
         <SectionCard title="Galerias por prova" description="Publicacao e organizacao comercial por evento.">
           <div className="overflow-x-auto rounded-xl border border-white/10">
             <table className="min-w-full text-sm">
@@ -68,7 +123,11 @@ export default function AdminFotosPage() {
         </SectionCard>
       </div>
 
-      <SectionCard title="Precificacao e desbloqueios" description="Controle por dinheiro, pontos, pacote ou concessao administrativa.">
+      <SectionCard
+        className={activeTab === "pricing" ? undefined : "hidden"}
+        title="Precificacao e desbloqueios"
+        description="Controle por dinheiro, pontos, pacote ou concessao administrativa."
+      >
         <div className="grid gap-3 md:grid-cols-4">
           {["Preco individual", "Custo em pontos", "Pacotes", "Comissoes"].map((label) => (
             <div key={label} className="rounded-xl border border-white/10 bg-[#102640] p-4">

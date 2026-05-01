@@ -1,8 +1,12 @@
+﻿"use client";
+
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { BarChart3, CreditCard, Gift, Handshake, Target } from "lucide-react";
 import { ActionButton } from "@/components/system/action-button";
 import { EmptyState } from "@/components/system/empty-state";
 import { MetricCard } from "@/components/system/metric-card";
+import { ModuleTabs, type ModuleTabItem } from "@/components/system/module-tabs";
 import { PageHeader } from "@/components/system/page-header";
 import { SectionCard } from "@/components/system/section-card";
 
@@ -14,7 +18,46 @@ const placementAreas = [
   "Resultados",
 ];
 
+type SponsorsTab = "overview" | "campaigns" | "metrics";
+
 export default function AdminPatrocinadoresPage() {
+  const [activeTab, setActiveTab] = useState<SponsorsTab>("overview");
+  const tabs = useMemo<ModuleTabItem<SponsorsTab>[]>(
+    () => [
+      {
+        key: "overview",
+        label: "Painel",
+        audience: "Comercial",
+        description: "Patrocinadores, campanhas, receita e produtos.",
+        icon: Handshake,
+        metricLabel: "Patrocinadores",
+        metricValue: 0,
+        metricTone: "neutral",
+      },
+      {
+        key: "campaigns",
+        label: "Campanhas",
+        audience: "Operacao",
+        description: "Contratos, placements, budget e ativacoes.",
+        icon: Target,
+        metricLabel: "Ativas",
+        metricValue: 0,
+        metricTone: "neutral",
+      },
+      {
+        key: "metrics",
+        label: "Metricas",
+        audience: "Diretoria",
+        description: "Impressoes, cliques, conversoes e cupons.",
+        icon: BarChart3,
+        metricLabel: "Conversoes",
+        metricValue: 0,
+        metricTone: "neutral",
+      },
+    ],
+    [],
+  );
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -27,14 +70,26 @@ export default function AdminPatrocinadoresPage() {
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-4">
+      <SectionCard
+        title="Modulo de patrocinadores"
+        description="Separe visao comercial, campanhas e metricas em abas."
+      >
+        <ModuleTabs
+          tabs={tabs}
+          activeTab={activeTab}
+          onChange={setActiveTab}
+          columnsClassName="md:grid-cols-3"
+        />
+      </SectionCard>
+
+      <div className={activeTab === "overview" ? "grid gap-3 sm:grid-cols-4" : "hidden"}>
         <MetricCard label="Patrocinadores" value="0" icon={Handshake} tone="highlight" />
         <MetricCard label="Campanhas ativas" value="0" icon={Target} />
         <MetricCard label="Receita" value="R$ 0" icon={CreditCard} />
         <MetricCard label="Produtos" value="0" icon={Gift} />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+      <div className={activeTab === "campaigns" ? "grid gap-4 xl:grid-cols-[1.2fr_0.8fr]" : "hidden"}>
         <SectionCard title="Campanhas" description="Contratos, periodo, budget, pontos patrocinados e status.">
           <div className="overflow-x-auto rounded-xl border border-white/10">
             <table className="min-w-full text-sm">
@@ -68,7 +123,11 @@ export default function AdminPatrocinadoresPage() {
         </SectionCard>
       </div>
 
-      <SectionCard title="Metricas" description="Impressoes, cliques, conversoes, cupons e receita por patrocinador.">
+      <SectionCard
+        className={activeTab === "metrics" ? undefined : "hidden"}
+        title="Metricas"
+        description="Impressoes, cliques, conversoes, cupons e receita por patrocinador."
+      >
         <div className="grid gap-3 md:grid-cols-4">
           {["Impressoes", "Cliques", "Conversoes", "Cupons usados"].map((label) => (
             <div key={label} className="rounded-xl border border-white/10 bg-[#102640] p-4">

@@ -1,17 +1,19 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { BarChart3, FileText, History } from "lucide-react";
 import { toast } from "sonner";
 import { useAuthToken } from "@/components/auth/AuthTokenProvider";
 import { AdminNoticeFilters } from "@/components/notices/admin-notice-filters";
 import { NoticeCard } from "@/components/notices/notice-card";
 import { NoticeComposer, NoticeComposerPayload } from "@/components/notices/notice-composer";
+import { ActionButton } from "@/components/system/action-button";
 import { EmptyState } from "@/components/system/empty-state";
 import { LoadingState } from "@/components/system/loading-state";
 import { MetricCard } from "@/components/system/metric-card";
+import { ModuleTabs, type ModuleTabItem } from "@/components/system/module-tabs";
 import { PageHeader } from "@/components/system/page-header";
 import { SectionCard } from "@/components/system/section-card";
-import { ActionButton } from "@/components/system/action-button";
 import {
   createNotice,
   getNotices,
@@ -27,6 +29,8 @@ interface FilterState {
   endDate: string;
 }
 
+type NoticeModuleTab = "overview" | "compose" | "history";
+
 export default function AdminAvisosPage() {
   const { accessToken, hydrated } = useAuthToken();
   const [loading, setLoading] = useState(true);
@@ -41,6 +45,7 @@ export default function AdminAvisosPage() {
     startDate: "",
     endDate: "",
   });
+  const [activeTab, setActiveTab] = useState<NoticeModuleTab>("overview");
 
   const loadNotices = async () => {
     setLoading(true);
@@ -88,6 +93,42 @@ export default function AdminAvisosPage() {
 
     return { published, drafts, failedTelegram, total: notices.length };
   }, [notices]);
+
+  const tabs = useMemo<ModuleTabItem<NoticeModuleTab>[]>(
+    () => [
+      {
+        key: "overview",
+        label: "Painel",
+        audience: "Gestao",
+        description: "Volume, publicacoes, rascunhos e falhas de entrega.",
+        icon: BarChart3,
+        metricLabel: "Total",
+        metricValue: metrics.total,
+        metricTone: "info",
+      },
+      {
+        key: "compose",
+        label: "Criar",
+        audience: "Comunicacao",
+        description: "Novo aviso para atletas, treinadores ou administracao.",
+        icon: FileText,
+        metricLabel: "Rascunhos",
+        metricValue: metrics.drafts,
+        metricTone: metrics.drafts > 0 ? "warning" : "positive",
+      },
+      {
+        key: "history",
+        label: "Historico",
+        audience: "Auditoria",
+        description: "Filtro por periodo, audiencia, status e entregas.",
+        icon: History,
+        metricLabel: "Falhas",
+        metricValue: metrics.failedTelegram,
+        metricTone: metrics.failedTelegram > 0 ? "danger" : "positive",
+      },
+    ],
+    [metrics],
+  );
 
   const handleCreate = async (payload: NoticeComposerPayload) => {
     setSubmitting(true);
@@ -161,7 +202,21 @@ export default function AdminAvisosPage() {
         subtitle="Gestão completa de comunicados oficiais, agendamento e entregas por canal."
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <SectionCard
+        title="Modulo de avisos"
+        description="Separe acompanhamento, criacao e auditoria em abas objetivas."
+      >
+        <ModuleTabs
+          tabs={tabs}
+          activeTab={activeTab}
+          onChange={setActiveTab}
+          columnsClassName="md:grid-cols-3"
+        />
+      </SectionCard>
+
+      <div
+        className={activeTab === "overview" ? "grid gap-3 sm:grid-cols-2 xl:grid-cols-4" : "hidden"}
+      >
         <MetricCard label="Total" value={metrics.total} />
         <MetricCard label="Publicados" value={metrics.published} />
         <MetricCard label="Rascunhos" value={metrics.drafts} />
@@ -169,6 +224,7 @@ export default function AdminAvisosPage() {
       </div>
 
       <SectionCard
+        className={activeTab === "compose" ? undefined : "hidden"}
         title="Novo aviso"
         description="Crie um rascunho e publique quando estiver pronto"
       >
@@ -176,6 +232,7 @@ export default function AdminAvisosPage() {
       </SectionCard>
 
       <SectionCard
+        className={activeTab === "history" ? undefined : "hidden"}
         title="Histórico e entregas"
         description="Filtre por status, audiência e período para auditoria operacional"
       >

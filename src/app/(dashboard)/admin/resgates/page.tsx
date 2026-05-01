@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { BarChart3, ClipboardList, PackageCheck } from "lucide-react";
+import { toast } from "sonner";
 import { DataTable, type DataTableColumn } from "@/components/system/data-table";
 import { EmptyState } from "@/components/system/empty-state";
 import { LoadingState } from "@/components/system/loading-state";
 import { MetricCard } from "@/components/system/metric-card";
+import { ModuleTabs, type ModuleTabItem } from "@/components/system/module-tabs";
 import { PageHeader } from "@/components/system/page-header";
 import { SectionCard } from "@/components/system/section-card";
 import { StatusBadge } from "@/components/system/status-badge";
@@ -30,6 +32,8 @@ interface AdminRedemptionsResponse {
 }
 
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+
+type RedemptionsTab = "overview" | "operation" | "delivered";
 
 function toneByStatus(status: string): "positive" | "warning" | "danger" | "neutral" | "info" {
   if (status === "DELIVERED") return "positive";
@@ -55,6 +59,7 @@ export default function AdminResgatesPage() {
   const [rows, setRows] = useState<AdminRedemption[]>([]);
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [updatingAction, setUpdatingAction] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<RedemptionsTab>("overview");
 
   const load = async () => {
     setLoading(true);
@@ -88,6 +93,42 @@ export default function AdminResgatesPage() {
     const delivered = rows.filter((row) => row.status === "DELIVERED").length;
     return { pending, approved, delivered };
   }, [rows]);
+
+  const tabs = useMemo<ModuleTabItem<RedemptionsTab>[]>(
+    () => [
+      {
+        key: "overview",
+        label: "Painel",
+        audience: "Gestao",
+        description: "Resumo de pedidos, pendencias e entregas.",
+        icon: BarChart3,
+        metricLabel: "Pendentes",
+        metricValue: summary.pending,
+        metricTone: summary.pending > 0 ? "warning" : "positive",
+      },
+      {
+        key: "operation",
+        label: "Operacao",
+        audience: "Equipe",
+        description: "Separar, entregar ou cancelar pedidos abertos.",
+        icon: ClipboardList,
+        metricLabel: "Em operacao",
+        metricValue: summary.approved,
+        metricTone: summary.approved > 0 ? "info" : "neutral",
+      },
+      {
+        key: "delivered",
+        label: "Entregues",
+        audience: "Auditoria",
+        description: "Pedidos finalizados e historico de entrega.",
+        icon: PackageCheck,
+        metricLabel: "Entregues",
+        metricValue: summary.delivered,
+        metricTone: "positive",
+      },
+    ],
+    [summary],
+  );
 
   const patchStatus = async (id: string, status: string) => {
     try {
@@ -208,13 +249,31 @@ export default function AdminResgatesPage() {
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <SectionCard
+        title="Modulo de resgates"
+        description="Separe acompanhamento, operacao e auditoria dos pedidos."
+      >
+        <ModuleTabs
+          tabs={tabs}
+          activeTab={activeTab}
+          onChange={(tab) => {
+            setActiveTab(tab);
+            if (tab === "overview") setStatusFilter("ALL");
+            if (tab === "operation") setStatusFilter("APPROVED");
+            if (tab === "delivered") setStatusFilter("DELIVERED");
+          }}
+          columnsClassName="md:grid-cols-3"
+        />
+      </SectionCard>
+
+      <div className={activeTab === "overview" ? "grid gap-3 sm:grid-cols-3" : "hidden"}>
         <MetricCard label="Pendentes de pagamento" value={String(summary.pending)} />
         <MetricCard label="Em operacao" value={String(summary.approved)} />
         <MetricCard label="Entregues" value={String(summary.delivered)} tone="highlight" />
       </div>
 
       <SectionCard
+        className={activeTab === "operation" || activeTab === "delivered" ? undefined : "hidden"}
         title="Fila de resgates"
         description="Gerencie o status operacional do pedido ate a entrega final"
       >

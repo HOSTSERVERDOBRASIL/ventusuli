@@ -1,12 +1,13 @@
 ﻿"use client";
 
-import { ChangeEvent, useEffect, useState } from "react";
-import { Copy, Link2, Plus, Power, Trash2 } from "lucide-react";
+import { ChangeEvent, useEffect, useMemo, useState } from "react";
+import { Building2, CreditCard, FileText, Link2, Plus, Power, Trash2, UserPlus, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { useAuthToken } from "@/components/auth/AuthTokenProvider";
 import { ActionButton } from "@/components/system/action-button";
 import { EmptyState } from "@/components/system/empty-state";
 import { LoadingState } from "@/components/system/loading-state";
+import { ModuleTabs, type ModuleTabItem } from "@/components/system/module-tabs";
 import { PageHeader } from "@/components/system/page-header";
 import { SectionCard } from "@/components/system/section-card";
 import { StatusBadge } from "@/components/system/status-badge";
@@ -30,6 +31,7 @@ import { UserRole } from "@/types";
 const ADMIN_ROLES = new Set<UserRole>([UserRole.ADMIN]);
 const DEFAULT_ORG_LOGO = "/branding/ventu-suli-logo.png";
 const MAX_LOGO_FILE_SIZE = 2 * 1024 * 1024;
+type SettingsTab = "brand" | "access" | "finance" | "invites" | "summary";
 
 function inviteLink(token: string): string {
   return `${window.location.origin}/register/atleta?inviteToken=${token}`;
@@ -109,6 +111,7 @@ export default function AdminConfiguracoesPage() {
   const [newInviteLabel, setNewInviteLabel] = useState("");
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [activeTab, setActiveTab] = useState<SettingsTab>("brand");
 
   const [form, setForm] = useState({
     name: "",
@@ -139,6 +142,68 @@ export default function AdminConfiguracoesPage() {
 
   const canEdit = userRole ? ADMIN_ROLES.has(userRole) : false;
   const logoPreviewUrl = form.logoUrl.trim() || settings?.logoUrl || DEFAULT_ORG_LOGO;
+  const activeInvites = useMemo(() => invites.filter((invite) => invite.active).length, [invites]);
+  const tabs = useMemo<ModuleTabItem<SettingsTab>[]>(
+    () => [
+      {
+        key: "brand",
+        label: "Marca",
+        audience: "Gestao",
+        description: "Nome, slug, logo, cor e canal de suporte.",
+        icon: Building2,
+        metricLabel: "Plano",
+        metricValue: settings?.plan ?? "-",
+        metricTone: "info",
+      },
+      {
+        key: "access",
+        label: "Acesso",
+        audience: "Cadastro",
+        description: "Auto-cadastro, aprovacao e entrada de atletas.",
+        icon: UserPlus,
+        metricLabel: "Aprovacao",
+        metricValue: form.requireAthleteApproval ? "Ativa" : "Livre",
+        metricTone: form.requireAthleteApproval ? "warning" : "positive",
+      },
+      {
+        key: "finance",
+        label: "Financeiro",
+        audience: "Tesouraria",
+        description: "Mensalidade, contas, centros e formas de pagamento.",
+        icon: CreditCard,
+        metricLabel: "Recorrencia",
+        metricValue: form.financeRecurringChargeEnabled ? "Ativa" : "Inativa",
+        metricTone: form.financeRecurringChargeEnabled ? "positive" : "neutral",
+      },
+      {
+        key: "invites",
+        label: "Convites",
+        audience: "Operacao",
+        description: "Links unicos para trazer atletas para a assessoria.",
+        icon: Link2,
+        metricLabel: "Ativos",
+        metricValue: activeInvites,
+        metricTone: activeInvites > 0 ? "positive" : "neutral",
+      },
+      {
+        key: "summary",
+        label: "Resumo",
+        audience: "Diretoria",
+        description: "Informacoes comerciais essenciais do tenant.",
+        icon: FileText,
+        metricLabel: "Edicao",
+        metricValue: canEdit ? "Liberada" : "Leitura",
+        metricTone: canEdit ? "positive" : "neutral",
+      },
+    ],
+    [
+      activeInvites,
+      canEdit,
+      form.financeRecurringChargeEnabled,
+      form.requireAthleteApproval,
+      settings?.plan,
+    ],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -348,6 +413,19 @@ export default function AdminConfiguracoesPage() {
       ) : (
         <>
           <SectionCard
+            title="Modulo de configuracoes"
+            description="Separe marca, acesso, financeiro, convites e resumo comercial em abas."
+          >
+            <ModuleTabs
+              tabs={tabs}
+              activeTab={activeTab}
+              onChange={setActiveTab}
+              columnsClassName="md:grid-cols-5"
+            />
+          </SectionCard>
+
+          <SectionCard
+            className={activeTab === "brand" ? undefined : "hidden"}
             title="Identidade da marca"
             description="Nome, slug, logo e cor principal da assessoria."
             action={
@@ -463,6 +541,7 @@ export default function AdminConfiguracoesPage() {
           </SectionCard>
 
           <SectionCard
+            className={activeTab === "access" ? undefined : "hidden"}
             title="Regras de entrada de atletas"
             description="Controle como novos atletas acessam sua assessoria."
           >
@@ -505,6 +584,7 @@ export default function AdminConfiguracoesPage() {
           </SectionCard>
 
           <SectionCard
+            className={activeTab === "finance" ? undefined : "hidden"}
             title="Modelo financeiro da operacao"
             description="Defina como a assessoria cobra, classifica e controla receitas e despesas."
           >
@@ -727,6 +807,7 @@ export default function AdminConfiguracoesPage() {
 
           {canEdit ? (
             <SectionCard
+              className={activeTab === "invites" ? undefined : "hidden"}
               title="Convites de entrada"
               description="Gere links unicos para convidar atletas diretamente para sua assessoria."
               action={
@@ -839,7 +920,11 @@ export default function AdminConfiguracoesPage() {
             </SectionCard>
           ) : null}
 
-          <SectionCard title="Resumo comercial" description="Informacoes essenciais da plataforma">
+          <SectionCard
+            className={activeTab === "summary" ? undefined : "hidden"}
+            title="Resumo comercial"
+            description="Informacoes essenciais da plataforma"
+          >
             <div className="grid gap-3 md:grid-cols-3">
               <div className="rounded-xl border border-[#24486f] bg-[#0f233d] p-3">
                 <p className="text-xs uppercase tracking-wide text-[#8eb0dc]">Assessoria</p>

@@ -10,6 +10,7 @@ import { useAuthToken } from "@/components/auth/AuthTokenProvider";
 import { ActionButton } from "@/components/system/action-button";
 import { EmptyState } from "@/components/system/empty-state";
 import { LoadingState } from "@/components/system/loading-state";
+import { ModuleTabs, type ModuleTabItem } from "@/components/system/module-tabs";
 import { PageHeader } from "@/components/system/page-header";
 import { SectionCard } from "@/components/system/section-card";
 import { StatusBadge } from "@/components/system/status-badge";
@@ -63,6 +64,7 @@ const EMPTY_INVITE_SUMMARY: AdminAthleteInviteSummary = {
 };
 
 type AthleteStatusFilter = "ALL" | "PENDING_APPROVAL" | "ACTIVE" | "REJECTED" | "BLOCKED";
+type AthletesTab = "overview" | "pipeline" | "invites" | "reports";
 
 export default function AdminAtletasPage() {
   const { accessToken } = useAuthToken();
@@ -71,7 +73,8 @@ export default function AdminAtletasPage() {
   const [summary, setSummary] = useState<AthletesListSummary>(EMPTY_SUMMARY);
   const [policy, setPolicy] = useState<AdminAthletePolicy>(EMPTY_POLICY);
   const [invites, setInvites] = useState<AdminAthleteInvite[]>([]);
-  const [inviteSummary, setInviteSummary] = useState<AdminAthleteInviteSummary>(EMPTY_INVITE_SUMMARY);
+  const [inviteSummary, setInviteSummary] =
+    useState<AdminAthleteInviteSummary>(EMPTY_INVITE_SUMMARY);
   const [loadingAthletes, setLoadingAthletes] = useState(true);
   const [loadingInvites, setLoadingInvites] = useState(true);
 
@@ -84,6 +87,7 @@ export default function AdminAtletasPage() {
   const [inviteExpiresAt, setInviteExpiresAt] = useState("");
   const [creatingInvite, setCreatingInvite] = useState(false);
   const [statusActionId, setStatusActionId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<AthletesTab>("overview");
 
   const statusCards = useMemo(
     () => [
@@ -94,6 +98,52 @@ export default function AdminAtletasPage() {
       { key: "BLOCKED" as const, label: "Bloqueados", value: summary.blocked },
     ],
     [summary],
+  );
+
+  const tabs = useMemo<ModuleTabItem<AthletesTab>[]>(
+    () => [
+      {
+        key: "overview",
+        label: "Painel",
+        audience: "Gestao",
+        description: "Resumo da base, politicas e situacao dos associados.",
+        icon: Users,
+        metricLabel: "Associados",
+        metricValue: summary.totalAthletes,
+        metricTone: "info",
+      },
+      {
+        key: "pipeline",
+        label: "Fila",
+        audience: "Operacao",
+        description: "Aprovacoes, bloqueios, busca e lista operacional.",
+        icon: RefreshCw,
+        metricLabel: "Pendentes",
+        metricValue: summary.pendingApproval,
+        metricTone: summary.pendingApproval > 0 ? "warning" : "positive",
+      },
+      {
+        key: "invites",
+        label: "Convites",
+        audience: "Cadastro",
+        description: "Links gerais, individuais e convites de associados.",
+        icon: UserPlus,
+        metricLabel: "Disponiveis",
+        metricValue: inviteSummary.available,
+        metricTone: inviteSummary.available > 0 ? "positive" : "neutral",
+      },
+      {
+        key: "reports",
+        label: "Relatorios",
+        audience: "Diretoria",
+        description: "Matriculas, origem de cadastro e exportacao CSV.",
+        icon: Download,
+        metricLabel: "Sem matricula",
+        metricValue: summary.missingMemberNumber ?? 0,
+        metricTone: (summary.missingMemberNumber ?? 0) > 0 ? "warning" : "positive",
+      },
+    ],
+    [inviteSummary.available, summary],
   );
 
   const refreshAthletes = async () => {
@@ -217,6 +267,19 @@ export default function AdminAtletasPage() {
       />
 
       <SectionCard
+        title="Modulo de associados"
+        description="Separe gestao, fila operacional, convites e relatorios em abas."
+      >
+        <ModuleTabs
+          tabs={tabs}
+          activeTab={activeTab}
+          onChange={setActiveTab}
+          columnsClassName="md:grid-cols-4"
+        />
+      </SectionCard>
+
+      <SectionCard
+        className={activeTab === "overview" ? undefined : "hidden"}
         title="Politica de cadastro"
         description="Controle de entrada por slug aberto ou convite"
       >
@@ -246,9 +309,12 @@ export default function AdminAtletasPage() {
         </div>
       </SectionCard>
 
-      {loadingAthletes ? <LoadingState lines={3} /> : <AthletesSummaryCards summary={summary} />}
+      <div className={activeTab === "overview" ? undefined : "hidden"}>
+        {loadingAthletes ? <LoadingState lines={3} /> : <AthletesSummaryCards summary={summary} />}
+      </div>
 
       <SectionCard
+        className={activeTab === "reports" ? undefined : "hidden"}
         title="Relatorio de associados"
         description="Controle de matriculas e origem de entrada dos atletas"
       >
@@ -261,11 +327,15 @@ export default function AdminAtletasPage() {
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <div className="rounded-xl border border-white/10 bg-[#0F2743] p-4">
             <p className="text-xs uppercase tracking-wide text-slate-300">Com matricula</p>
-            <p className="mt-2 text-2xl font-semibold text-white">{summary.withMemberNumber ?? 0}</p>
+            <p className="mt-2 text-2xl font-semibold text-white">
+              {summary.withMemberNumber ?? 0}
+            </p>
           </div>
           <div className="rounded-xl border border-white/10 bg-[#0F2743] p-4">
             <p className="text-xs uppercase tracking-wide text-slate-300">Sem matricula</p>
-            <p className="mt-2 text-2xl font-semibold text-white">{summary.missingMemberNumber ?? 0}</p>
+            <p className="mt-2 text-2xl font-semibold text-white">
+              {summary.missingMemberNumber ?? 0}
+            </p>
           </div>
           <div className="rounded-xl border border-white/10 bg-[#0F2743] p-4">
             <p className="text-xs uppercase tracking-wide text-slate-300">Por convite</p>
@@ -283,6 +353,7 @@ export default function AdminAtletasPage() {
       </SectionCard>
 
       <SectionCard
+        className={activeTab === "pipeline" ? undefined : "hidden"}
         title="Fila operacional"
         description="Listagens por status com acoes de aprovacao, rejeicao e bloqueio"
       >
@@ -394,6 +465,7 @@ export default function AdminAtletasPage() {
       </SectionCard>
 
       <SectionCard
+        className={activeTab === "invites" ? undefined : "hidden"}
         title="Convites para atletas"
         description="Controle convites gerais, individuais e convites gerados por associados"
       >
@@ -417,7 +489,9 @@ export default function AdminAtletasPage() {
             </div>
             <div className="rounded-xl border border-white/10 bg-[#0F2743] p-3">
               <p className="text-xs uppercase tracking-wide text-slate-300">De associados</p>
-              <p className="mt-2 text-xl font-semibold text-white">{inviteSummary.athleteReferral}</p>
+              <p className="mt-2 text-xl font-semibold text-white">
+                {inviteSummary.athleteReferral}
+              </p>
             </div>
             <div className="rounded-xl border border-white/10 bg-[#0F2743] p-3">
               <p className="text-xs uppercase tracking-wide text-slate-300">Gerais</p>
@@ -549,7 +623,9 @@ export default function AdminAtletasPage() {
                       </p>
                       <p className="text-xs text-slate-300">Token: {invite.token}</p>
                       <p className="mt-1 text-xs text-slate-400">
-                        {invite.inviteKind === "ATHLETE_REFERRAL" ? "Convite de associado" : "Convite geral"}
+                        {invite.inviteKind === "ATHLETE_REFERRAL"
+                          ? "Convite de associado"
+                          : "Convite geral"}
                         {invite.createdBy?.name ? ` por ${invite.createdBy.name}` : ""}
                       </p>
                       {invite.invitedEmail ? (

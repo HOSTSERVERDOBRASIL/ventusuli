@@ -1,11 +1,14 @@
 ﻿"use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { BarChart3, ClipboardList, Gift } from "lucide-react";
 import { toast } from "sonner";
 import { ActionButton } from "@/components/system/action-button";
 import { DataTable, type DataTableColumn } from "@/components/system/data-table";
 import { EmptyState } from "@/components/system/empty-state";
 import { LoadingState } from "@/components/system/loading-state";
+import { MetricCard } from "@/components/system/metric-card";
+import { ModuleTabs, type ModuleTabItem } from "@/components/system/module-tabs";
 import { PageHeader } from "@/components/system/page-header";
 import { SectionCard } from "@/components/system/section-card";
 import { StatusBadge } from "@/components/system/status-badge";
@@ -48,6 +51,8 @@ const initialForm = {
   allowMixed: true,
 };
 
+type RewardsTab = "overview" | "create" | "catalog";
+
 export default function AdminRecompensasPage() {
   const { accessToken } = useAuthToken();
   const [loading, setLoading] = useState(true);
@@ -55,6 +60,7 @@ export default function AdminRecompensasPage() {
   const [form, setForm] = useState(initialForm);
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [activeTab, setActiveTab] = useState<RewardsTab>("overview");
 
   const load = async () => {
     setLoading(true);
@@ -78,8 +84,45 @@ export default function AdminRecompensasPage() {
   const summary = useMemo(() => {
     const active = items.filter((item) => item.active).length;
     const stock = items.reduce((sum, item) => sum + item.stockQuantity, 0);
-    return { active, stock };
+    const lowStock = items.filter((item) => item.stockQuantity <= 3).length;
+    return { active, stock, lowStock, total: items.length };
   }, [items]);
+
+  const tabs = useMemo<ModuleTabItem<RewardsTab>[]>(
+    () => [
+      {
+        key: "overview",
+        label: "Painel",
+        audience: "Gestao",
+        description: "Ativos, estoque e alertas do catalogo.",
+        icon: BarChart3,
+        metricLabel: "Itens",
+        metricValue: summary.total,
+        metricTone: "info",
+      },
+      {
+        key: "create",
+        label: "Cadastro",
+        audience: "Operacao",
+        description: "Criar item, politica de pontos e pagamento.",
+        icon: Gift,
+        metricLabel: "Ativos",
+        metricValue: summary.active,
+        metricTone: summary.active > 0 ? "positive" : "neutral",
+      },
+      {
+        key: "catalog",
+        label: "Catalogo",
+        audience: "Estoque",
+        description: "Editar imagem, status, estoque e disponibilidade.",
+        icon: ClipboardList,
+        metricLabel: "Estoque",
+        metricValue: summary.stock,
+        metricTone: summary.lowStock > 0 ? "warning" : "positive",
+      },
+    ],
+    [summary],
+  );
 
   const handleCreate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -283,8 +326,37 @@ export default function AdminRecompensasPage() {
         subtitle="Cadastro, estoque e controle do catalogo de recompensas."
       />
 
+      <SectionCard
+        title="Modulo de recompensas"
+        description="Separe painel, cadastro e operacao do catalogo em abas claras."
+      >
+        <ModuleTabs
+          tabs={tabs}
+          activeTab={activeTab}
+          onChange={setActiveTab}
+          columnsClassName="md:grid-cols-3"
+        />
+      </SectionCard>
+
+      <div
+        className={activeTab === "overview" ? "grid gap-3 sm:grid-cols-2 xl:grid-cols-4" : "hidden"}
+      >
+        <MetricCard label="Itens cadastrados" value={summary.total} />
+        <MetricCard label="Ativos" value={summary.active} tone="highlight" />
+        <MetricCard label="Estoque total" value={summary.stock} />
+        <MetricCard
+          label="Estoque baixo"
+          value={summary.lowStock}
+          tone={summary.lowStock > 0 ? "warning" : "highlight"}
+        />
+      </div>
+
       <div className="grid gap-4 lg:grid-cols-[1.1fr_1.9fr]">
-        <SectionCard title="Novo item" description="Crie recompensas para atletas e grupos">
+        <SectionCard
+          className={activeTab === "create" ? undefined : "hidden"}
+          title="Novo item"
+          description="Crie recompensas para atletas e grupos"
+        >
           <form className="space-y-3" onSubmit={handleCreate}>
             <input
               className="w-full rounded-lg border border-white/[0.1] bg-white/[0.05] px-3 py-2 text-[13px] text-white placeholder:text-white/30"
@@ -414,7 +486,9 @@ export default function AdminRecompensasPage() {
                 <input
                   type="checkbox"
                   checked={form.allowPoints}
-                  onChange={(event) => setForm((prev) => ({ ...prev, allowPoints: event.target.checked }))}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, allowPoints: event.target.checked }))
+                  }
                 />
                 Permitir troca com pontos
               </label>
@@ -422,7 +496,9 @@ export default function AdminRecompensasPage() {
                 <input
                   type="checkbox"
                   checked={form.allowCash}
-                  onChange={(event) => setForm((prev) => ({ ...prev, allowCash: event.target.checked }))}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, allowCash: event.target.checked }))
+                  }
                 />
                 Permitir pagamento em PIX
               </label>
@@ -430,7 +506,9 @@ export default function AdminRecompensasPage() {
                 <input
                   type="checkbox"
                   checked={form.allowMixed}
-                  onChange={(event) => setForm((prev) => ({ ...prev, allowMixed: event.target.checked }))}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, allowMixed: event.target.checked }))
+                  }
                 />
                 Permitir pontos + PIX
               </label>
@@ -442,6 +520,7 @@ export default function AdminRecompensasPage() {
         </SectionCard>
 
         <SectionCard
+          className={activeTab === "catalog" ? undefined : "hidden"}
           title="Catalogo administrativo"
           description={`Itens ativos: ${summary.active} | Estoque total: ${summary.stock}`}
         >

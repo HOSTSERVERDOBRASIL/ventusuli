@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
+  BarChart3,
   CircleDollarSign,
   CopyPlus,
   Eye,
@@ -22,6 +23,7 @@ import { type DataTableColumn, DataTable } from "@/components/system/data-table"
 import { EmptyState } from "@/components/system/empty-state";
 import { LoadingState } from "@/components/system/loading-state";
 import { MetricCard } from "@/components/system/metric-card";
+import { ModuleTabs, type ModuleTabItem } from "@/components/system/module-tabs";
 import { PageHeader } from "@/components/system/page-header";
 import { SectionCard } from "@/components/system/section-card";
 import { StatusBadge } from "@/components/system/status-badge";
@@ -39,6 +41,8 @@ import {
 import { toast } from "sonner";
 
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+
+type EventsTab = "overview" | "attention" | "list";
 
 /* Botão ícone compacto para ações de evento */
 function EventIconBtn({
@@ -136,6 +140,7 @@ export default function AdminEventosPage() {
   const [cancelTarget, setCancelTarget] = useState<EventView | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [actionInFlight, setActionInFlight] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<EventsTab>("overview");
 
   useEffect(() => {
     const statusParam = searchParams.get("status");
@@ -239,6 +244,42 @@ export default function AdminEventosPage() {
       noRegistrationsCount: noRegistrations.length,
     };
   }, [events, metrics.draft]);
+
+  const tabs = useMemo<ModuleTabItem<EventsTab>[]>(
+    () => [
+      {
+        key: "overview",
+        label: "Painel",
+        audience: "Gestao",
+        description: "Volume de provas, publicadas, inscricoes e receita.",
+        icon: BarChart3,
+        metricLabel: "Provas",
+        metricValue: metrics.total,
+        metricTone: "info",
+      },
+      {
+        key: "attention",
+        label: "Atencao",
+        audience: "Operacao",
+        description: "Rascunhos, prazos proximos e baixa tracao.",
+        icon: Rocket,
+        metricLabel: "Rascunhos",
+        metricValue: attention.draftCount,
+        metricTone: attention.draftCount > 0 ? "warning" : "positive",
+      },
+      {
+        key: "list",
+        label: "Lista",
+        audience: "Secretaria",
+        description: "Filtros, acoes e acompanhamento de provas.",
+        icon: Search,
+        metricLabel: "Filtradas",
+        metricValue: filtered.length,
+        metricTone: filtered.length > 0 ? "positive" : "neutral",
+      },
+    ],
+    [attention.draftCount, filtered.length, metrics.total],
+  );
 
   // ─── Colunas: total alvo ≤ 900px ─────────────────────────────────────────────
   // Prova 200 + Status 90 + Data 100 + Inscrições 120 + Ações 220 = 730px ✓
@@ -393,7 +434,21 @@ export default function AdminEventosPage() {
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <SectionCard
+        title="Modulo de provas"
+        description="Separe indicadores, alertas e operacao da agenda esportiva em abas."
+      >
+        <ModuleTabs
+          tabs={tabs}
+          activeTab={activeTab}
+          onChange={setActiveTab}
+          columnsClassName="md:grid-cols-3"
+        />
+      </SectionCard>
+
+      <div
+        className={activeTab === "overview" ? "grid gap-3 sm:grid-cols-2 xl:grid-cols-5" : "hidden"}
+      >
         <MetricCard label="Total de provas" value={metrics.total} />
         <MetricCard label="Publicadas" value={metrics.published} tone="highlight" />
         <MetricCard label="Rascunhos" value={metrics.draft} />
@@ -402,6 +457,7 @@ export default function AdminEventosPage() {
       </div>
 
       <SectionCard
+        className={activeTab === "attention" ? undefined : "hidden"}
         title="Precisa de atenção"
         description="Itens que exigem ação para manter a operação eficiente"
       >
@@ -434,6 +490,7 @@ export default function AdminEventosPage() {
       </SectionCard>
 
       <SectionCard
+        className={activeTab === "list" ? undefined : "hidden"}
         title="Provas cadastradas"
         description="Tabela de gestão com foco em status, ocupação e receita"
       >

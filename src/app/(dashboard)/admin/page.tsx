@@ -20,6 +20,7 @@ import { type DataTableColumn, DataTable } from "@/components/system/data-table"
 import { EmptyState } from "@/components/system/empty-state";
 import { LoadingState } from "@/components/system/loading-state";
 import { MetricCard } from "@/components/system/metric-card";
+import { ModuleTabs, type ModuleTabItem } from "@/components/system/module-tabs";
 import { PageHeader } from "@/components/system/page-header";
 import { SectionCard } from "@/components/system/section-card";
 import { StatusBadge } from "@/components/system/status-badge";
@@ -29,6 +30,7 @@ import { AdminOverviewData } from "@/services/types";
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
 type PaymentTone = "positive" | "warning" | "danger" | "neutral";
+type AdminOverviewTab = "overview" | "attention" | "activity" | "shortcuts";
 
 function paymentTone(status: string): PaymentTone {
   if (status === "PAID") return "positive";
@@ -58,6 +60,7 @@ export default function AdminOverviewPage() {
   const [data, setData] = useState<AdminOverviewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<AdminOverviewTab>("overview");
 
   const load = async (cancelledRef?: { value: boolean }) => {
     setLoading(true);
@@ -163,6 +166,51 @@ export default function AdminOverviewPage() {
       pendingRows.length,
     ],
   );
+  const tabs = useMemo<ModuleTabItem<AdminOverviewTab>[]>(
+    () => [
+      {
+        key: "overview",
+        label: "Painel",
+        audience: "Diretoria",
+        description: "Receita, pendencias, associados e provas publicadas.",
+        icon: FileBarChart2,
+        metricLabel: "Receita",
+        metricValue: BRL.format((data?.metrics.receitaMes ?? 0) / 100),
+        metricTone: "info",
+      },
+      {
+        key: "attention",
+        label: "Atencao",
+        audience: "Operacao",
+        description: "Cobranças pendentes, rascunhos e proximas provas.",
+        icon: AlertTriangle,
+        metricLabel: "Itens",
+        metricValue: attentionItems.reduce((sum, item) => sum + item.value, 0),
+        metricTone: attentionItems.some((item) => item.tone === "warning") ? "warning" : "positive",
+      },
+      {
+        key: "activity",
+        label: "Atividade",
+        audience: "Auditoria",
+        description: "Ultimas movimentacoes financeiras e inscricoes.",
+        icon: ClipboardList,
+        metricLabel: "Registros",
+        metricValue: rows.length,
+        metricTone: rows.length > 0 ? "positive" : "neutral",
+      },
+      {
+        key: "shortcuts",
+        label: "Atalhos",
+        audience: "Equipe",
+        description: "Entrada rapida para os modulos de execucao.",
+        icon: ArrowRight,
+        metricLabel: "Modulos",
+        metricValue: 4,
+        metricTone: "info",
+      },
+    ],
+    [attentionItems, data?.metrics.receitaMes, rows.length],
+  );
 
   const recentColumns: DataTableColumn<(typeof rows)[number]>[] = [
     {
@@ -238,7 +286,19 @@ export default function AdminOverviewPage() {
         }
       />
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <SectionCard
+        title="Modulo administrativo"
+        description="Separe leitura executiva, alertas, atividade recente e atalhos."
+      >
+        <ModuleTabs
+          tabs={tabs}
+          activeTab={activeTab}
+          onChange={setActiveTab}
+          columnsClassName="md:grid-cols-4"
+        />
+      </SectionCard>
+
+      <section className={activeTab === "overview" ? "grid gap-3 sm:grid-cols-2 xl:grid-cols-5" : "hidden"}>
         <MetricCard
           label="Receita do mês"
           value={BRL.format(data.metrics.receitaMes / 100)}
@@ -253,7 +313,7 @@ export default function AdminOverviewPage() {
         <MetricCard label="Provas publicadas" value={data.metrics.provasPublicadas} />
       </section>
 
-      <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
+      <div className={activeTab === "attention" ? "grid gap-4 xl:grid-cols-[1.4fr_1fr]" : "hidden"}>
         <SectionCard
           title="Precisa da sua atenção"
           description="Itens de urgência para priorização imediata"
@@ -335,6 +395,7 @@ export default function AdminOverviewPage() {
       </div>
 
       <SectionCard
+        className={activeTab === "activity" ? undefined : "hidden"}
         title="Operação recente"
         description="Últimas movimentações financeiras e inscrições em andamento"
       >
@@ -353,6 +414,7 @@ export default function AdminOverviewPage() {
       </SectionCard>
 
       <SectionCard
+        className={activeTab === "shortcuts" ? undefined : "hidden"}
         title="Atalhos administrativos"
         description="Entrada direta para os módulos de execução"
       >
