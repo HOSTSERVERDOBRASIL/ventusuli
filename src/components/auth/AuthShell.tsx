@@ -40,7 +40,7 @@ export function AuthShell({
     <div
       className={cn(
         "relative min-h-svh overflow-x-hidden bg-[#020a1b] text-white",
-        fitViewport && "lg:h-dvh lg:overflow-hidden",
+        fitViewport && "lg:min-h-dvh",
       )}
     >
       <header
@@ -79,11 +79,16 @@ export function AuthShell({
       <main
         className={cn(
           "relative z-10 grid min-h-svh items-center gap-6 px-5 pb-6 pt-28 sm:px-6 md:px-10 lg:grid-cols-[minmax(0,1fr)_450px] lg:gap-10 lg:px-12 xl:px-16",
-          fitViewport ? "lg:h-dvh lg:min-h-0 lg:py-5" : "lg:py-12",
+          fitViewport ? "lg:min-h-dvh lg:py-5" : "lg:py-12",
           isHeroLogo && "pt-48 sm:pt-60 lg:pt-5",
         )}
       >
-        <section className="hidden w-full max-w-[510px] text-left lg:block">
+        <section
+          className={cn(
+            "hidden w-full max-w-[510px] text-left lg:block",
+            fitViewport && "lg:max-h-[calc(100dvh-40px)] lg:overflow-hidden",
+          )}
+        >
           {isHeroLogo ? (
             <Image
               src={VENTU_SULI_LOGO_SRC}
@@ -91,7 +96,7 @@ export function AuthShell({
               width={1080}
               height={1350}
               priority
-              className="-ml-8 mb-1 h-80 w-80 object-contain drop-shadow-[0_28px_60px_rgba(0,0,0,0.5)] xl:h-[360px] xl:w-[360px]"
+              className="-ml-8 mb-1 h-64 w-64 object-contain drop-shadow-[0_28px_60px_rgba(0,0,0,0.5)] xl:h-72 xl:w-72 2xl:h-[340px] 2xl:w-[340px]"
             />
           ) : null}
 
@@ -104,7 +109,7 @@ export function AuthShell({
             perceber o próprio progresso.
           </p>
 
-          <div className="mt-6 grid max-w-[470px] gap-2.5">
+          <div className="mt-5 grid max-w-[470px] gap-2.5">
             {featureHighlights.map(({ icon: Icon, title: featureTitle, description: text }) => (
               <div
                 key={featureTitle}
@@ -123,7 +128,12 @@ export function AuthShell({
         </section>
 
         <section className="mx-auto flex w-full max-w-[450px] items-center justify-center lg:mx-0">
-          <div className="w-full rounded-lg border border-white/15 bg-[linear-gradient(180deg,rgba(4,12,31,0.95),rgba(5,13,29,0.9))] p-5 shadow-[0_24px_70px_rgba(0,0,0,0.42)] backdrop-blur-[18px] sm:p-7 lg:p-7">
+          <div
+            className={cn(
+              "w-full rounded-lg border border-white/15 bg-[linear-gradient(180deg,rgba(4,12,31,0.95),rgba(5,13,29,0.9))] p-5 shadow-[0_24px_70px_rgba(0,0,0,0.42)] backdrop-blur-[18px] sm:p-7 lg:p-7",
+              fitViewport && "lg:max-h-[calc(100dvh-40px)] lg:overflow-y-auto lg:p-6 xl:p-7",
+            )}
+          >
             <div className="mb-5">
               <h2 className="text-[25px] font-extrabold leading-tight text-white sm:text-[28px]">
                 {title}

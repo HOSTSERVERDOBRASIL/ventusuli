@@ -2,6 +2,7 @@
 import { PaymentStatus, Prisma, RegistrationStatus } from "@prisma/client";
 import { z } from "zod";
 import { apiError } from "@/lib/api-error";
+import { notifyRegistrationConfirmed } from "@/lib/notifications/domain-events";
 import { approveRedemptionAfterPayment, RedemptionServiceError } from "@/lib/points/redemptionService";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext, isFinanceRole } from "@/lib/request-auth";
@@ -343,6 +344,15 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
   });
 
   if (!updated) return apiError("USER_NOT_FOUND", "Cobranca nao encontrada.", 404);
+
+  if (action === "MARK_PAID") {
+    await notifyRegistrationConfirmed(prisma, {
+      organizationId: auth.organizationId,
+      userId: updated.user_id,
+      registrationId: updated.registration_id,
+      eventName: updated.registration.event.name,
+    });
+  }
 
   const detail = toDetail(updated);
   return NextResponse.json({

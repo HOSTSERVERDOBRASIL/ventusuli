@@ -2,6 +2,7 @@
 import { EventStatus, Prisma, UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { apiError } from "@/lib/api-error";
+import { notifyEventPublished } from "@/lib/notifications/domain-events";
 import { getAuthContext } from "@/lib/request-auth";
 
 function isAdminRole(role: UserRole): boolean {
@@ -70,6 +71,8 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       data: { status: EventStatus.PUBLISHED },
       include: { distances: { orderBy: { distance_km: "asc" } } },
     });
+
+    await notifyEventPublished(prisma, published);
 
     return NextResponse.json({ data: published });
   } catch (error) {

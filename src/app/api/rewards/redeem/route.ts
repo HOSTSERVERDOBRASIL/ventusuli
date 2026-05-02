@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { apiError } from "@/lib/api-error";
+import { notifyRewardRedeemed } from "@/lib/notifications/domain-events";
 import { createRedemption, RedemptionServiceError } from "@/lib/points/redemptionService";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/request-auth";
@@ -67,6 +68,23 @@ export async function POST(req: NextRequest) {
       requestedPoints: parsed.data.pointsToUse,
       idempotencyKey: parsed.data.idempotencyKey,
       createdBy: auth.userId,
+    });
+
+    const rewardItem = await prisma.rewardItem.findFirst({
+      where: {
+        id: result.redemption.rewardItemId,
+        organizationId: auth.organizationId,
+      },
+      select: { name: true },
+    });
+
+    await notifyRewardRedeemed(prisma, {
+      organizationId: auth.organizationId,
+      userId: auth.userId,
+      redemptionId: result.redemption.id,
+      rewardName: rewardItem?.name ?? "Recompensa",
+      pointsUsed: result.redemption.pointsUsed,
+      status: result.redemption.status,
     });
 
     if (result.paymentRequired) {

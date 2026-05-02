@@ -6,6 +6,7 @@ export * from "./dashboard-service";
 export * from "./events-service";
 export * from "./financial-service";
 export * from "./notice-service";
+export * from "./notification-service";
 export * from "./organization-service";
 export * from "./payment-service";
 export * from "./registrations-service";

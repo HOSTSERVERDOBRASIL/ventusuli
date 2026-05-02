@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { randomUUID } from "crypto";
+import { notifyPointsCredited } from "@/lib/notifications/domain-events";
 import { buildAvailableCreditBuckets } from "@/lib/points/expirationService";
 import { getOrganizationPointPolicy } from "@/lib/points/policy";
 import { prisma } from "@/lib/prisma";
@@ -14,6 +15,7 @@ export type LedgerSource =
   | "ACTIVITY_APPROVAL"
   | "REFERRAL"
   | "RECURRENCE"
+  | "BIRTHDAY"
   | "MANUAL"
   | "REDEMPTION"
   | "REFUND"
@@ -244,7 +246,17 @@ export async function creditPoints(input: LedgerMutationInput): Promise<LedgerMu
     throw new Error("credit_points_must_be_positive");
   }
 
-  return prisma.$transaction((tx) => createLedgerEntryInTransaction(tx, input, "CREDIT"));
+  const result = await prisma.$transaction((tx) => createLedgerEntryInTransaction(tx, input, "CREDIT"));
+  if (result.created) {
+    await notifyPointsCredited(prisma, {
+      organizationId: input.orgId,
+      userId: input.userId,
+      points: input.points,
+      reason: input.description,
+      referenceCode: input.referenceCode,
+    });
+  }
+  return result;
 }
 
 export async function creditPointsInTransaction(
@@ -319,7 +331,7 @@ export async function creditEventPoints(p: {
   const points = pointsByTrigger[p.triggerSource];
   const sourceType = sourceByTrigger[p.triggerSource];
 
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const netRows = await tx.$queryRaw<EventPointNetRow[]>`
       SELECT
         "sourceType" AS "sourceType",
@@ -370,6 +382,18 @@ export async function creditEventPoints(p: {
       createdBy: p.createdBy,
     });
   });
+
+  if (result.created) {
+    await notifyPointsCredited(prisma, {
+      organizationId: p.orgId,
+      userId: p.userId,
+      points: result.entry.points,
+      reason: result.entry.description,
+      referenceCode: result.entry.referenceCode,
+    });
+  }
+
+  return result;
 }
 
 export async function reverseEventPointsForRegistrationInTransaction(

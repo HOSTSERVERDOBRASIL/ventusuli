@@ -2,6 +2,7 @@
 import { PaymentStatus, Prisma, RegistrationStatus } from "@prisma/client";
 import { z } from "zod";
 import { apiError } from "@/lib/api-error";
+import { notifyPaymentPending } from "@/lib/notifications/domain-events";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/request-auth";
 
@@ -164,6 +165,7 @@ export async function POST(req: NextRequest) {
               id: true,
               status: true,
               amount_cents: true,
+              expires_at: true,
             },
           },
           event: {
@@ -213,6 +215,7 @@ export async function POST(req: NextRequest) {
                   id: true,
                   status: true,
                   amount_cents: true,
+                  expires_at: true,
                 },
               },
             },
@@ -230,6 +233,7 @@ export async function POST(req: NextRequest) {
                   id: true,
                   status: true,
                   amount_cents: true,
+                  expires_at: true,
                 },
               })
             : await tx.payment.create({
@@ -248,6 +252,7 @@ export async function POST(req: NextRequest) {
                   id: true,
                   status: true,
                   amount_cents: true,
+                  expires_at: true,
                 },
               });
 
@@ -313,6 +318,7 @@ export async function POST(req: NextRequest) {
           id: true,
           status: true,
           amount_cents: true,
+          expires_at: true,
         },
       });
 
@@ -342,6 +348,18 @@ export async function POST(req: NextRequest) {
       amountCents:
         result.registration.payment?.amount_cents ?? result.registration.distance.price_cents,
     };
+
+    if (result.registration.payment?.status === PaymentStatus.PENDING) {
+      await notifyPaymentPending(prisma, {
+        organizationId: auth.organizationId,
+        userId: auth.userId,
+        registrationId: result.registration.id,
+        eventName: result.registration.event.name,
+        dueDate: result.registration.payment.expires_at ?? new Date(Date.now() + 15 * 60 * 1000),
+        amountCents:
+          result.registration.payment.amount_cents ?? result.registration.distance.price_cents,
+      });
+    }
 
     return NextResponse.json({ data: payload }, { status: result.created ? 201 : 200 });
   } catch (error) {

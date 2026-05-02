@@ -3,14 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Bell, LogOut, Menu, Search } from "lucide-react";
 import { useAuthToken } from "@/components/auth/AuthTokenProvider";
 import { getQuickSearchLinks, getVisibleNavItems } from "@/components/layout/nav-items";
 import { ProfileSwitcher } from "@/components/layout/ProfileSwitcher";
 import { getProfileConfig } from "@/lib/profile-config";
 import { rolesLabel } from "@/lib/role-labels";
+import { getNotifications, markNotificationRead } from "@/services/notification-service";
+import { UserNotificationItem } from "@/services/types";
 import { UserRole } from "@/types";
 
 interface TopbarProps {
@@ -32,11 +33,34 @@ function initialsFromName(name?: string | null): string {
     .join("");
 }
 
+function formatNotificationTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function Topbar({ user, onMobileMenuOpen }: TopbarProps) {
-  const { clearAccessToken, userRoles, activeRole, organization, currentUser } = useAuthToken();
+  const {
+    accessToken,
+    clearAccessToken,
+    hydrated,
+    userRoles,
+    activeRole,
+    organization,
+    currentUser,
+  } = useAuthToken();
   const router = useRouter();
   const pathname = usePathname();
   const [searchOpen, setSearchOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notifications, setNotifications] = useState<UserNotificationItem[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [query, setQuery] = useState("");
   const navScope = useMemo(() => (activeRole ? [activeRole] : userRoles), [activeRole, userRoles]);
 
@@ -63,6 +87,21 @@ export function Topbar({ user, onMobileMenuOpen }: TopbarProps) {
   const avatarUrl = currentUser?.avatar_url ?? user?.image ?? null;
   const activeProfile = getProfileConfig(activeRole ?? userRoles[0]);
 
+  const loadNotifications = useCallback(async () => {
+    if (!hydrated) return;
+    setNotificationsLoading(true);
+    try {
+      const payload = await getNotifications({ accessToken, limit: 6 });
+      setNotifications(payload.data);
+      setUnreadCount(payload.meta.unread_count);
+    } catch {
+      setNotifications([]);
+      setUnreadCount(0);
+    } finally {
+      setNotificationsLoading(false);
+    }
+  }, [accessToken, hydrated]);
+
   const handleLogout = async () => {
     clearAccessToken();
     try {
@@ -83,6 +122,32 @@ export function Topbar({ user, onMobileMenuOpen }: TopbarProps) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [searchOpen]);
+
+  useEffect(() => {
+    void loadNotifications();
+  }, [loadNotifications]);
+
+  useEffect(() => {
+    if (!notificationsOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setNotificationsOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [notificationsOpen]);
+
+  const handleNotificationClick = (notification: UserNotificationItem) => {
+    setNotificationsOpen(false);
+    if (!notification.read_at) {
+      setUnreadCount((count) => Math.max(0, count - 1));
+      setNotifications((current) =>
+        current.map((item) =>
+          item.id === notification.id ? { ...item, read_at: new Date().toISOString() } : item,
+        ),
+      );
+    }
+    void markNotificationRead(notification.id, accessToken).catch(() => undefined);
+  };
 
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-white/[0.06] bg-[#0D1B2A] px-4 sm:px-6">
@@ -152,15 +217,75 @@ export function Topbar({ user, onMobileMenuOpen }: TopbarProps) {
         </div>
 
         {/* Notifications */}
-        <button
-          type="button"
-          aria-label="Notificações"
-          onClick={() => toast.info("Sem novas notificações no momento.")}
-          className="relative flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.07] text-white/55 transition hover:bg-white/[0.05]"
-        >
-          <Bell className="h-4 w-4" />
-          <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-[#1E90FF]" />
-        </button>
+        <div className="relative">
+          <button
+            type="button"
+            aria-label="Notificações"
+            onClick={() => {
+              setNotificationsOpen((prev) => !prev);
+              if (!notificationsOpen) void loadNotifications();
+            }}
+            className="relative flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.07] text-white/55 transition hover:bg-white/[0.05]"
+          >
+            <Bell className="h-4 w-4" />
+            {unreadCount > 0 ? (
+              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#1E90FF] px-1 text-[10px] font-bold leading-none text-white">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            ) : (
+              <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-white/25" />
+            )}
+          </button>
+          {notificationsOpen && (
+            <div className="absolute right-0 top-10 z-30 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-white/[0.1] bg-[#112240] shadow-[0_20px_60px_rgba(0,0,0,0.5)]">
+              <div className="flex items-center justify-between border-b border-white/[0.08] px-4 py-3">
+                <span className="text-[13px] font-semibold text-white">Notificações</span>
+                <Link
+                  href="/avisos"
+                  onClick={() => setNotificationsOpen(false)}
+                  className="text-[11px] font-semibold text-[#8ec5ff] transition hover:text-white"
+                >
+                  Avisos
+                </Link>
+              </div>
+              <div className="max-h-80 overflow-y-auto py-1">
+                {notificationsLoading ? (
+                  <p className="px-4 py-3 text-[13px] text-white/35">Carregando...</p>
+                ) : notifications.length ? (
+                  notifications.map((notification) => (
+                    <Link
+                      key={notification.id}
+                      href={notification.url ?? "/avisos"}
+                      onClick={() => handleNotificationClick(notification)}
+                      className="flex gap-3 border-b border-white/[0.05] px-4 py-3 text-left transition last:border-b-0 hover:bg-white/[0.05]"
+                    >
+                      <span
+                        className={`mt-1 h-2 w-2 shrink-0 rounded-full ${
+                          notification.read_at ? "bg-white/20" : "bg-[#1E90FF]"
+                        }`}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[13px] font-semibold text-white">
+                          {notification.title}
+                        </span>
+                        <span className="mt-1 block max-h-10 overflow-hidden text-[12px] leading-snug text-white/45">
+                          {notification.body}
+                        </span>
+                        <span className="mt-2 block text-[10px] font-semibold text-white/25">
+                          {formatNotificationTime(notification.created_at)}
+                        </span>
+                      </span>
+                    </Link>
+                  ))
+                ) : (
+                  <p className="px-4 py-3 text-[13px] text-white/35">
+                    Sem notificações no momento.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         <ProfileSwitcher compact />
 

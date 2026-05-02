@@ -6,6 +6,7 @@ import {
   CreditCard,
   FileText,
   Link2,
+  Mail,
   Plus,
   Power,
   Trash2,
@@ -37,13 +38,18 @@ import {
   toggleInvite,
   updateOrganizationSettings,
 } from "@/services/organization-service";
+import {
+  getAdminNotificationTemplates,
+  updateAdminNotificationTemplate,
+} from "@/services/notification-service";
+import { AdminNotificationTemplate } from "@/services/types";
 import { uploadImageFile } from "@/services/upload-service";
 import { UserRole } from "@/types";
 
 const ADMIN_ROLES = new Set<UserRole>([UserRole.ADMIN, UserRole.MANAGER]);
 const DEFAULT_ORG_LOGO = VENTU_SULI_LOGO_SRC;
 const MAX_LOGO_FILE_SIZE = 2 * 1024 * 1024;
-type SettingsTab = "brand" | "access" | "finance" | "invites" | "summary";
+type SettingsTab = "brand" | "access" | "finance" | "emails" | "invites" | "summary";
 
 function inviteLink(token: string): string {
   return `${window.location.origin}/register/atleta?inviteToken=${token}`;
@@ -124,6 +130,9 @@ export default function AdminConfiguracoesPage() {
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [activeTab, setActiveTab] = useState<SettingsTab>("brand");
+  const [emailTemplates, setEmailTemplates] = useState<AdminNotificationTemplate[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [savingTemplateId, setSavingTemplateId] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     name: "",
@@ -157,6 +166,10 @@ export default function AdminConfiguracoesPage() {
     form.logoUrl.trim() || settings?.logoUrl || DEFAULT_ORG_LOGO,
   );
   const activeInvites = useMemo(() => invites.filter((invite) => invite.active).length, [invites]);
+  const selectedTemplate = useMemo(
+    () => emailTemplates.find((template) => template.id === selectedTemplateId) ?? emailTemplates[0],
+    [emailTemplates, selectedTemplateId],
+  );
   const tabs = useMemo<ModuleTabItem<SettingsTab>[]>(
     () => [
       {
@@ -190,6 +203,16 @@ export default function AdminConfiguracoesPage() {
         metricTone: form.financeRecurringChargeEnabled ? "positive" : "neutral",
       },
       {
+        key: "emails",
+        label: "E-mails",
+        audience: "Comunicacao",
+        description: "Assuntos, mensagens e status dos modelos enviados por SMTP.",
+        icon: Mail,
+        metricLabel: "Modelos",
+        metricValue: emailTemplates.length,
+        metricTone: emailTemplates.length > 0 ? "positive" : "neutral",
+      },
+      {
         key: "invites",
         label: "Convites",
         audience: "Operacao",
@@ -213,6 +236,7 @@ export default function AdminConfiguracoesPage() {
     [
       activeInvites,
       canEdit,
+      emailTemplates.length,
       form.financeRecurringChargeEnabled,
       form.requireAthleteApproval,
       settings?.plan,
@@ -226,13 +250,16 @@ export default function AdminConfiguracoesPage() {
       setLoading(true);
       setError(null);
       try {
-        const [payload, inviteList] = await Promise.all([
+        const [payload, inviteList, templateList] = await Promise.all([
           getOrganizationSettings(accessToken),
           listInvites(accessToken).catch(() => []),
+          getAdminNotificationTemplates(accessToken, "EMAIL").catch(() => []),
         ]);
 
         if (!cancelled) {
           setSettings(payload);
+          setEmailTemplates(templateList);
+          setSelectedTemplateId((current) => current ?? templateList[0]?.id ?? null);
           setForm({
             name: payload.name,
             slug: payload.slug,
@@ -412,6 +439,40 @@ export default function AdminConfiguracoesPage() {
     });
   };
 
+  const updateTemplateDraft = (
+    id: string,
+    patch: Partial<Pick<AdminNotificationTemplate, "subject" | "body" | "is_active">>,
+  ) => {
+    setEmailTemplates((current) =>
+      current.map((template) => (template.id === id ? { ...template, ...patch } : template)),
+    );
+  };
+
+  const saveTemplate = async (template: AdminNotificationTemplate) => {
+    if (!canEdit) return;
+
+    setSavingTemplateId(template.id);
+    try {
+      const updated = await updateAdminNotificationTemplate(
+        template.id,
+        {
+          subject: template.subject,
+          body: template.body,
+          isActive: template.is_active,
+        },
+        accessToken,
+      );
+      setEmailTemplates((current) =>
+        current.map((item) => (item.id === updated.id ? updated : item)),
+      );
+      toast.success("Modelo de e-mail salvo.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao salvar modelo de e-mail.");
+    } finally {
+      setSavingTemplateId(null);
+    }
+  };
+
   return (
     <div className="space-y-6 text-white">
       <PageHeader
@@ -432,7 +493,7 @@ export default function AdminConfiguracoesPage() {
             tabs={tabs}
             activeTab={activeTab}
             onChange={setActiveTab}
-            columnsClassName="md:grid-cols-5"
+            columnsClassName="md:grid-cols-6"
           />
 
           <SectionCard
@@ -819,6 +880,121 @@ export default function AdminConfiguracoesPage() {
                 </ActionButton>
               </div>
             ) : null}
+          </SectionCard>
+
+          <SectionCard
+            className={activeTab === "emails" ? undefined : "hidden"}
+            title="Modelos de e-mail"
+            description="Edite os assuntos e mensagens usadas nos envios SMTP da assessoria."
+            action={
+              <StatusBadge
+                label={canEdit ? "SMTP" : "LEITURA"}
+                tone={canEdit ? "positive" : "neutral"}
+              />
+            }
+          >
+            {emailTemplates.length === 0 ? (
+              <p className="text-sm text-[#8eb0dc]">
+                Nenhum modelo de e-mail foi carregado para esta assessoria.
+              </p>
+            ) : (
+              <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
+                <div className="max-h-[560px] overflow-y-auto rounded-xl border border-white/10 bg-[#0a1d36] p-2">
+                  {emailTemplates.map((template) => (
+                    <button
+                      key={template.id}
+                      type="button"
+                      onClick={() => setSelectedTemplateId(template.id)}
+                      className={`mb-1 flex w-full items-start justify-between gap-3 rounded-lg px-3 py-2 text-left transition last:mb-0 ${
+                        selectedTemplate?.id === template.id
+                          ? "bg-[#18436f] text-white"
+                          : "text-[#8eb0dc] hover:bg-white/[0.05] hover:text-white"
+                      }`}
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold">
+                          {template.name}
+                        </span>
+                        <span className="mt-0.5 block truncate font-mono text-[10px] opacity-70">
+                          {template.code}
+                        </span>
+                      </span>
+                      <span
+                        className={`mt-1 h-2 w-2 shrink-0 rounded-full ${
+                          template.is_active ? "bg-emerald-400" : "bg-slate-500"
+                        }`}
+                      />
+                    </button>
+                  ))}
+                </div>
+
+                {selectedTemplate ? (
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-[#0a1d36] px-3 py-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-white">
+                          {selectedTemplate.name}
+                        </p>
+                        <p className="mt-0.5 font-mono text-[11px] text-[#8eb0dc]">
+                          {selectedTemplate.code} · {selectedTemplate.audience}
+                        </p>
+                      </div>
+                      <Toggle
+                        label="Ativo"
+                        checked={selectedTemplate.is_active}
+                        onChange={(value) =>
+                          updateTemplateDraft(selectedTemplate.id, { is_active: value })
+                        }
+                        disabled={!canEdit}
+                      />
+                    </div>
+
+                    <Input
+                      value={selectedTemplate.subject ?? ""}
+                      onChange={(event) =>
+                        updateTemplateDraft(selectedTemplate.id, {
+                          subject: event.target.value,
+                        })
+                      }
+                      placeholder="Assunto do e-mail"
+                      className="border-white/15 bg-[#0F2743] text-white"
+                      disabled={!canEdit}
+                    />
+
+                    <Textarea
+                      value={selectedTemplate.body}
+                      onChange={(event) =>
+                        updateTemplateDraft(selectedTemplate.id, {
+                          body: event.target.value,
+                        })
+                      }
+                      placeholder="Corpo do e-mail"
+                      className="min-h-[300px] border-white/15 bg-[#0F2743] font-mono text-sm text-white"
+                      disabled={!canEdit}
+                    />
+
+                    <div className="rounded-xl border border-[#24486f] bg-[#0a1d36] px-3 py-2 text-xs text-[#8eb0dc]">
+                      Variáveis disponíveis no texto usam o formato{" "}
+                      <span className="font-mono text-white">{"{{nome}}"}</span>,{" "}
+                      <span className="font-mono text-white">{"{{event_name}}"}</span>,{" "}
+                      <span className="font-mono text-white">{"{{amount}}"}</span> e outras
+                      variáveis do evento.
+                    </div>
+
+                    {canEdit ? (
+                      <ActionButton
+                        onClick={() => void saveTemplate(selectedTemplate)}
+                        disabled={savingTemplateId === selectedTemplate.id}
+                      >
+                        {savingTemplateId === selectedTemplate.id
+                          ? "Salvando..."
+                          : "Salvar modelo de e-mail"}
+                      </ActionButton>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            )}
           </SectionCard>
 
           {canEdit ? (

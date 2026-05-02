@@ -11,6 +11,51 @@ export type NoticeAudience = "ALL" | "ATHLETES" | "COACHES" | "ADMINS";
 export type NoticeStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";
 export type NoticeChannel = "IN_APP" | "TELEGRAM";
 export type NoticeDeliveryStatus = "PENDING" | "SENT" | "FAILED";
+export type UserNotificationChannel = "IN_APP" | "EMAIL" | "WHATSAPP" | "SMS";
+
+export interface UserNotificationItem {
+  id: string;
+  event_type: string;
+  entity_type: string | null;
+  entity_id: string | null;
+  template_code: string;
+  title: string;
+  body: string;
+  url: string | null;
+  read_at: string | null;
+  sent_at: string | null;
+  created_at: string;
+}
+
+export interface UserNotificationPreference {
+  id: string;
+  user_id: string;
+  organization_id: string;
+  email_enabled: boolean;
+  whatsapp_enabled: boolean;
+  sms_enabled: boolean;
+  in_app_enabled: boolean;
+  marketing_enabled: boolean;
+  events_enabled: boolean;
+  training_enabled: boolean;
+  birthday_message_enabled: boolean;
+  birthday_public_enabled: boolean;
+  financial_enabled: boolean;
+  updated_at: string;
+}
+
+export interface AdminNotificationTemplate {
+  id: string;
+  code: string;
+  name: string;
+  channel: UserNotificationChannel;
+  audience: string;
+  subject: string | null;
+  body: string;
+  is_active: boolean;
+  version: number;
+  updated_at: string;
+}
 
 export interface DashboardCalendarEntry {
   id: string;

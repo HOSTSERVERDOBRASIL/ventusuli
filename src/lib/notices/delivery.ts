@@ -1,5 +1,6 @@
 ﻿import { NoticeChannel, NoticeDeliveryStatus, NoticeStatus, PrismaClient } from "@prisma/client";
 import { sendNoticeToTelegram } from "@/lib/integrations/telegram";
+import { notifyNoticePublished } from "@/lib/notifications/domain-events";
 import { resolveTelegramSettings } from "@/lib/notices/telegram-config";
 
 function audienceLabel(audience: string): string {
@@ -108,6 +109,8 @@ export async function deliverNoticeChannels(
     },
   });
 
+  await notifyNoticePublished(prisma, notice);
+
   if (!notice.telegram_enabled) return;
   if (telegramDelivery?.status === NoticeDeliveryStatus.SENT && !options.forceTelegram) return;
 
@@ -168,4 +171,3 @@ export async function processScheduledNotices(prisma: PrismaClient, organization
     await deliverNoticeChannels(prisma, notice.id, organizationId);
   }
 }
-

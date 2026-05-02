@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { apiError } from "@/lib/api-error";
+import { notifyPointsCredited } from "@/lib/notifications/domain-events";
 import {
   reviewPointActivityEntry,
   updatePendingPointActivityEntry,
 } from "@/lib/points/activityService";
+import { prisma } from "@/lib/prisma";
 import { getAuthContext, isAdminRole } from "@/lib/request-auth";
 
 const patchSchema = z.object({
@@ -61,6 +63,16 @@ export async function PATCH(
 
   if (!data) {
     return apiError("USER_NOT_FOUND", "Lancamento nao encontrado.", 404);
+  }
+
+  if (parsed.data.action === "APPROVE" && data.status === "APPROVED") {
+    await notifyPointsCredited(prisma, {
+      organizationId: auth.organizationId,
+      userId: data.userId,
+      points: data.points,
+      reason: data.note ?? `Atividade aprovada: ${data.activityName ?? "atividade"}`,
+      referenceCode: data.referenceCode,
+    });
   }
 
   return NextResponse.json({ data });

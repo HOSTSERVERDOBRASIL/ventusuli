@@ -3,6 +3,7 @@ import { EventStatus, Prisma, RegistrationStatus, UserRole } from "@prisma/clien
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { apiError } from "@/lib/api-error";
+import { notifyEventCancelled, notifyEventUpdated } from "@/lib/notifications/domain-events";
 import { getAuthContext } from "@/lib/request-auth";
 import { isAllowedImageUrl } from "@/lib/storage/image-url";
 
@@ -289,6 +290,14 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
       include: { distances: { orderBy: { distance_km: "asc" } } },
     });
 
+    if (
+      updated &&
+      current.status === EventStatus.PUBLISHED &&
+      updated.status === EventStatus.PUBLISHED
+    ) {
+      await notifyEventUpdated(prisma, updated);
+    }
+
     return NextResponse.json({ data: updated });
   } catch (error) {
     if (error instanceof Error && error.message === "DISTANCE_HAS_REGISTRATIONS") {
@@ -339,6 +348,8 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
       data: { status: EventStatus.CANCELLED },
       include: { distances: { orderBy: { distance_km: "asc" } } },
     });
+
+    await notifyEventCancelled(prisma, cancelled);
 
     return NextResponse.json({ data: cancelled });
   } catch (error) {

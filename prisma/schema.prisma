@@ -190,6 +190,7 @@ enum LedgerSource {
   ACTIVITY_APPROVAL
   REFERRAL
   RECURRENCE
+  BIRTHDAY
   MANUAL
   REDEMPTION
   EXPIRATION
@@ -450,6 +451,10 @@ model Organization {
   community_reactions       CommunityReaction[]
   notices                   Notice[]
   notice_deliveries         NoticeDelivery[]
+  notification_preferences  NotificationPreference[]
+  notification_templates    NotificationTemplate[]
+  notification_jobs         NotificationJob[]
+  notification_logs         NotificationLog[]
   event_point_rules         EventPointRule[]
   athlete_point_ledger      AthletePointLedger[]
   reward_items              RewardItem[]
@@ -512,17 +517,20 @@ model User {
   auth_challenges            AuthChallenge[]
   mfa_settings               UserMfaSettings?
   athlete_profile            AthleteProfile?
-  created_events             Event[]               @relation("EventCreator")
+  created_events             Event[]                 @relation("EventCreator")
   registrations              Registration[]
   payments                   Payment[]
-  financial_entries_created  FinancialEntry[]      @relation("FinancialEntryCreator")
-  financial_entries_subject  FinancialEntry[]      @relation("FinancialEntrySubject")
-  created_collective_signups CollectiveSignup[]    @relation("CollectiveSignupCreator")
+  financial_entries_created  FinancialEntry[]        @relation("FinancialEntryCreator")
+  financial_entries_subject  FinancialEntry[]        @relation("FinancialEntrySubject")
+  created_collective_signups CollectiveSignup[]      @relation("CollectiveSignupCreator")
   collective_memberships     CollectiveMember[]
   community_posts            CommunityPost[]
   community_comments         CommunityComment[]
   community_reactions        CommunityReaction[]
-  created_notices            Notice[]              @relation("NoticeCreator")
+  created_notices            Notice[]                @relation("NoticeCreator")
+  notification_preference    NotificationPreference?
+  notification_jobs          NotificationJob[]       @relation("NotificationJobRecipient")
+  notification_logs          NotificationLog[]       @relation("NotificationLogRecipient")
   athlete_point_ledger       AthletePointLedger[]
   reward_redemptions         RewardRedemption[]
   loyalty_profile            UserLoyalty?
@@ -533,23 +541,23 @@ model User {
   strava_connection          StravaConnection?
   activities                 Activity[]
   strava_sync_logs           StravaSyncLog[]
-  generated_rankings         RankingSnapshot[]     @relation("RankingSnapshotGenerator")
-  assigned_training_plans    TrainingPlan[]        @relation("TrainingPlanAthlete")
-  coached_training_plans     TrainingPlan[]        @relation("TrainingPlanCoach")
-  workout_sessions           WorkoutSession[]      @relation("WorkoutSessionAthlete")
-  coached_workout_sessions   WorkoutSession[]      @relation("WorkoutSessionCoach")
-  athlete_feedbacks          AthleteFeedback[]     @relation("AthleteFeedbackAthlete")
-  ai_recommendations         AIRecommendation[]    @relation("AIRecommendationAthlete")
-  coach_ai_recommendations   AIRecommendation[]    @relation("AIRecommendationCoach")
-  created_exercises          Exercise[]            @relation("ExerciseCreator")
-  training_plan_reviews      AIRecommendation[]    @relation("AIRecommendationReviewer")
-  audit_logs                 AuditLog[]            @relation("AuditActor")
+  generated_rankings         RankingSnapshot[]       @relation("RankingSnapshotGenerator")
+  assigned_training_plans    TrainingPlan[]          @relation("TrainingPlanAthlete")
+  coached_training_plans     TrainingPlan[]          @relation("TrainingPlanCoach")
+  workout_sessions           WorkoutSession[]        @relation("WorkoutSessionAthlete")
+  coached_workout_sessions   WorkoutSession[]        @relation("WorkoutSessionCoach")
+  athlete_feedbacks          AthleteFeedback[]       @relation("AthleteFeedbackAthlete")
+  ai_recommendations         AIRecommendation[]      @relation("AIRecommendationAthlete")
+  coach_ai_recommendations   AIRecommendation[]      @relation("AIRecommendationCoach")
+  created_exercises          Exercise[]              @relation("ExerciseCreator")
+  training_plan_reviews      AIRecommendation[]      @relation("AIRecommendationReviewer")
+  audit_logs                 AuditLog[]              @relation("AuditActor")
   internal_events            InternalEvent[]
-  photographed_photos        Photo[]               @relation("PhotoPhotographer")
+  photographed_photos        Photo[]                 @relation("PhotoPhotographer")
   photo_athlete_matches      PhotoAthleteMatch[]
   photo_purchases            PhotoPurchase[]
   photo_unlocks              PhotoUnlock[]
-  sponsor_contacts_created   SponsorContact[]      @relation("SponsorContactCreator")
+  sponsor_contacts_created   SponsorContact[]        @relation("SponsorContactCreator")
 
   @@index([organization_id])
   @@index([email])
@@ -1389,6 +1397,115 @@ model NoticeDelivery {
   @@index([organization_id, created_at(sort: Desc)])
   @@index([sent_at(sort: Desc)])
   @@map("notice_deliveries")
+  @@schema("public")
+}
+
+model NotificationTemplate {
+  id             String        @id @default(uuid())
+  organizationId String?       @map("organization_id")
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  code           String
+  name           String
+  channel        String
+  audience       String
+  subject        String?
+  body           String
+  variables      Json?
+  isActive       Boolean       @default(true) @map("is_active")
+  version        Int           @default(1)
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  @@unique([organizationId, code, channel, version])
+  @@index([code, channel, isActive])
+  @@index([organizationId, code])
+  @@map("notification_templates")
+  @@schema("public")
+}
+
+model NotificationPreference {
+  id                     String       @id @default(uuid())
+  userId                 String       @unique @map("user_id")
+  user                   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId         String       @map("organization_id")
+  organization           Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  emailEnabled           Boolean      @default(true) @map("email_enabled")
+  whatsappEnabled        Boolean      @default(false) @map("whatsapp_enabled")
+  smsEnabled             Boolean      @default(false) @map("sms_enabled")
+  inAppEnabled           Boolean      @default(true) @map("in_app_enabled")
+  marketingEnabled       Boolean      @default(false) @map("marketing_enabled")
+  eventsEnabled          Boolean      @default(true) @map("events_enabled")
+  trainingEnabled        Boolean      @default(true) @map("training_enabled")
+  birthdayMessageEnabled Boolean      @default(true) @map("birthday_message_enabled")
+  birthdayPublicEnabled  Boolean      @default(false) @map("birthday_public_enabled")
+  financialEnabled       Boolean      @default(true) @map("financial_enabled")
+  createdAt              DateTime     @default(now()) @map("created_at")
+  updatedAt              DateTime     @updatedAt @map("updated_at")
+
+  @@index([organizationId])
+  @@index([userId])
+  @@map("notification_preferences")
+  @@schema("public")
+}
+
+model NotificationJob {
+  id                String       @id @default(uuid())
+  organizationId    String       @map("organization_id")
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  eventType         String       @map("event_type")
+  entityType        String?      @map("entity_type")
+  entityId          String?      @map("entity_id")
+  recipientId       String       @map("recipient_id")
+  recipient         User         @relation("NotificationJobRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  channel           String
+  templateCode      String       @map("template_code")
+  title             String
+  subject           String?
+  body              String
+  url               String?
+  payload           Json
+  scheduledAt       DateTime     @map("scheduled_at")
+  sentAt            DateTime?    @map("sent_at")
+  readAt            DateTime?    @map("read_at")
+  status            String       @default("PENDING")
+  attempts          Int          @default(0)
+  lastError         String?      @map("last_error")
+  provider          String?
+  providerMessageId String?      @map("provider_message_id")
+  deduplicationKey  String       @unique @map("deduplication_key")
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @updatedAt @map("updated_at")
+
+  logs NotificationLog[]
+
+  @@index([organizationId, recipientId, channel, createdAt(sort: Desc)])
+  @@index([organizationId, status, scheduledAt(sort: Asc)])
+  @@index([recipientId, readAt, createdAt(sort: Desc)])
+  @@index([entityType, entityId])
+  @@map("notification_jobs")
+  @@schema("public")
+}
+
+model NotificationLog {
+  id               String           @id @default(uuid())
+  organizationId   String?          @map("organization_id")
+  organization     Organization?    @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  jobId            String?          @map("job_id")
+  job              NotificationJob? @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  recipientId      String           @map("recipient_id")
+  recipient        User             @relation("NotificationLogRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  channel          String
+  provider         String
+  status           String
+  requestPayload   Json?            @map("request_payload")
+  providerResponse Json?            @map("provider_response")
+  errorMessage     String?          @map("error_message")
+  createdAt        DateTime         @default(now()) @map("created_at")
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([jobId])
+  @@index([recipientId, createdAt(sort: Desc)])
+  @@map("notification_logs")
   @@schema("public")
 }
 
