@@ -1,11 +1,22 @@
 ﻿import { buildAuthHeaders } from "@/services/runtime";
-import { AthleteDetail, AthletesListResponse, CreateAthleteByAdminResponse } from "@/services/types";
+import {
+  AthleteDetail,
+  AthletesListResponse,
+  CreateAthleteByAdminResponse,
+} from "@/services/types";
 
 export interface AthletesListFilters {
   q?: string;
   status?: "ALL" | "PENDING_APPROVAL" | "ACTIVE" | "REJECTED" | "BLOCKED";
   financial?: "ALL" | "EM_DIA" | "PENDENTE" | "SEM_HISTORICO";
-  sortBy?: "name" | "registrations" | "nextEvent" | "pending" | "paid" | "lastPayment";
+  sortBy?:
+    | "createdAt"
+    | "name"
+    | "registrations"
+    | "nextEvent"
+    | "pending"
+    | "paid"
+    | "lastPayment";
   sortDir?: "asc" | "desc";
   page?: number;
   pageSize?: number;
@@ -66,7 +77,10 @@ export async function getAthletesList(filters: AthletesListFilters): Promise<Ath
   return (await response.json()) as AthletesListResponse;
 }
 
-export async function getAthleteDetail(athleteId: string, accessToken?: string | null): Promise<AthleteDetail> {
+export async function getAthleteDetail(
+  athleteId: string,
+  accessToken?: string | null,
+): Promise<AthleteDetail> {
   const response = await fetch(`/api/athletes/${athleteId}`, {
     cache: "no-store",
     headers: buildAuthHeaders(accessToken),
@@ -170,10 +184,7 @@ export async function approveAthlete(
   }
 }
 
-export async function rejectAthlete(
-  athleteId: string,
-  accessToken?: string | null,
-): Promise<void> {
+export async function rejectAthlete(athleteId: string, accessToken?: string | null): Promise<void> {
   const response = await fetch(`/api/athletes/${athleteId}/reject`, {
     method: "POST",
     headers: buildAuthHeaders(accessToken),
@@ -184,10 +195,7 @@ export async function rejectAthlete(
   }
 }
 
-export async function blockAthlete(
-  athleteId: string,
-  accessToken?: string | null,
-): Promise<void> {
+export async function blockAthlete(athleteId: string, accessToken?: string | null): Promise<void> {
   const response = await fetch(`/api/athletes/${athleteId}/block`, {
     method: "POST",
     headers: buildAuthHeaders(accessToken),

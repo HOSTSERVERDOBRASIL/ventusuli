@@ -21,6 +21,7 @@ import { Select } from "@/components/ui/select";
 import {
   createAdminInvite,
   buildAdminAthletesExportUrl,
+  deleteAdminAthlete,
   getAdminAthletes,
   listAdminInvites,
   resendAdminInvite,
@@ -66,6 +67,8 @@ const EMPTY_INVITE_SUMMARY: AdminAthleteInviteSummary = {
 
 type AthleteStatusFilter = "ALL" | "PENDING_APPROVAL" | "ACTIVE" | "REJECTED" | "BLOCKED";
 type AthletesTab = "overview" | "pipeline" | "invites" | "reports";
+type AdminAthleteSortBy = "createdAt" | "name" | "memberNumber" | "registrations";
+type SortDir = "asc" | "desc";
 
 function parseStatusFilter(value: string | null): AthleteStatusFilter {
   if (
@@ -97,6 +100,8 @@ export default function AdminAtletasPage() {
     parseStatusFilter(searchParams.get("status")),
   );
   const [query, setQuery] = useState(() => searchParams.get("q") ?? "");
+  const [sortBy, setSortBy] = useState<AdminAthleteSortBy>("createdAt");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   const [inviteLabel, setInviteLabel] = useState("");
   const [inviteReusable, setInviteReusable] = useState(false);
@@ -104,6 +109,7 @@ export default function AdminAtletasPage() {
   const [inviteExpiresAt, setInviteExpiresAt] = useState("");
   const [creatingInvite, setCreatingInvite] = useState(false);
   const [statusActionId, setStatusActionId] = useState<string | null>(null);
+  const [deletingAthleteId, setDeletingAthleteId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<AthletesTab>("overview");
 
   const statusCards = useMemo(
@@ -169,6 +175,8 @@ export default function AdminAtletasPage() {
       const payload = await getAdminAthletes({
         q: query || undefined,
         status,
+        sortBy,
+        sortDir,
         page: 1,
         pageSize: 50,
         accessToken,
@@ -180,7 +188,7 @@ export default function AdminAtletasPage() {
     } catch (error) {
       setRows([]);
       setSummary(EMPTY_SUMMARY);
-        toast.error(error instanceof Error ? error.message : "Falha ao carregar atletas.");
+      toast.error(error instanceof Error ? error.message : "Falha ao carregar atletas.");
     } finally {
       setLoadingAthletes(false);
     }
@@ -205,7 +213,7 @@ export default function AdminAtletasPage() {
   useEffect(() => {
     void refreshAthletes();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accessToken, query, status]);
+  }, [accessToken, query, sortBy, sortDir, status]);
 
   useEffect(() => {
     void refreshInvites();
@@ -235,6 +243,8 @@ export default function AdminAtletasPage() {
         buildAdminAthletesExportUrl({
           q: query || undefined,
           status,
+          sortBy,
+          sortDir,
           accessToken,
         }),
         {
@@ -257,6 +267,25 @@ export default function AdminAtletasPage() {
       toast.success("Relatório de associados exportado.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Falha ao exportar associados.");
+    }
+  };
+
+  const handleDeleteAthlete = async (athlete: AthleteListRow) => {
+    const confirmed = window.confirm(
+      `Excluir o atleta ${athlete.name}? Esta ação remove o cadastro quando não houver histórico financeiro vinculado.`,
+    );
+
+    if (!confirmed) return;
+
+    setDeletingAthleteId(athlete.id);
+    try {
+      await deleteAdminAthlete(athlete.id, accessToken);
+      toast.success("Atleta excluído com sucesso.");
+      await refreshAthletes();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível excluir atleta.");
+    } finally {
+      setDeletingAthleteId(null);
     }
   };
 
@@ -422,13 +451,31 @@ export default function AdminAtletasPage() {
             ))}
           </div>
 
-          <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+          <div className="grid gap-3 md:grid-cols-[1fr_220px_180px_auto]">
             <Input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Buscar por nome, e-mail ou matrícula"
               className="border-white/[0.1] bg-white/[0.05] text-white placeholder:text-white/30"
             />
+            <Select
+              value={sortBy}
+              onChange={(event) => setSortBy(event.target.value as AdminAthleteSortBy)}
+              className="border-white/[0.1] bg-white/[0.05] text-white"
+            >
+              <option value="createdAt">Ordenar por cadastro</option>
+              <option value="name">Ordenar por nome</option>
+              <option value="memberNumber">Ordenar por matrícula</option>
+              <option value="registrations">Ordenar por inscrições</option>
+            </Select>
+            <Select
+              value={sortDir}
+              onChange={(event) => setSortDir(event.target.value as SortDir)}
+              className="border-white/[0.1] bg-white/[0.05] text-white"
+            >
+              <option value="desc">Decrescente</option>
+              <option value="asc">Crescente</option>
+            </Select>
             <ActionButton intent="secondary" onClick={() => void refreshAthletes()}>
               <RefreshCw className="mr-2 h-4 w-4" />
               Atualizar
@@ -444,7 +491,12 @@ export default function AdminAtletasPage() {
             />
           ) : (
             <>
-              <AthletesCrmTable rows={rows} basePath="/admin/atletas" />
+              <AthletesCrmTable
+                rows={rows}
+                basePath="/admin/atletas"
+                deletingId={deletingAthleteId}
+                onDelete={handleDeleteAthlete}
+              />
               <div className="flex flex-wrap items-center gap-2">
                 {status === "PENDING_APPROVAL"
                   ? rows.map((athlete) => (

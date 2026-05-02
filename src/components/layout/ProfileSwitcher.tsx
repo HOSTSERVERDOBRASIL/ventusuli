@@ -42,7 +42,7 @@ export function ProfileSwitcher({
     return (
       <label
         className={cn(
-          "relative hidden h-9 min-w-[150px] items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.035] pl-2.5 pr-8 text-[12px] text-white/75 sm:flex",
+          "relative hidden h-9 min-w-[150px] items-center gap-2 rounded-lg border border-[#1b3350] bg-[#07192b]/85 pl-2.5 pr-8 text-[12px] text-white/75 shadow-[0_10px_24px_rgba(0,0,0,0.16)] transition hover:border-sky-400/35 sm:flex",
           className,
         )}
       >
@@ -65,9 +65,19 @@ export function ProfileSwitcher({
   }
 
   return (
-    <div className={cn("rounded-xl border border-white/[0.07] bg-white/[0.035] p-2.5", className)}>
+    <div
+      className={cn(
+        "rounded-lg border border-[#1b3350] bg-[#07192b]/85 p-2.5 shadow-[0_12px_28px_rgba(0,0,0,0.18)]",
+        className,
+      )}
+    >
       <div className="mb-2 flex items-center gap-2">
-        <div className={cn("grid h-8 w-8 place-items-center rounded-lg border", selectedConfig.accent)}>
+        <div
+          className={cn(
+            "grid h-9 w-9 place-items-center rounded-md border shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]",
+            selectedConfig.accent,
+          )}
+        >
           <Icon className="h-4 w-4" />
         </div>
         <div className="min-w-0">
@@ -80,7 +90,7 @@ export function ProfileSwitcher({
         <select
           value={selectedRole}
           onChange={(event) => handleChange(event.target.value as UserRole)}
-          className="h-9 w-full appearance-none rounded-lg border border-white/[0.08] bg-[#091729] px-3 pr-8 text-[12px] font-semibold text-white outline-none transition focus:border-[#ffc229]/70"
+          className="h-9 w-full appearance-none rounded-md border border-white/[0.08] bg-[#04111f] px-3 pr-8 text-[12px] font-semibold text-white outline-none transition focus:border-[#ffc229]/70"
         >
           {roles.map((role) => (
             <option key={role} value={role} className="bg-[#0d1b2a] text-white">

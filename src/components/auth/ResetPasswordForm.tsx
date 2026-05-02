@@ -21,7 +21,7 @@ const formSchema = resetPasswordSchema
     if (password !== confirmPassword) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "As senhas nao coincidem",
+        message: "As senhas não coincidem",
         path: ["confirmPassword"],
       });
     }
@@ -63,14 +63,14 @@ export function ResetPasswordForm() {
 
       const payload = (await response.json()) as ResetResponse;
       if (!response.ok) {
-        toast.error(payload.error?.message ?? "Nao foi possivel redefinir a senha.");
+        toast.error(payload.error?.message ?? "Não foi possível redefinir a senha.");
         return;
       }
 
       toast.success(payload.message ?? "Senha redefinida com sucesso.");
       router.push("/login?reason=expired");
     } catch {
-      toast.error("Erro de conexao. Tente novamente.");
+      toast.error("Erro de conexão. Tente novamente.");
     }
   };
 
@@ -78,11 +78,11 @@ export function ResetPasswordForm() {
     return (
       <AuthShell
         title="Redefinir senha"
-        description="O link de recuperacao precisa de um token valido para continuar."
+        description="O link de recuperação precisa de um token válido para continuar."
       >
         <div className="space-y-4">
           <div className="rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-            Link de recuperacao invalido.
+            Link de recuperação inválido.
           </div>
           <Button asChild className="h-14 w-full rounded-xl bg-[#f7b529] font-semibold text-[#091223] hover:bg-[#ffbf3e]">
             <Link href="/forgot-password">Solicitar novo link</Link>
@@ -95,7 +95,7 @@ export function ResetPasswordForm() {
   return (
     <AuthShell
       title="Defina sua nova senha"
-      description="Crie uma nova credencial forte para voltar ao Ventu Suli com seguranca."
+      description="Crie uma nova credencial forte para voltar ao Ventu Suli com segurança."
     >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <input type="hidden" {...register("token")} />

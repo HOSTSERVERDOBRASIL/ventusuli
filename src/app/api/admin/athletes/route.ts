@@ -10,6 +10,7 @@ import { createAthleteByAdminSchema } from "@/lib/validations/athletes";
 
 type AthleteStatus = "PENDING_APPROVAL" | "ACTIVE" | "REJECTED" | "BLOCKED";
 type FinancialSituation = "EM_DIA" | "PENDENTE" | "SEM_HISTORICO";
+type AdminAthleteSortBy = "createdAt" | "name" | "memberNumber" | "registrations";
 
 type AthleteListUser = Prisma.UserGetPayload<{
   include: {
@@ -56,6 +57,8 @@ type AthleteListUser = Prisma.UserGetPayload<{
 const querySchema = z.object({
   q: z.string().trim().optional(),
   status: z.enum(["ALL", "PENDING_APPROVAL", "ACTIVE", "REJECTED", "BLOCKED"]).default("ALL"),
+  sortBy: z.enum(["createdAt", "name", "memberNumber", "registrations"]).default("createdAt"),
+  sortDir: z.enum(["asc", "desc"]).default("desc"),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
   export: z.enum(["csv"]).optional(),
@@ -171,16 +174,18 @@ function buildAthleteRow(
   );
   const recurringEntries = user.financial_entries_subject;
 
-  const pendingAmountCents = payments
-    .filter((payment) => payment.status === "PENDING")
-    .reduce((sum, payment) => sum + payment.amount_cents, 0) +
+  const pendingAmountCents =
+    payments
+      .filter((payment) => payment.status === "PENDING")
+      .reduce((sum, payment) => sum + payment.amount_cents, 0) +
     recurringEntries
       .filter((entry) => entry.status === "OPEN")
       .reduce((sum, entry) => sum + entry.amount_cents, 0);
 
-  const paidAmountCents = payments
-    .filter((payment) => payment.status === "PAID")
-    .reduce((sum, payment) => sum + payment.amount_cents, 0) +
+  const paidAmountCents =
+    payments
+      .filter((payment) => payment.status === "PAID")
+      .reduce((sum, payment) => sum + payment.amount_cents, 0) +
     recurringEntries
       .filter((entry) => entry.status === "PAID")
       .reduce((sum, entry) => sum + entry.amount_cents, 0);
@@ -188,8 +193,9 @@ function buildAthleteRow(
   const nextRegistration =
     user.registrations
       .filter((registration) => new Date(registration.event.event_date) >= now)
-      .sort((a, b) => new Date(a.event.event_date).getTime() - new Date(b.event.event_date).getTime())[0] ??
-    null;
+      .sort(
+        (a, b) => new Date(a.event.event_date).getTime() - new Date(b.event.event_date).getTime(),
+      )[0] ?? null;
 
   const lastPayment =
     [
@@ -205,14 +211,16 @@ function buildAthleteRow(
           paidAt: entry.settled_at,
           createdAt: entry.created_at,
         })),
-    ]
-      .sort((a, b) => {
-        const aDate = a.paidAt ? new Date(a.paidAt) : new Date(a.createdAt);
-        const bDate = b.paidAt ? new Date(b.paidAt) : new Date(b.createdAt);
-        return bDate.getTime() - aDate.getTime();
-      })[0] ?? null;
+    ].sort((a, b) => {
+      const aDate = a.paidAt ? new Date(a.paidAt) : new Date(a.createdAt);
+      const bDate = b.paidAt ? new Date(b.paidAt) : new Date(b.createdAt);
+      return bDate.getTime() - aDate.getTime();
+    })[0] ?? null;
 
-  const athleteStatus = resolveAthleteStatus(user.athlete_profile?.athlete_status, user.account_status);
+  const athleteStatus = resolveAthleteStatus(
+    user.athlete_profile?.athlete_status,
+    user.account_status,
+  );
   const inviteSource = inviteByAcceptedUserId.get(user.id) ?? null;
 
   return {
@@ -222,6 +230,7 @@ function buildAthleteRow(
     memberSince: user.athlete_profile?.member_since
       ? new Date(user.athlete_profile.member_since).toISOString()
       : null,
+    createdAt: user.created_at.toISOString(),
     name: user.name,
     email: user.email,
     avatarUrl: user.avatar_url ?? null,
@@ -233,15 +242,48 @@ function buildAthleteRow(
     invitedByMemberNumber: inviteSource?.creatorMemberNumber ?? null,
     registrationsCount: user.registrations.length,
     nextEventName: nextRegistration?.event.name ?? null,
-    nextEventDate: nextRegistration ? new Date(nextRegistration.event.event_date).toISOString() : null,
+    nextEventDate: nextRegistration
+      ? new Date(nextRegistration.event.event_date).toISOString()
+      : null,
     pendingAmountCents,
     paidAmountCents,
-    financialSituation: financialFromData(payments.length + recurringEntries.length, pendingAmountCents),
+    financialSituation: financialFromData(
+      payments.length + recurringEntries.length,
+      pendingAmountCents,
+    ),
     lastPaymentAt: lastPayment?.paidAt ? new Date(lastPayment.paidAt).toISOString() : null,
     city: user.athlete_profile?.city ?? null,
     state: user.athlete_profile?.state ?? null,
     internalNote: null,
   };
+}
+
+function sortAthleteRows(
+  rows: ReturnType<typeof buildAthleteRow>[],
+  sortBy: AdminAthleteSortBy,
+  sortDir: "asc" | "desc",
+): ReturnType<typeof buildAthleteRow>[] {
+  const direction = sortDir === "asc" ? 1 : -1;
+
+  return [...rows].sort((a, b) => {
+    if (sortBy === "name") {
+      return a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" }) * direction;
+    }
+
+    if (sortBy === "memberNumber") {
+      const aValue = a.memberNumber ?? "";
+      const bValue = b.memberNumber ?? "";
+      return (
+        aValue.localeCompare(bValue, "pt-BR", { numeric: true, sensitivity: "base" }) * direction
+      );
+    }
+
+    if (sortBy === "registrations") {
+      return (a.registrationsCount - b.registrationsCount) * direction;
+    }
+
+    return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * direction;
+  });
 }
 
 export async function GET(req: NextRequest) {
@@ -254,6 +296,8 @@ export async function GET(req: NextRequest) {
   const parsed = querySchema.safeParse({
     q: req.nextUrl.searchParams.get("q") ?? undefined,
     status: req.nextUrl.searchParams.get("status") ?? undefined,
+    sortBy: req.nextUrl.searchParams.get("sortBy") ?? undefined,
+    sortDir: req.nextUrl.searchParams.get("sortDir") ?? undefined,
     page: req.nextUrl.searchParams.get("page") ?? undefined,
     pageSize: req.nextUrl.searchParams.get("pageSize") ?? undefined,
     export: req.nextUrl.searchParams.get("export") ?? undefined,
@@ -263,7 +307,7 @@ export async function GET(req: NextRequest) {
     return apiError("VALIDATION_ERROR", parsed.error.errors[0]?.message ?? "Query invalida.", 400);
   }
 
-  const { q, status, page, pageSize } = parsed.data;
+  const { q, status, sortBy, sortDir, page, pageSize } = parsed.data;
   const now = new Date();
 
   const [users, organization] = await Promise.all([
@@ -276,7 +320,9 @@ export async function GET(req: NextRequest) {
               OR: [
                 { name: { contains: q, mode: "insensitive" } },
                 { email: { contains: q, mode: "insensitive" } },
-                { athlete_profile: { is: { member_number: { contains: q, mode: "insensitive" } } } },
+                {
+                  athlete_profile: { is: { member_number: { contains: q, mode: "insensitive" } } },
+                },
               ],
             }
           : {}),
@@ -349,7 +395,9 @@ export async function GET(req: NextRequest) {
     : [];
 
   const creatorIds = Array.from(
-    new Set(acceptedInvites.map((invite) => invite.created_by).filter((id): id is string => Boolean(id))),
+    new Set(
+      acceptedInvites.map((invite) => invite.created_by).filter((id): id is string => Boolean(id)),
+    ),
   );
   const creators = creatorIds.length
     ? await prisma.user.findMany({
@@ -382,9 +430,10 @@ export async function GET(req: NextRequest) {
   const rows = users.map((user) => buildAthleteRow(user, now, inviteByAcceptedUserId));
 
   const filteredRows = rows.filter((row) => (status === "ALL" ? true : row.status === status));
+  const sortedRows = sortAthleteRows(filteredRows, sortBy, sortDir);
 
   if (parsed.data.export === "csv") {
-    return new NextResponse(toCsv(filteredRows), {
+    return new NextResponse(toCsv(sortedRows), {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
         "Content-Disposition": `attachment; filename="associados-${new Date().toISOString().slice(0, 10)}.csv"`,
@@ -393,11 +442,11 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const total = filteredRows.length;
+  const total = sortedRows.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const safePage = Math.min(page, totalPages);
   const start = (safePage - 1) * pageSize;
-  const data = filteredRows.slice(start, start + pageSize);
+  const data = sortedRows.slice(start, start + pageSize);
 
   return NextResponse.json({
     data,

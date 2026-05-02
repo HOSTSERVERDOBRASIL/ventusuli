@@ -37,7 +37,7 @@ export const athleteNavItems: NavItem[] = [
   },
   {
     href: "/minhas-inscricoes",
-    label: "Inscricoes e Pagamentos",
+    label: "Inscrições e Pagamentos",
     icon: ClipboardList,
     roles: [...ROLE_GROUPS.athlete],
     policy: "ATHLETE_AREA",
@@ -64,7 +64,7 @@ export const athleteNavItems: NavItem[] = [
   },
   {
     href: "/calendario",
-    label: "Calendario",
+    label: "Calendário",
     icon: CalendarDays,
     roles: [...ROLE_GROUPS.athlete],
     policy: "ATHLETE_AREA",
@@ -73,7 +73,7 @@ export const athleteNavItems: NavItem[] = [
   },
   {
     href: "/evolucao",
-    label: "Evolucao e Ranking",
+    label: "Evolução e Ranking",
     icon: TrendingUp,
     roles: [...ROLE_GROUPS.athlete],
     policy: "ATHLETE_AREA",

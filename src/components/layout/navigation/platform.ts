@@ -14,7 +14,7 @@ export const platformNavItems: NavItem[] = [
   },
   {
     href: "/super-admin/organizations",
-    label: "Organizacoes",
+    label: "Organizações",
     icon: Users,
     roles: [UserRole.SUPER_ADMIN],
     policy: "SUPER_ADMIN_ONLY",
@@ -32,7 +32,7 @@ export const platformNavItems: NavItem[] = [
   },
   {
     href: "/super-admin/billing",
-    label: "Locacao da Plataforma",
+    label: "Locação da Plataforma",
     icon: CreditCard,
     roles: [UserRole.SUPER_ADMIN],
     policy: "SUPER_ADMIN_ONLY",

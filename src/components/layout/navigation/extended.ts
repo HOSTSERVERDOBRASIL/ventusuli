@@ -15,7 +15,7 @@ import { UserRole } from "@/types";
 export const extendedNavItems: NavItem[] = [
   {
     href: "/gestor",
-    label: "Gestao Geral",
+    label: "Gestão Geral",
     icon: SlidersHorizontal,
     roles: [UserRole.MANAGER],
     policy: "MANAGER_AREA",
@@ -24,7 +24,7 @@ export const extendedNavItems: NavItem[] = [
   },
   {
     href: "/organizador",
-    label: "Operacao de Eventos",
+    label: "Operação de Eventos",
     icon: Megaphone,
     roles: [UserRole.ORGANIZER],
     policy: "ORGANIZER_AREA",
@@ -60,7 +60,7 @@ export const extendedNavItems: NavItem[] = [
   },
   {
     href: "/moderador",
-    label: "Moderacao",
+    label: "Moderação",
     icon: BadgeCheck,
     roles: [UserRole.MODERATOR],
     policy: "MODERATOR_AREA",

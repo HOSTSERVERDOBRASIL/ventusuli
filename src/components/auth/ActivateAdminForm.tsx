@@ -24,7 +24,7 @@ const formSchema = activateAdminSchema
     if (password !== confirmPassword) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "As senhas nao coincidem",
+        message: "As senhas não coincidem",
         path: ["confirmPassword"],
       });
     }
@@ -61,9 +61,9 @@ interface ActivateResponse {
 }
 
 const PASSWORD_RULES = [
-  { label: "Minimo de 8 caracteres", test: (value: string) => value.length >= 8 },
-  { label: "Ao menos uma letra maiuscula", test: (value: string) => /[A-Z]/.test(value) },
-  { label: "Ao menos um numero", test: (value: string) => /[0-9]/.test(value) },
+  { label: "Mínimo de 8 caracteres", test: (value: string) => value.length >= 8 },
+  { label: "Ao menos uma letra maiúscula", test: (value: string) => /[A-Z]/.test(value) },
+  { label: "Ao menos um número", test: (value: string) => /[0-9]/.test(value) },
 ] as const;
 
 export function ActivateAdminForm() {
@@ -119,14 +119,14 @@ export function ActivateAdminForm() {
         const payload = (await response.json()) as InviteLookupPayload;
 
         if (!response.ok || !payload.data) {
-          setInviteError(payload.error?.message ?? "Convite invalido ou expirado.");
+          setInviteError(payload.error?.message ?? "Convite inválido ou expirado.");
           return;
         }
 
         setInviteEmail(payload.data.email);
         setOrganizationName(payload.data.organization.name);
       } catch {
-        setInviteError("Nao foi possivel validar o convite agora.");
+        setInviteError("Não foi possível validar o convite agora.");
       } finally {
         setLoadingInvite(false);
       }
@@ -151,8 +151,8 @@ export function ActivateAdminForm() {
       if (!response.ok || !("accessToken" in payload)) {
         toast.error(
           "error" in payload
-            ? (payload.error?.message ?? "Nao foi possivel ativar a conta agora.")
-            : "Nao foi possivel ativar a conta agora.",
+            ? (payload.error?.message ?? "Não foi possível ativar a conta agora.")
+            : "Não foi possível ativar a conta agora.",
         );
         return;
       }
@@ -171,7 +171,7 @@ export function ActivateAdminForm() {
 
       router.push("/admin");
     } catch {
-      toast.error("Erro de conexao. Tente novamente.");
+      toast.error("Erro de conexão. Tente novamente.");
     }
   };
 
@@ -187,7 +187,7 @@ export function ActivateAdminForm() {
 
   if (inviteError) {
     return (
-      <AuthCard title="Ativar conta de admin" description="Convite indisponivel.">
+      <AuthCard title="Ativar conta de admin" description="Convite indisponível.">
         <div className="space-y-4">
           <div className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
             {inviteError}

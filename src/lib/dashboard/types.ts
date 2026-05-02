@@ -1,7 +1,11 @@
-﻿export interface ActivitySummary {
+export interface ActivitySummary {
   kmNoAno: number;
   volume30dKm: number;
   previous30dKm: number;
+  movingTime30dSeconds: number;
+  previousMovingTime30dSeconds: number;
+  activityCount30d: number;
+  previousActivityCount30d: number;
   consistencyPercent: number;
   activeWeeksInYear: number;
   activityCountInYear: number;
@@ -11,6 +15,10 @@ export interface EvolutionPoint {
   month: string;
   current: number;
   previous: number;
+  durationMinutes: number;
+  previousDurationMinutes: number;
+  sessions: number;
+  previousSessions: number;
 }
 
 export interface DistributionSlice {
@@ -44,4 +52,15 @@ export interface RankingSnapshot {
   leaderboard: RankingEntry[];
   currentUser: RankingEntry | null;
   totalAthletes: number;
+}
+
+export interface RecentActivityItem {
+  id: string;
+  name: string;
+  type: string;
+  source: string;
+  distanceKm: number;
+  durationMinutes: number;
+  pace: string | null;
+  activityDate: string;
 }

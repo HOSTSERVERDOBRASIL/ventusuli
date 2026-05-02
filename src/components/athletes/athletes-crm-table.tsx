@@ -1,7 +1,7 @@
 ﻿import Link from "next/link";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { BellRing, FileText, ShieldCheck, UserRoundPen } from "lucide-react";
+import { BellRing, FileText, ShieldCheck, Trash2, UserRoundPen } from "lucide-react";
 import { type DataTableColumn, DataTable } from "@/components/system/data-table";
 import { StatusBadge } from "@/components/system/status-badge";
 import { managedAthleteLabel } from "@/lib/role-labels";
@@ -71,14 +71,44 @@ function ActionLink({
   );
 }
 
+function ActionButton({
+  icon: Icon,
+  label,
+  disabled,
+  onClick,
+}: {
+  icon: React.ElementType;
+  label: string;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      disabled={disabled}
+      onClick={onClick}
+      className="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg border border-rose-400/30 bg-rose-500/10 px-2.5 py-1 text-[11px] font-semibold text-rose-200 transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      <Icon className="h-3.5 w-3.5 flex-shrink-0" />
+      <span>{label}</span>
+    </button>
+  );
+}
+
 export function AthletesCrmTable({
   rows,
   basePath = "/atletas",
   showActions = true,
+  deletingId = null,
+  onDelete,
 }: {
   rows: AthleteListRow[];
   basePath?: string;
   showActions?: boolean;
+  deletingId?: string | null;
+  onDelete?: (row: AthleteListRow) => void;
 }) {
   const baseColumns: DataTableColumn<AthleteListRow>[] = [
     {
@@ -111,6 +141,9 @@ export function AthletesCrmTable({
             <p className="mt-0.5 text-[11px] text-white/40">{row.email}</p>
             <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#8eb0dc]">
               {row.memberNumber ?? "Sem matrícula"}
+            </p>
+            <p className="mt-0.5 text-[10px] text-white/35">
+              Cadastro: {format(new Date(row.createdAt), "dd/MM/yyyy", { locale: ptBR })}
             </p>
             {row.invitedByName ? (
               <p className="mt-0.5 text-[10px] text-white/35">
@@ -197,6 +230,14 @@ export function AthletesCrmTable({
             icon={ShieldCheck}
             label="Aprovar"
             variant="success"
+          />
+        ) : null}
+        {onDelete ? (
+          <ActionButton
+            icon={Trash2}
+            label={deletingId === row.id ? "Excluindo..." : "Excluir"}
+            disabled={deletingId === row.id}
+            onClick={() => onDelete(row)}
           />
         ) : null}
       </div>

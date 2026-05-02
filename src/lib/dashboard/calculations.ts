@@ -14,7 +14,20 @@ export function formatPace(secPerKm: number): string {
   return `${min}:${String(sec).padStart(2, "0")}/km`;
 }
 
-export function monthlyDeltaLabel(current: number, previous: number): { trend: "up" | "down" | "stable"; delta: string } {
+export function formatDurationCompact(totalSeconds: number): string {
+  const safeSeconds = Math.max(0, Math.round(totalSeconds));
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.round((safeSeconds % 3600) / 60);
+
+  if (hours <= 0) return `${minutes}min`;
+  if (minutes <= 0) return `${hours}h`;
+  return `${hours}h ${minutes}min`;
+}
+
+export function monthlyDeltaLabel(
+  current: number,
+  previous: number,
+): { trend: "up" | "down" | "stable"; delta: string } {
   if (previous <= 0 && current > 0) return { trend: "up", delta: "+100%" };
   if (previous <= 0 && current <= 0) return { trend: "stable", delta: "0%" };
 
@@ -28,7 +41,10 @@ export function monthlyDeltaLabel(current: number, previous: number): { trend: "
   };
 }
 
-export function buildAchievements(summary: ActivitySummary, best5kPace: number | null): AchievementItem[] {
+export function buildAchievements(
+  summary: ActivitySummary,
+  best5kPace: number | null,
+): AchievementItem[] {
   const achievements: AchievementItem[] = [];
 
   if (summary.kmNoAno >= 100) {
@@ -38,10 +54,10 @@ export function buildAchievements(summary: ActivitySummary, best5kPace: number |
     achievements.push({ id: "km-500", label: "500 km acumulados", tone: "success" });
   }
   if (summary.consistencyPercent >= 50) {
-    achievements.push({ id: "consistency-50", label: "Consistencia 50%+", tone: "info" });
+    achievements.push({ id: "consistency-50", label: "Consistência 50%+", tone: "info" });
   }
   if (summary.consistencyPercent >= 75) {
-    achievements.push({ id: "consistency-75", label: "Alta consistencia 75%+", tone: "success" });
+    achievements.push({ id: "consistency-75", label: "Alta consistência 75%+", tone: "success" });
   }
   if (best5kPace !== null && best5kPace <= 300) {
     achievements.push({ id: "pace-sub5", label: "Ritmo sub 5:00/km", tone: "warning" });
@@ -51,12 +67,12 @@ export function buildAchievements(summary: ActivitySummary, best5kPace: number |
 }
 
 export function buildYearWarning(hasConnection: boolean, hasActivities: boolean): string | null {
-  if (!hasConnection) {
-    return "Conta Strava nao conectada. Conecte o Strava para habilitar metricas reais de evolucao.";
+  if (!hasActivities && !hasConnection) {
+    return "Conecte o Strava ou lance um treino manual para liberar métricas reais de evolução.";
   }
 
   if (!hasActivities) {
-    return "Nenhuma atividade sincronizada encontrada para este atleta. Execute uma sincronizacao para preencher o dashboard.";
+    return "Nenhuma atividade sincronizada encontrada. Sincronize o Strava ou lance um treino manual.";
   }
 
   return null;

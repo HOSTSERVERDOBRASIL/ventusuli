@@ -14,7 +14,7 @@ export const accountNavItems: NavItem[] = [
   },
   {
     href: "/configuracoes/conta",
-    label: "Configuracoes",
+    label: "Configurações",
     icon: Settings,
     roles: [...ROLE_GROUPS.tenant],
     policy: "TENANT_AUTHENTICATED",

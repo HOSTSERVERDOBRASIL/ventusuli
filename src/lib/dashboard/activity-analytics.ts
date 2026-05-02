@@ -6,6 +6,7 @@ import {
   PersonalRecordItem,
   RankingEntry,
   RankingSnapshot,
+  RecentActivityItem,
 } from "@/lib/dashboard/types";
 import { formatPace, roundTwo } from "@/lib/dashboard/calculations";
 
@@ -15,6 +16,10 @@ interface SummaryRow {
   km_year: number | null;
   km_30d: number | null;
   km_prev_30d: number | null;
+  seconds_30d: number | bigint | null;
+  seconds_prev_30d: number | bigint | null;
+  count_30d: number | bigint | null;
+  count_prev_30d: number | bigint | null;
   active_weeks_year: number | bigint | null;
   activity_count_year: number | bigint | null;
 }
@@ -22,6 +27,8 @@ interface SummaryRow {
 interface MonthlyRow {
   month_start: Date;
   km: number | null;
+  moving_time_s: number | bigint | null;
+  sessions: number | bigint;
 }
 
 interface DistRow {
@@ -48,6 +55,17 @@ interface RankingRow {
   sessions: number | bigint;
 }
 
+interface RecentActivityRow {
+  id: string;
+  name: string;
+  type: string;
+  external_source: string;
+  distance_m: number | null;
+  moving_time_s: number | null;
+  average_pace_sec_km: number | null;
+  activity_date: Date;
+}
+
 const DISTANCE_COLORS: Record<string, string> = {
   short: "#38bdf8",
   medium: "#34d399",
@@ -71,7 +89,10 @@ function monthsBetween(base: Date, count: number): Date[] {
 }
 
 function monthLabel(d: Date): string {
-  return d.toLocaleDateString("pt-BR", { month: "short", timeZone: "UTC" }).replace(".", "").toUpperCase();
+  return d
+    .toLocaleDateString("pt-BR", { month: "short", timeZone: "UTC" })
+    .replace(".", "")
+    .toUpperCase();
 }
 
 function currentYearBounds(now: Date): { start: Date; end: Date; weeksElapsed: number } {
@@ -88,7 +109,11 @@ function rankingPeriodStart(now: Date, period: RankingPeriod): Date {
   return new Date(now.getTime() - 90 * 86_400_000);
 }
 
-export async function hasStravaConnection(prisma: PrismaClient, userId: string, organizationId: string): Promise<boolean> {
+export async function hasStravaConnection(
+  prisma: PrismaClient,
+  userId: string,
+  organizationId: string,
+): Promise<boolean> {
   const count = await prisma.stravaConnection.count({
     where: {
       user_id: userId,
@@ -98,7 +123,11 @@ export async function hasStravaConnection(prisma: PrismaClient, userId: string, 
   return count > 0;
 }
 
-export async function hasActivities(prisma: PrismaClient, userId: string, organizationId: string): Promise<boolean> {
+export async function hasActivities(
+  prisma: PrismaClient,
+  userId: string,
+  organizationId: string,
+): Promise<boolean> {
   const count = await prisma.activity.count({
     where: {
       user_id: userId,
@@ -108,7 +137,12 @@ export async function hasActivities(prisma: PrismaClient, userId: string, organi
   return count > 0;
 }
 
-export async function getActivitySummary(prisma: PrismaClient, userId: string, organizationId: string, now: Date): Promise<ActivitySummary> {
+export async function getActivitySummary(
+  prisma: PrismaClient,
+  userId: string,
+  organizationId: string,
+  now: Date,
+): Promise<ActivitySummary> {
   const { start, end, weeksElapsed } = currentYearBounds(now);
   const last30Start = new Date(now.getTime() - 30 * 86_400_000);
   const prev30Start = new Date(now.getTime() - 60 * 86_400_000);
@@ -118,6 +152,10 @@ export async function getActivitySummary(prisma: PrismaClient, userId: string, o
       COALESCE(SUM(a.distance_m) FILTER (WHERE a.activity_date >= ${start} AND a.activity_date < ${end}), 0) / 1000.0 AS km_year,
       COALESCE(SUM(a.distance_m) FILTER (WHERE a.activity_date >= ${last30Start} AND a.activity_date <= ${now}), 0) / 1000.0 AS km_30d,
       COALESCE(SUM(a.distance_m) FILTER (WHERE a.activity_date >= ${prev30Start} AND a.activity_date < ${last30Start}), 0) / 1000.0 AS km_prev_30d,
+      COALESCE(SUM(a.moving_time_s) FILTER (WHERE a.activity_date >= ${last30Start} AND a.activity_date <= ${now}), 0) AS seconds_30d,
+      COALESCE(SUM(a.moving_time_s) FILTER (WHERE a.activity_date >= ${prev30Start} AND a.activity_date < ${last30Start}), 0) AS seconds_prev_30d,
+      COUNT(*) FILTER (WHERE a.activity_date >= ${last30Start} AND a.activity_date <= ${now}) AS count_30d,
+      COUNT(*) FILTER (WHERE a.activity_date >= ${prev30Start} AND a.activity_date < ${last30Start}) AS count_prev_30d,
       COUNT(DISTINCT DATE_TRUNC('week', a.activity_date)) FILTER (WHERE a.activity_date >= ${start} AND a.activity_date < ${end}) AS active_weeks_year,
       COUNT(*) FILTER (WHERE a.activity_date >= ${start} AND a.activity_date < ${end}) AS activity_count_year
     FROM "public"."activities" a
@@ -129,6 +167,10 @@ export async function getActivitySummary(prisma: PrismaClient, userId: string, o
     km_year: 0,
     km_30d: 0,
     km_prev_30d: 0,
+    seconds_30d: 0,
+    seconds_prev_30d: 0,
+    count_30d: 0,
+    count_prev_30d: 0,
     active_weeks_year: 0,
     activity_count_year: 0,
   };
@@ -140,20 +182,31 @@ export async function getActivitySummary(prisma: PrismaClient, userId: string, o
     kmNoAno: roundTwo(Number(row.km_year ?? 0)),
     volume30dKm: roundTwo(Number(row.km_30d ?? 0)),
     previous30dKm: roundTwo(Number(row.km_prev_30d ?? 0)),
+    movingTime30dSeconds: Number(row.seconds_30d ?? 0),
+    previousMovingTime30dSeconds: Number(row.seconds_prev_30d ?? 0),
+    activityCount30d: Number(row.count_30d ?? 0),
+    previousActivityCount30d: Number(row.count_prev_30d ?? 0),
     consistencyPercent,
     activeWeeksInYear: activeWeeks,
     activityCountInYear: Number(row.activity_count_year ?? 0),
   };
 }
 
-export async function getEvolutionSeries(prisma: PrismaClient, userId: string, organizationId: string, now: Date): Promise<EvolutionPoint[]> {
+export async function getEvolutionSeries(
+  prisma: PrismaClient,
+  userId: string,
+  organizationId: string,
+  now: Date,
+): Promise<EvolutionPoint[]> {
   const months = monthsBetween(now, 6);
   const start = months[0];
   const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
 
   const rows = await prisma.$queryRaw<MonthlyRow[]>`
     SELECT DATE_TRUNC('month', a.activity_date) AS month_start,
-           COALESCE(SUM(a.distance_m), 0) / 1000.0 AS km
+           COALESCE(SUM(a.distance_m), 0) / 1000.0 AS km,
+           COALESCE(SUM(a.moving_time_s), 0) AS moving_time_s,
+           COUNT(*) AS sessions
     FROM "public"."activities" a
     WHERE a.organization_id = ${organizationId}
       AND a.user_id = ${userId}
@@ -162,24 +215,39 @@ export async function getEvolutionSeries(prisma: PrismaClient, userId: string, o
     GROUP BY DATE_TRUNC('month', a.activity_date)
   `;
 
-  const map = new Map<string, number>();
+  const map = new Map<string, { km: number; durationMinutes: number; sessions: number }>();
   rows.forEach((row) => {
     const key = `${row.month_start.getUTCFullYear()}-${String(row.month_start.getUTCMonth() + 1).padStart(2, "0")}`;
-    map.set(key, Number(row.km ?? 0));
+    map.set(key, {
+      km: Number(row.km ?? 0),
+      durationMinutes: Math.round(Number(row.moving_time_s ?? 0) / 60),
+      sessions: Number(row.sessions ?? 0),
+    });
   });
 
   return months.map((month) => {
     const monthKey = `${month.getUTCFullYear()}-${String(month.getUTCMonth() + 1).padStart(2, "0")}`;
     const prevKey = `${month.getUTCFullYear() - 1}-${String(month.getUTCMonth() + 1).padStart(2, "0")}`;
+    const current = map.get(monthKey);
+    const previous = map.get(prevKey);
     return {
       month: monthLabel(month),
-      current: roundTwo(map.get(monthKey) ?? 0),
-      previous: roundTwo(map.get(prevKey) ?? 0),
+      current: roundTwo(current?.km ?? 0),
+      previous: roundTwo(previous?.km ?? 0),
+      durationMinutes: current?.durationMinutes ?? 0,
+      previousDurationMinutes: previous?.durationMinutes ?? 0,
+      sessions: current?.sessions ?? 0,
+      previousSessions: previous?.sessions ?? 0,
     };
   });
 }
 
-export async function getDistanceDistribution(prisma: PrismaClient, userId: string, organizationId: string, now: Date): Promise<DistributionSlice[]> {
+export async function getDistanceDistribution(
+  prisma: PrismaClient,
+  userId: string,
+  organizationId: string,
+  now: Date,
+): Promise<DistributionSlice[]> {
   const { start, end } = currentYearBounds(now);
 
   const rows = await prisma.$queryRaw<DistRow[]>`
@@ -209,7 +277,11 @@ export async function getDistanceDistribution(prisma: PrismaClient, userId: stri
   ].filter((item) => item.value > 0);
 }
 
-export async function getPersonalRecords(prisma: PrismaClient, userId: string, organizationId: string): Promise<PersonalRecordItem[]> {
+export async function getPersonalRecords(
+  prisma: PrismaClient,
+  userId: string,
+  organizationId: string,
+): Promise<PersonalRecordItem[]> {
   const items = await Promise.all(
     PR_CONFIG.map(async (config) => {
       const row = await prisma.$queryRaw<PrResult[]>`
@@ -234,7 +306,7 @@ export async function getPersonalRecords(prisma: PrismaClient, userId: string, o
         id: config.id,
         label: config.label,
         value: formatPace(Number(best.pace_sec_km)),
-        event: best.activity_name ?? "Atividade Strava",
+        event: best.activity_name ?? "Atividade registrada",
         achievedAt: best.activity_date.toISOString(),
       };
 
@@ -243,6 +315,40 @@ export async function getPersonalRecords(prisma: PrismaClient, userId: string, o
   );
 
   return items.filter((item): item is PersonalRecordItem => Boolean(item));
+}
+
+export async function getRecentActivities(
+  prisma: PrismaClient,
+  userId: string,
+  organizationId: string,
+): Promise<RecentActivityItem[]> {
+  const rows = await prisma.$queryRaw<RecentActivityRow[]>`
+    SELECT
+      a.id,
+      a.name,
+      a.type,
+      a.external_source,
+      a.distance_m,
+      a.moving_time_s,
+      COALESCE(a.average_pace_sec_km, (a.moving_time_s / NULLIF((a.distance_m / 1000.0), 0))) AS average_pace_sec_km,
+      a.activity_date
+    FROM "public"."activities" a
+    WHERE a.organization_id = ${organizationId}
+      AND a.user_id = ${userId}
+    ORDER BY a.activity_date DESC
+    LIMIT 6
+  `;
+
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    type: row.type,
+    source: row.external_source,
+    distanceKm: roundTwo(Number(row.distance_m ?? 0) / 1000),
+    durationMinutes: Math.round(Number(row.moving_time_s ?? 0) / 60),
+    pace: row.average_pace_sec_km ? formatPace(Number(row.average_pace_sec_km)) : null,
+    activityDate: row.activity_date.toISOString(),
+  }));
 }
 
 export async function getGroupRanking(
@@ -265,8 +371,9 @@ export async function getGroupRanking(
     INNER JOIN "public"."athlete_profiles" ap ON ap.user_id = u.id AND ap.organization_id = a.organization_id
     WHERE a.organization_id = ${organizationId}
       AND a.activity_date >= ${periodStart}
-      AND u.role = 'ATHLETE'
+      AND u.role IN ('ATHLETE', 'PREMIUM_ATHLETE')
       AND ap.athlete_status = 'ACTIVE'
+      AND a.external_source <> 'manual'
     GROUP BY a.user_id, u.name
     ORDER BY COALESCE(SUM(a.distance_m), 0) DESC, COUNT(*) DESC, u.name ASC
     LIMIT 30

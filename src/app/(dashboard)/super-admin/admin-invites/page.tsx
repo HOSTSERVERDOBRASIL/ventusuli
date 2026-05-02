@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Copy, Loader2, RefreshCw, Search } from "lucide-react";
 import { useAuthToken } from "@/components/auth/AuthTokenProvider";
 import { roleLabel } from "@/lib/role-labels";
@@ -99,7 +99,7 @@ export default function SuperAdminAdminInvitesPage() {
     });
   }, [invites, search]);
 
-  const loadOrganizations = async () => {
+  const loadOrganizations = useCallback(async () => {
     const response = await fetch("/api/super-admin/organizations", {
       headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
       cache: "no-store",
@@ -123,12 +123,14 @@ export default function SuperAdminAdminInvitesPage() {
     }));
 
     setOrganizations(options);
-    if (!form.organizationId && options[0]) {
-      setForm((current) => ({ ...current, organizationId: options[0].id }));
-    }
-  };
+    setForm((current) =>
+      !current.organizationId && options[0]
+        ? { ...current, organizationId: options[0].id }
+        : current,
+    );
+  }, [accessToken]);
 
-  const loadInvites = async () => {
+  const loadInvites = useCallback(async () => {
     const response = await fetch("/api/super-admin/organization-invites", {
       headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
       cache: "no-store",
@@ -144,9 +146,9 @@ export default function SuperAdminAdminInvitesPage() {
     }
 
     setInvites(payload.data);
-  };
+  }, [accessToken]);
 
-  const bootstrap = async () => {
+  const bootstrap = useCallback(async () => {
     setLoading(true);
     setError(null);
     setFeedback(null);
@@ -159,12 +161,12 @@ export default function SuperAdminAdminInvitesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [loadInvites, loadOrganizations]);
 
   useEffect(() => {
     if (!accessToken) return;
     void bootstrap();
-  }, [accessToken]);
+  }, [accessToken, bootstrap]);
 
   const createInvite = async () => {
     if (!form.organizationId || !form.email.trim()) {

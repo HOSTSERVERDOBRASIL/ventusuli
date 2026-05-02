@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { format, formatDistanceToNowStrict } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -15,17 +15,18 @@ import {
   Users,
 } from "lucide-react";
 import { useAuthToken } from "@/components/auth/AuthTokenProvider";
+import { ProfileCockpit } from "@/components/profile/profile-cockpit";
 import { ActionButton } from "@/components/system/action-button";
 import { type DataTableColumn, DataTable } from "@/components/system/data-table";
 import { EmptyState } from "@/components/system/empty-state";
 import { LoadingState } from "@/components/system/loading-state";
-import { MetricCard } from "@/components/system/metric-card";
+import { MetricStrip } from "@/components/system/metric-strip";
 import { ModuleTabs, type ModuleTabItem } from "@/components/system/module-tabs";
-import { PageHeader } from "@/components/system/page-header";
 import { SectionCard } from "@/components/system/section-card";
 import { StatusBadge } from "@/components/system/status-badge";
 import { getAdminOverview } from "@/services/admin-service";
 import { AdminOverviewData } from "@/services/types";
+import { UserRole } from "@/types";
 
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -62,25 +63,28 @@ export default function AdminOverviewPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<AdminOverviewTab>("overview");
 
-  const load = async (cancelledRef?: { value: boolean }) => {
-    setLoading(true);
-    setErrorMessage(null);
-    try {
-      const payload = await getAdminOverview(accessToken);
-      if (!cancelledRef?.value) setData(payload);
-    } catch (error) {
-      if (!cancelledRef?.value) {
-        setData(null);
-        setErrorMessage(
-          error instanceof Error
-            ? error.message
-            : "Não foi possível carregar os dados administrativos.",
-        );
+  const load = useCallback(
+    async (cancelledRef?: { value: boolean }) => {
+      setLoading(true);
+      setErrorMessage(null);
+      try {
+        const payload = await getAdminOverview(accessToken);
+        if (!cancelledRef?.value) setData(payload);
+      } catch (error) {
+        if (!cancelledRef?.value) {
+          setData(null);
+          setErrorMessage(
+            error instanceof Error
+              ? error.message
+              : "Não foi possível carregar os dados administrativos.",
+          );
+        }
+      } finally {
+        if (!cancelledRef?.value) setLoading(false);
       }
-    } finally {
-      if (!cancelledRef?.value) setLoading(false);
-    }
-  };
+    },
+    [accessToken],
+  );
 
   useEffect(() => {
     const cancelledRef = { value: false };
@@ -88,7 +92,7 @@ export default function AdminOverviewPage() {
     return () => {
       cancelledRef.value = true;
     };
-  }, [accessToken]);
+  }, [load]);
 
   const rows = useMemo(() => data?.report.data ?? [], [data?.report.data]);
   const events = useMemo(() => data?.events ?? [], [data?.events]);
@@ -266,52 +270,132 @@ export default function AdminOverviewPage() {
   }
 
   return (
-    <div className="space-y-6 text-white">
-      <PageHeader
-        title="Cockpit administrativo"
-        subtitle="Diagnóstico da operação em segundos, com foco no que exige ação agora."
-        actions={
-          <>
-            <ActionButton asChild>
-              <Link href="/admin/eventos/novo">
-                <Plus className="mr-2 h-4 w-4" /> Nova prova
-              </Link>
-            </ActionButton>
-            <ActionButton asChild intent="secondary">
-              <Link href="/admin/financeiro">
-                <CircleDollarSign className="mr-2 h-4 w-4" /> Financeiro
-              </Link>
-            </ActionButton>
-          </>
-        }
+    <ProfileCockpit
+      role={UserRole.ADMIN}
+      title="Cockpit administrativo"
+      subtitle="Diagnóstico da operação em segundos, com foco no que exige ação agora."
+      eyebrow="Operação da assessoria"
+      metrics={[
+        {
+          label: "Receita do mês",
+          value: BRL.format(data.metrics.receitaMes / 100),
+          description: "Pagamentos confirmados no período.",
+          icon: CircleDollarSign,
+          tone: "green",
+        },
+        {
+          label: "Cobranças pendentes",
+          value: data.metrics.inscricoesPendentes,
+          description: BRL.format(data.report.totals.totalPendente / 100),
+          icon: AlertTriangle,
+          tone: "amber",
+        },
+        {
+          label: "Atletas ativos",
+          value: data.metrics.atletasAtivos,
+          description: "Base com movimentação financeira no mês.",
+          icon: Users,
+          tone: "blue",
+        },
+      ]}
+      actions={[
+        {
+          href: "/admin/eventos/novo",
+          label: "Nova prova",
+          description: "Crie um evento, distâncias e regras de inscrição.",
+          icon: Plus,
+        },
+        {
+          href: "/admin/financeiro",
+          label: "Financeiro",
+          description: "Cobranças, conciliação e relatórios.",
+          icon: CircleDollarSign,
+        },
+        {
+          href: "/admin/atletas?status=ALL&financial=ALL",
+          label: "Atletas",
+          description: "Base ativa, pendências e relacionamento.",
+          icon: Users,
+        },
+      ]}
+      focusItems={attentionItems.map((item) => ({
+        title: item.title,
+        description: item.detail,
+        status: String(item.value),
+        href: item.href,
+      }))}
+      activityItems={upcomingEvents.slice(0, 4).map((event) => ({
+        title: event.name,
+        description: `${format(new Date(event.event_date), "dd/MM/yyyy", { locale: ptBR })} • ${
+          event.city
+        }/${event.state}`,
+        status: eventStatusLabel(event.status),
+        href: `/admin/eventos/${event.id}`,
+      }))}
+      insightItems={[
+        {
+          title: "Publicação de provas",
+          description: `${data.metrics.provasPublicadas} prova(s) publicada(s) para conversão.`,
+          status: "Eventos",
+        },
+        {
+          title: "Fila de cobrança",
+          description: `${pendingAthletes} atleta(s) com pendência financeira para acompanhamento.`,
+          status: "Financeiro",
+        },
+        {
+          title: "Risco operacional",
+          description:
+            draftEvents > 0
+              ? `${draftEvents} prova(s) ainda em rascunho.`
+              : "Sem rascunhos travando a operação agora.",
+          status: "Atenção",
+        },
+      ]}
+    >
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <ActionButton asChild>
+          <Link href="/admin/eventos/novo">
+            <Plus className="mr-2 h-4 w-4" /> Nova prova
+          </Link>
+        </ActionButton>
+        <ActionButton asChild intent="secondary">
+          <Link href="/admin/financeiro">
+            <CircleDollarSign className="mr-2 h-4 w-4" /> Financeiro
+          </Link>
+        </ActionButton>
+      </div>
+
+      <ModuleTabs
+        tabs={tabs}
+        activeTab={activeTab}
+        onChange={setActiveTab}
+        columnsClassName="md:grid-cols-4"
       />
 
-      <SectionCard
-        title="Modulo administrativo"
-        description="Separe leitura executiva, alertas, atividade recente e atalhos."
-      >
-        <ModuleTabs
-          tabs={tabs}
-          activeTab={activeTab}
-          onChange={setActiveTab}
-          columnsClassName="md:grid-cols-4"
-        />
-      </SectionCard>
-
-      <section className={activeTab === "overview" ? "grid gap-3 sm:grid-cols-2 xl:grid-cols-5" : "hidden"}>
-        <MetricCard
-          label="Receita do mês"
-          value={BRL.format(data.metrics.receitaMes / 100)}
-          tone="highlight"
-        />
-        <MetricCard label="Cobranças pendentes" value={data.metrics.inscricoesPendentes} />
-        <MetricCard
-          label="Total em aberto"
-          value={BRL.format(data.report.totals.totalPendente / 100)}
-        />
-        <MetricCard label="Atletas ativos" value={data.metrics.atletasAtivos} />
-        <MetricCard label="Provas publicadas" value={data.metrics.provasPublicadas} />
-      </section>
+      <MetricStrip
+        className={activeTab === "overview" ? undefined : "hidden"}
+        columnsClassName="sm:grid-cols-2 xl:grid-cols-5"
+        items={[
+          {
+            label: "Receita do mês",
+            value: BRL.format(data.metrics.receitaMes / 100),
+            tone: "highlight",
+          },
+          {
+            label: "Cobranças pendentes",
+            value: data.metrics.inscricoesPendentes,
+            tone: "warning",
+          },
+          {
+            label: "Total em aberto",
+            value: BRL.format(data.report.totals.totalPendente / 100),
+            tone: "warning",
+          },
+          { label: "Atletas ativos", value: data.metrics.atletasAtivos, tone: "positive" },
+          { label: "Provas publicadas", value: data.metrics.provasPublicadas },
+        ]}
+      />
 
       <div className={activeTab === "attention" ? "grid gap-4 xl:grid-cols-[1.4fr_1fr]" : "hidden"}>
         <SectionCard
@@ -469,6 +553,6 @@ export default function AdminOverviewPage() {
           </div>
         )}
       </SectionCard>
-    </div>
+    </ProfileCockpit>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
@@ -78,7 +78,7 @@ export default function MeusResgatesPage() {
   const [loadingPayment, setLoadingPayment] = useState(false);
   const [confirmingPayment, setConfirmingPayment] = useState(false);
 
-  const loadRedemptions = async (cancelledRef?: { current: boolean }) => {
+  const loadRedemptions = useCallback(async (cancelledRef?: { current: boolean }) => {
     setLoading(true);
     setError(null);
     try {
@@ -100,7 +100,7 @@ export default function MeusResgatesPage() {
     } finally {
       if (!cancelledRef?.current) setLoading(false);
     }
-  };
+  }, [accessToken]);
 
   useEffect(() => {
     const cancelledRef = { current: false };
@@ -109,7 +109,7 @@ export default function MeusResgatesPage() {
     return () => {
       cancelledRef.current = true;
     };
-  }, [accessToken]);
+  }, [loadRedemptions]);
 
   const openPaymentModal = async (redemptionId: string) => {
     setLoadingPayment(true);

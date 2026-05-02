@@ -13,7 +13,7 @@ const querySchema = z.object({
   status: z.enum(["ALL", "PENDING_APPROVAL", "ACTIVE", "REJECTED", "BLOCKED"]).default("ALL"),
   financial: z.enum(["ALL", "EM_DIA", "PENDENTE", "SEM_HISTORICO"]).default("ALL"),
   sortBy: z
-    .enum(["name", "registrations", "nextEvent", "pending", "paid", "lastPayment"])
+    .enum(["createdAt", "name", "registrations", "nextEvent", "pending", "paid", "lastPayment"])
     .default("name"),
   sortDir: z.enum(["asc", "desc"]).default("asc"),
   page: z.coerce.number().int().min(1).default(1),
@@ -140,16 +140,18 @@ export async function GET(req: NextRequest) {
     );
     const recurringEntries = user.financial_entries_subject;
 
-    const pendingAmountCents = payments
-      .filter((payment) => payment.status === "PENDING")
-      .reduce((sum, payment) => sum + payment.amount_cents, 0) +
+    const pendingAmountCents =
+      payments
+        .filter((payment) => payment.status === "PENDING")
+        .reduce((sum, payment) => sum + payment.amount_cents, 0) +
       recurringEntries
         .filter((entry) => entry.status === "OPEN")
         .reduce((sum, entry) => sum + entry.amount_cents, 0);
 
-    const paidAmountCents = payments
-      .filter((payment) => payment.status === "PAID")
-      .reduce((sum, payment) => sum + payment.amount_cents, 0) +
+    const paidAmountCents =
+      payments
+        .filter((payment) => payment.status === "PAID")
+        .reduce((sum, payment) => sum + payment.amount_cents, 0) +
       recurringEntries
         .filter((entry) => entry.status === "PAID")
         .reduce((sum, entry) => sum + entry.amount_cents, 0);
@@ -175,21 +177,24 @@ export async function GET(req: NextRequest) {
             paidAt: entry.settled_at,
             createdAt: entry.created_at,
           })),
-      ]
-        .sort((a, b) => {
-          const aDate = a.paidAt ? new Date(a.paidAt) : new Date(a.createdAt);
-          const bDate = b.paidAt ? new Date(b.paidAt) : new Date(b.createdAt);
-          return bDate.getTime() - aDate.getTime();
-        })[0] ?? null;
+      ].sort((a, b) => {
+        const aDate = a.paidAt ? new Date(a.paidAt) : new Date(a.createdAt);
+        const bDate = b.paidAt ? new Date(b.paidAt) : new Date(b.createdAt);
+        return bDate.getTime() - aDate.getTime();
+      })[0] ?? null;
 
     const athleteStatus = resolveAthleteStatus(
       user.athlete_profile?.athlete_status,
       user.account_status,
     );
-    const financialSituation = financialFromData(payments.length + recurringEntries.length, pendingAmountCents);
+    const financialSituation = financialFromData(
+      payments.length + recurringEntries.length,
+      pendingAmountCents,
+    );
 
     return {
       id: user.id,
+      createdAt: user.created_at.toISOString(),
       name: user.name,
       email: user.email,
       status: athleteStatus,
@@ -235,8 +240,11 @@ export async function GET(req: NextRequest) {
       const bDate = b.lastPaymentAt ? new Date(b.lastPaymentAt).getTime() : 0;
       return (aDate - bDate) * dir;
     }
+    if (sortBy === "createdAt") {
+      return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * dir;
+    }
 
-    return a.name.localeCompare(b.name) * dir;
+    return a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" }) * dir;
   });
 
   const total = sortedRows.length;

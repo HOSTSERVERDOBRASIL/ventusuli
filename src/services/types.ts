@@ -211,6 +211,10 @@ export interface DashboardData {
       month: string;
       current: number;
       previous: number;
+      durationMinutes?: number;
+      previousDurationMinutes?: number;
+      sessions?: number;
+      previousSessions?: number;
     }>;
     highlights: Array<{
       id: "completed" | "distance" | "consistency" | "podium" | "best5k" | "best21k" | "best42k";
@@ -240,6 +244,16 @@ export interface DashboardData {
       value: string;
       event: string;
       achievedAt: string;
+    }>;
+    recentActivities?: Array<{
+      id: string;
+      name: string;
+      type: string;
+      source: string;
+      distanceKm: number;
+      durationMinutes: number;
+      pace: string | null;
+      activityDate: string;
     }>;
     groupRanking: {
       updatedAt: string;
@@ -404,6 +418,7 @@ export interface AthleteListRow {
   memberNumber: string | null;
   memberSequence: number | null;
   memberSince: string | null;
+  createdAt: string;
   name: string;
   email: string;
   status: AthleteCrmStatus;

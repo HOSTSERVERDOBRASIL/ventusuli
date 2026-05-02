@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { DoorOpen, UserCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getProfileConfig } from "@/lib/profile-config";
+import { resolveOrganizationLogo } from "@/lib/brand";
 import { rolesLabel } from "@/lib/role-labels";
 import { useAuthToken } from "@/components/auth/AuthTokenProvider";
 import { isNavItemActive, splitNavBySection, type NavItem } from "@/components/layout/nav-items";
@@ -19,13 +20,6 @@ function initialsFromName(name?: string | null): string {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() ?? "")
     .join("");
-}
-
-function resolveOrganizationLogo(logoUrl?: string | null): string {
-  if (!logoUrl || logoUrl.trim().length === 0) return "/branding/ventu-suli-logo.png";
-  const normalized = logoUrl.trim().toLowerCase();
-  if (normalized.includes("cdn.seudominio.com/logo.png")) return "/branding/ventu-suli-logo.png";
-  return logoUrl;
 }
 
 function NavGroup({
@@ -72,13 +66,13 @@ export function Sidebar() {
   const navScope = activeRole ? [activeRole] : userRoles;
   const groups = splitNavBySection(navScope);
   const navGroups = [
-    { title: "Inicio", items: groups.home },
+    { title: "Início", items: groups.home },
     { title: "Provas e agenda", items: groups.events },
     { title: "Financeiro", items: groups.finance },
-    { title: "Pontos e beneficios", items: groups.points },
-    { title: "Comunicacao", items: groups.communication },
-    { title: "Tecnico", items: groups.coaching },
-    { title: "Administracao", items: groups.admin },
+    { title: "Pontos e benefícios", items: groups.points },
+    { title: "Comunicação", items: groups.communication },
+    { title: "Técnico", items: groups.coaching },
+    { title: "Administração", items: groups.admin },
     { title: "Plataforma", items: groups.platform },
     { title: "Conta", items: groups.account },
   ];
@@ -87,7 +81,11 @@ export function Sidebar() {
   const hasAthleteProfile =
     userRoles.includes(UserRole.ATHLETE) || userRoles.includes(UserRole.PREMIUM_ATHLETE);
   const onlyPlatform = userRoles.includes(UserRole.SUPER_ADMIN) && !hasAthleteProfile;
-  const profileHref = onlyPlatform ? "/super-admin" : hasAthleteProfile ? "/perfil" : "/configuracoes/conta";
+  const profileHref = onlyPlatform
+    ? "/super-admin"
+    : hasAthleteProfile
+      ? "/perfil"
+      : "/configuracoes/conta";
   const profileLabel = onlyPlatform ? "Plataforma" : hasAthleteProfile ? "Perfil" : "Conta";
   const activeProfile = getProfileConfig(activeRole ?? userRoles[0]);
 
@@ -104,16 +102,17 @@ export function Sidebar() {
 
   return (
     <aside className="flex h-full w-[200px] flex-col overflow-hidden border-r border-white/[0.06] bg-[#0A1628]">
-      <div className="border-b border-white/[0.06] px-4 pb-4 pt-4">
-        <div className="flex flex-col items-center text-center">
-          <div className="relative flex h-24 w-24 items-center justify-center overflow-hidden rounded-[24px] border border-[#1E90FF]/45 bg-transparent shadow-[0_12px_32px_rgba(3,10,22,0.45)]">
+      <div className="border-b border-white/[0.06] p-3">
+        <Link href="/" className="flex min-w-0 items-center gap-2.5 rounded-lg px-1 py-1.5">
+          <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden">
             <img
               src={organizationLogo}
               alt="Logo da assessoria"
-              className="h-full w-full scale-[1.35] object-cover mix-blend-screen drop-shadow-[0_10px_20px_rgba(3,10,22,0.5)]"
+              referrerPolicy="no-referrer"
+              className="h-full w-full object-contain drop-shadow-[0_8px_16px_rgba(3,10,22,0.5)]"
             />
           </div>
-          <div className="mt-3 min-w-0">
+          <div className="min-w-0">
             <span className="block truncate text-[14px] font-bold leading-tight text-white">
               {organization?.name ?? "Ventu Suli"}
             </span>
@@ -121,7 +120,7 @@ export function Sidebar() {
               {organization?.slug ?? "grupo de corrida"}
             </span>
           </div>
-        </div>
+        </Link>
       </div>
 
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4">
@@ -140,7 +139,11 @@ export function Sidebar() {
         <div className="flex items-center gap-2.5 rounded-xl border border-white/[0.07] bg-white/[0.03] p-2.5">
           <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#1E90FF]/20 text-[11px] font-bold text-white">
             {currentUser?.avatar_url ? (
-              <img src={currentUser.avatar_url} alt="Avatar do usuário" className="h-full w-full object-cover" />
+              <img
+                src={currentUser.avatar_url}
+                alt="Avatar do usuário"
+                className="h-full w-full object-cover"
+              />
             ) : (
               <>{initialsFromName(currentUser?.name)}</>
             )}

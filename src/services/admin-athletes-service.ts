@@ -10,6 +10,8 @@ import {
 export interface AdminAthletesFilters {
   q?: string;
   status?: "ALL" | "PENDING_APPROVAL" | "ACTIVE" | "REJECTED" | "BLOCKED";
+  sortBy?: "createdAt" | "name" | "memberNumber" | "registrations";
+  sortDir?: "asc" | "desc";
   page?: number;
   pageSize?: number;
   accessToken?: string | null;
@@ -31,11 +33,15 @@ async function parseError(response: Response, fallback: string): Promise<Error> 
   }
 }
 
-export async function getAdminAthletes(filters: AdminAthletesFilters): Promise<AdminAthletesListResponse> {
+export async function getAdminAthletes(
+  filters: AdminAthletesFilters,
+): Promise<AdminAthletesListResponse> {
   const query = new URLSearchParams();
 
   if (filters.q) query.set("q", filters.q);
   if (filters.status) query.set("status", filters.status);
+  if (filters.sortBy) query.set("sortBy", filters.sortBy);
+  if (filters.sortDir) query.set("sortDir", filters.sortDir);
   query.set("page", String(filters.page ?? 1));
   query.set("pageSize", String(filters.pageSize ?? 20));
 
@@ -56,11 +62,27 @@ export function buildAdminAthletesExportUrl(filters: AdminAthletesFilters): stri
 
   if (filters.q) query.set("q", filters.q);
   if (filters.status) query.set("status", filters.status);
+  if (filters.sortBy) query.set("sortBy", filters.sortBy);
+  if (filters.sortDir) query.set("sortDir", filters.sortDir);
   query.set("page", "1");
   query.set("pageSize", "100");
   query.set("export", "csv");
 
   return `/api/admin/athletes?${query.toString()}`;
+}
+
+export async function deleteAdminAthlete(
+  athleteId: string,
+  accessToken?: string | null,
+): Promise<void> {
+  const response = await fetch(`/api/admin/athletes/${athleteId}`, {
+    method: "DELETE",
+    headers: buildAuthHeaders(accessToken),
+  });
+
+  if (!response.ok) {
+    throw await parseError(response, "Não foi possível excluir atleta.");
+  }
 }
 
 export async function updateAdminAthleteStatus(
@@ -156,7 +178,10 @@ export async function createAdminInvite(
   return payload.data;
 }
 
-export async function resendAdminInvite(inviteId: string, accessToken?: string | null): Promise<AdminAthleteInvite> {
+export async function resendAdminInvite(
+  inviteId: string,
+  accessToken?: string | null,
+): Promise<AdminAthleteInvite> {
   const response = await fetch(`/api/admin/invites/${inviteId}/resend`, {
     method: "POST",
     headers: buildAuthHeaders(accessToken),

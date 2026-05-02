@@ -5,7 +5,7 @@ import type { NavItem } from "@/components/layout/navigation/types";
 export const coachNavItems: NavItem[] = [
   {
     href: "/coach",
-    label: "Painel Tecnico",
+    label: "Painel Técnico",
     icon: LayoutDashboard,
     roles: [...ROLE_GROUPS.coach],
     policy: "COACH_AREA",
@@ -23,7 +23,7 @@ export const coachNavItems: NavItem[] = [
   },
   {
     href: "/coach/calendario",
-    label: "Calendario Tecnico",
+    label: "Calendário Técnico",
     icon: CalendarDays,
     roles: [...ROLE_GROUPS.coach],
     policy: "COACH_AREA",

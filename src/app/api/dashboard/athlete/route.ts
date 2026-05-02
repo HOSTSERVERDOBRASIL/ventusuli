@@ -7,6 +7,7 @@ import {
   getEvolutionSeries,
   getGroupRanking,
   getPersonalRecords,
+  getRecentActivities,
   hasActivities,
   hasStravaConnection,
   type RankingPeriod,
@@ -14,7 +15,9 @@ import {
 import {
   buildAchievements,
   buildYearWarning,
+  formatDurationCompact,
   formatDistanceKm,
+  formatPace,
   monthlyDeltaLabel,
 } from "@/lib/dashboard/calculations";
 import { buildUserGamificationSnapshot } from "@/lib/gamification/snapshot";
@@ -157,8 +160,7 @@ function buildEmptyExperience(
   return {
     greeting: {
       headline: `Bora correr, ${athleteName.split(" ")[0]}!`,
-      subtitle:
-        "Conecte sua conta Strava e sincronize atividades para liberar os indicadores reais.",
+      subtitle: "Conecte o Strava ou lance um treino manual para liberar os indicadores reais.",
     },
     financeBreakdown: [],
     evolutionSeries: [],
@@ -167,6 +169,7 @@ function buildEmptyExperience(
     achievements: [],
     sportsMetrics: [],
     personalRecords: [],
+    recentActivities: [],
     groupRanking: {
       updatedAt: new Date().toISOString(),
       totalAthletes: 0,
@@ -190,23 +193,27 @@ function buildEmptyExperience(
 
 function buildActivityExperience(params: {
   athleteName: string;
+  activitySource: "STRAVA" | "MANUAL";
   totalGastoAno: number;
   pendente: number;
   summary: Awaited<ReturnType<typeof getActivitySummary>>;
   evolutionSeries: Awaited<ReturnType<typeof getEvolutionSeries>>;
   distanceDistribution: Awaited<ReturnType<typeof getDistanceDistribution>>;
   personalRecords: Awaited<ReturnType<typeof getPersonalRecords>>;
+  recentActivities: Awaited<ReturnType<typeof getRecentActivities>>;
   ranking: Awaited<ReturnType<typeof getGroupRanking>>;
   gamification: NonNullable<DashboardData["experience"]>["gamification"];
 }): NonNullable<DashboardData["experience"]> {
   const {
     athleteName,
+    activitySource,
     totalGastoAno,
     pendente,
     summary,
     evolutionSeries,
     distanceDistribution,
     personalRecords,
+    recentActivities,
     ranking,
     gamification,
   } = params;
@@ -218,6 +225,27 @@ function buildActivityExperience(params: {
   const monthlyCurrent = summary.volume30dKm;
   const monthlyPrevious = summary.previous30dKm;
   const monthlyTrend = monthlyDeltaLabel(monthlyCurrent, monthlyPrevious);
+  const trainingCountTrend = monthlyDeltaLabel(
+    summary.activityCount30d,
+    summary.previousActivityCount30d,
+  );
+  const durationTrend = monthlyDeltaLabel(
+    summary.movingTime30dSeconds,
+    summary.previousMovingTime30dSeconds,
+  );
+  const currentPace =
+    summary.volume30dKm > 0 && summary.movingTime30dSeconds > 0
+      ? summary.movingTime30dSeconds / summary.volume30dKm
+      : null;
+  const previousPace =
+    summary.previous30dKm > 0 && summary.previousMovingTime30dSeconds > 0
+      ? summary.previousMovingTime30dSeconds / summary.previous30dKm
+      : null;
+  const paceDelta =
+    currentPace !== null && previousPace !== null && previousPace > 0
+      ? ((currentPace - previousPace) / previousPace) * 100
+      : 0;
+  const paceTrend = Math.abs(paceDelta) < 0.5 ? "stable" : paceDelta < 0 ? "up" : "down";
 
   const consistencyTrend = monthlyDeltaLabel(summary.consistencyPercent, 50);
 
@@ -237,7 +265,10 @@ function buildActivityExperience(params: {
   return {
     greeting: {
       headline: `Bora correr, ${athleteName.split(" ")[0]}!`,
-      subtitle: "Indicadores baseados em atividades reais sincronizadas do Strava.",
+      subtitle:
+        activitySource === "STRAVA"
+          ? "Indicadores baseados em atividades sincronizadas do Strava."
+          : "Indicadores baseados nos treinos lançados manualmente.",
     },
     financeBreakdown: [
       { name: "Pago", value: paidShare, color: "#22d3ee" },
@@ -248,13 +279,13 @@ function buildActivityExperience(params: {
       { id: "distance", label: "KM no ano", value: formatDistanceKm(summary.kmNoAno) },
       {
         id: "consistency",
-        label: "Consistencia semanal",
+        label: "Consistência semanal",
         value: `${Math.round(summary.consistencyPercent)}%`,
       },
       { id: "best5k", label: "Melhor pace 5K", value: best5k?.value ?? "Sem dado" },
       {
         id: "podium",
-        label: "Posicao no grupo",
+        label: "Posição no grupo",
         value: ranking.currentUser ? `#${ranking.currentUser.position}` : "Sem ranking",
       },
     ],
@@ -262,11 +293,35 @@ function buildActivityExperience(params: {
     achievements,
     sportsMetrics: [
       {
+        id: "training-30d",
+        label: "Treinos 30 dias",
+        value: String(summary.activityCount30d),
+        delta: trainingCountTrend.delta,
+        trend: trainingCountTrend.trend,
+      },
+      {
         id: "volume-30d",
         label: "Volume 30 dias",
         value: formatDistanceKm(summary.volume30dKm),
         delta: monthlyTrend.delta,
         trend: monthlyTrend.trend,
+      },
+      {
+        id: "duration-30d",
+        label: "Tempo em treino",
+        value: formatDurationCompact(summary.movingTime30dSeconds),
+        delta: durationTrend.delta,
+        trend: durationTrend.trend,
+      },
+      {
+        id: "pace-30d",
+        label: "Pace médio",
+        value: currentPace !== null ? formatPace(currentPace) : "Sem dado",
+        delta:
+          currentPace !== null && previousPace !== null
+            ? `${paceDelta > 0 ? "+" : ""}${Math.round(paceDelta)}%`
+            : "0%",
+        trend: paceTrend,
       },
       {
         id: "km-year",
@@ -277,7 +332,7 @@ function buildActivityExperience(params: {
       },
       {
         id: "consistency",
-        label: "Consistencia semanal",
+        label: "Consistência semanal",
         value: `${Math.round(summary.consistencyPercent)}%`,
         delta: consistencyTrend.delta,
         trend: consistencyTrend.trend,
@@ -291,6 +346,7 @@ function buildActivityExperience(params: {
       },
     ],
     personalRecords,
+    recentActivities,
     groupRanking: {
       updatedAt: new Date().toISOString(),
       totalAthletes: ranking.totalAthletes,
@@ -311,7 +367,7 @@ function buildActivityExperience(params: {
       tabs: ["Feed", "Treinos", "Eventos", "Resultados"],
       posts: [],
       source: "EMPTY",
-      message: "Comunidade sem publicacoes para sua organizacao no momento.",
+      message: "Comunidade sem publicações para sua organização no momento.",
     },
     gamification,
   };
@@ -320,9 +376,12 @@ function buildActivityExperience(params: {
 export async function GET(req: NextRequest) {
   const auth = getAuthContext(req);
   if (!auth) return apiError("UNAUTHORIZED", "Token de acesso ausente.", 401);
-  const authRole = String(auth.role);
-  if (authRole !== "ATHLETE" && authRole !== "PREMIUM_ATHLETE") {
-    return apiError("FORBIDDEN", "Apenas atletas podem acessar o dashboard de evolucao.", 403);
+  const canAccessAthleteDashboard = auth.roles.some((role) => {
+    const value = String(role);
+    return value === "ATHLETE" || value === "PREMIUM_ATHLETE";
+  });
+  if (!canAccessAthleteDashboard) {
+    return apiError("FORBIDDEN", "Apenas atletas podem acessar o dashboard de evolução.", 403);
   }
 
   try {
@@ -510,6 +569,11 @@ export async function GET(req: NextRequest) {
 
     const mainWarning = buildYearWarning(connectedToStrava, activitiesAvailable);
     if (mainWarning) warnings.push(mainWarning);
+    if (activitiesAvailable && !connectedToStrava) {
+      warnings.push(
+        "Você está usando lançamentos manuais. Eles alimentam sua evolução; ranking e pontos oficiais podem exigir validação da assessoria.",
+      );
+    }
 
     let metricsSnapshot: DashboardAthleteResponse["metrics"] = {
       provasConfirmadas,
@@ -519,24 +583,33 @@ export async function GET(req: NextRequest) {
       consistencia: null,
     };
 
-    if (connectedToStrava && activitiesAvailable) {
-      const [summary, evolutionSeries, distanceDistribution, personalRecords, ranking] =
-        await Promise.all([
-          getActivitySummary(prisma, auth.userId, auth.orgId, now),
-          getEvolutionSeries(prisma, auth.userId, auth.orgId, now),
-          getDistanceDistribution(prisma, auth.userId, auth.orgId, now),
-          getPersonalRecords(prisma, auth.userId, auth.orgId),
-          getGroupRanking(prisma, auth.orgId, auth.userId, now, rankingPeriod),
-        ]);
+    if (activitiesAvailable) {
+      const [
+        summary,
+        evolutionSeries,
+        distanceDistribution,
+        personalRecords,
+        recentActivities,
+        ranking,
+      ] = await Promise.all([
+        getActivitySummary(prisma, auth.userId, auth.orgId, now),
+        getEvolutionSeries(prisma, auth.userId, auth.orgId, now),
+        getDistanceDistribution(prisma, auth.userId, auth.orgId, now),
+        getPersonalRecords(prisma, auth.userId, auth.orgId),
+        getRecentActivities(prisma, auth.userId, auth.orgId),
+        getGroupRanking(prisma, auth.orgId, auth.userId, now, rankingPeriod),
+      ]);
 
       experience = buildActivityExperience({
         athleteName,
+        activitySource: connectedToStrava ? "STRAVA" : "MANUAL",
         totalGastoAno,
         pendente,
         summary,
         evolutionSeries,
         distanceDistribution,
         personalRecords,
+        recentActivities,
         ranking,
         gamification,
       });
@@ -575,13 +648,13 @@ export async function GET(req: NextRequest) {
         ...payload,
       },
       {
-      status: 200,
-      headers: {
-        "Cache-Control": "private, max-age=60, stale-while-revalidate=60",
-      },
+        status: 200,
+        headers: {
+          "Cache-Control": "private, max-age=60, stale-while-revalidate=60",
+        },
       },
     );
   } catch {
-    return apiError("INTERNAL_ERROR", "Nao foi possivel carregar o dashboard no momento.", 503);
+    return apiError("INTERNAL_ERROR", "Não foi possível carregar o dashboard no momento.", 503);
   }
 }

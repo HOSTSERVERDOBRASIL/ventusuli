@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, RefreshCw, Search } from "lucide-react";
 import { useAuthToken } from "@/components/auth/AuthTokenProvider";
 
@@ -71,7 +71,7 @@ export default function SuperAdminOrganizationsPage() {
     });
   }, [organizations, search]);
 
-  const loadOrganizations = async () => {
+  const loadOrganizations = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -98,12 +98,12 @@ export default function SuperAdminOrganizationsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [accessToken]);
 
   useEffect(() => {
     if (!accessToken) return;
     void loadOrganizations();
-  }, [accessToken]);
+  }, [accessToken, loadOrganizations]);
 
   const patchOrganization = async (
     organizationId: string,

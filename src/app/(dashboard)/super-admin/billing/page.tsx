@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
@@ -67,7 +67,7 @@ export default function SuperAdminBillingPage() {
     documentUrl: "",
   });
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const [billingResponse, orgResponse] = await Promise.all([
@@ -98,11 +98,11 @@ export default function SuperAdminBillingPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [accessToken, status]);
 
   useEffect(() => {
     void load();
-  }, [accessToken, status]);
+  }, [load]);
 
   const currentMonthRevenue = useMemo(
     () =>

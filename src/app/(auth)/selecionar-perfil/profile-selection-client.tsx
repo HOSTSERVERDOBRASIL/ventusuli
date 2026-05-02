@@ -2,19 +2,11 @@
 
 import { useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
+import { ArrowRight, CheckCircle2, Loader2, Sparkles } from "lucide-react";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { useAuthToken } from "@/components/auth/AuthTokenProvider";
-import {
-  PROFILE_CONFIG,
-  getProfileConfig,
-  sortRolesForProfiles,
-} from "@/lib/profile-config";
-import {
-  PAGE_ROUTE_POLICY_RULES,
-  canAccessPolicy,
-  getRoutePolicy,
-} from "@/lib/authorization";
+import { PROFILE_CONFIG, getProfileConfig, sortRolesForProfiles } from "@/lib/profile-config";
+import { PAGE_ROUTE_POLICY_RULES, canAccessPolicy, getRoutePolicy } from "@/lib/authorization";
 import { cn } from "@/lib/utils";
 import { UserRole } from "@/types";
 
@@ -81,16 +73,22 @@ export function ProfileSelectionClient() {
                 type="button"
                 onClick={() => handleSelect(role)}
                 className={cn(
-                  "group flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left transition",
+                  "group relative flex w-full items-center gap-3 overflow-hidden rounded-lg border px-3 py-3 text-left shadow-[0_12px_28px_rgba(0,0,0,0.16)] transition",
                   selected
-                    ? "border-[#ffc229]/45 bg-[#ffc229]/10"
-                    : "border-white/10 bg-white/[0.035] hover:border-white/20 hover:bg-white/[0.06]",
+                    ? "border-[#ffc229]/50 bg-[linear-gradient(135deg,rgba(255,194,41,0.16),rgba(14,165,233,0.08))]"
+                    : "border-[#1b3350] bg-[#07192b]/80 hover:border-sky-400/35 hover:bg-[#0a2037]",
                 )}
               >
-                <span className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-lg border", config.accent)}>
+                <span className="pointer-events-none absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-white/[0.05] to-transparent opacity-0 transition group-hover:opacity-100" />
+                <span
+                  className={cn(
+                    "relative grid h-12 w-12 shrink-0 place-items-center rounded-md border shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]",
+                    config.accent,
+                  )}
+                >
                   <Icon className="h-5 w-5" />
                 </span>
-                <span className="min-w-0 flex-1">
+                <span className="relative min-w-0 flex-1">
                   <span className="flex items-center gap-2">
                     <span className="truncate text-sm font-bold text-white">{config.label}</span>
                     {selected ? <CheckCircle2 className="h-4 w-4 shrink-0 text-[#ffc229]" /> : null}
@@ -98,8 +96,12 @@ export function ProfileSelectionClient() {
                   <span className="mt-0.5 block text-xs leading-5 text-slate-300">
                     {config.description}
                   </span>
+                  <span className="mt-2 inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-300">
+                    <Sparkles className="h-3 w-3 text-[#ffc229]" />
+                    {config.shortLabel}
+                  </span>
                 </span>
-                <ArrowRight className="h-4 w-4 shrink-0 text-white/35 transition group-hover:text-[#ffc229]" />
+                <ArrowRight className="relative h-4 w-4 shrink-0 text-white/35 transition group-hover:text-[#ffc229]" />
               </button>
             );
           })}

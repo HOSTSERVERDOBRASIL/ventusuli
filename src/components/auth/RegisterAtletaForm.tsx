@@ -20,14 +20,14 @@ const formSchema = registerAthleteSchemaBase
   .extend({
     confirmPassword: z.string({ required_error: "Confirme sua senha" }).min(1, "Confirme sua senha"),
     termsAccepted: z.boolean().refine((value) => value, {
-      message: "VocÃª precisa aceitar os termos para continuar",
+      message: "Você precisa aceitar os termos para continuar",
     }),
   })
   .superRefine(({ password, confirmPassword }, ctx) => {
     if (password !== confirmPassword) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "As senhas nÃ£o coincidem",
+        message: "As senhas não coincidem",
         path: ["confirmPassword"],
       });
     }
@@ -59,11 +59,11 @@ interface OrganizationBySlugResponse {
 }
 
 const PASSWORD_RULES = [
-  { label: "MÃ­nimo de 8 caracteres", test: (value: string) => value.length >= 8 },
-  { label: "Ao menos uma letra maiÃºscula", test: (value: string) => /[A-Z]/.test(value) },
-  { label: "Ao menos um nÃºmero", test: (value: string) => /[0-9]/.test(value) },
-  { label: "Ao menos uma letra minÃºscula", test: (value: string) => /[a-z]/.test(value) },
-  { label: "Ao menos um sÃ­mbolo", test: (value: string) => /[^A-Za-z0-9]/.test(value) },
+  { label: "Mínimo de 8 caracteres", test: (value: string) => value.length >= 8 },
+  { label: "Ao menos uma letra maiúscula", test: (value: string) => /[A-Z]/.test(value) },
+  { label: "Ao menos um número", test: (value: string) => /[0-9]/.test(value) },
+  { label: "Ao menos uma letra minúscula", test: (value: string) => /[a-z]/.test(value) },
+  { label: "Ao menos um símbolo", test: (value: string) => /[^A-Za-z0-9]/.test(value) },
 ] as const;
 
 export function RegisterAtletaForm() {
@@ -116,7 +116,7 @@ export function RegisterAtletaForm() {
   const passwordScore = passwordStatus.filter((item) => item.valid).length;
   const passwordPercent = (passwordScore / PASSWORD_RULES.length) * 100;
   const strengthLabel =
-    passwordScore <= 2 ? "Fraca" : passwordScore === 3 ? "MÃ©dia" : passwordScore === 4 ? "Boa" : "Forte";
+    passwordScore <= 2 ? "Fraca" : passwordScore === 3 ? "Média" : passwordScore === 4 ? "Boa" : "Forte";
   const strengthColor =
     passwordScore <= 2
       ? "bg-red-400"
@@ -147,8 +147,8 @@ export function RegisterAtletaForm() {
       if (!response.ok || !("user" in payload)) {
         const message =
           "error" in payload
-            ? (payload.error?.message ?? "NÃ£o foi possÃ­vel criar sua conta de atleta.")
-            : "NÃ£o foi possÃ­vel criar sua conta de atleta.";
+            ? (payload.error?.message ?? "Não foi possível criar sua conta de atleta.")
+            : "Não foi possível criar sua conta de atleta.";
         setError(message);
         toast.error(message);
         return;
@@ -156,7 +156,7 @@ export function RegisterAtletaForm() {
 
       const isPending = payload.user.athleteStatus === "PENDING_APPROVAL";
       if (isPending || !payload.accessToken) {
-        toast.success("Cadastro enviado. Sua conta aguarda aprovacao da assessoria.");
+        toast.success("Cadastro enviado. Sua conta aguarda aprovação da assessoria.");
         router.push("/aguardando-aprovacao");
         return;
       }
@@ -165,7 +165,7 @@ export function RegisterAtletaForm() {
       toast.success("Conta de atleta criada com sucesso.");
       router.push("/dashboard");
     } catch {
-      const message = "Erro de conexÃ£o. Tente novamente em instantes.";
+      const message = "Erro de conexão. Tente novamente em instantes.";
       setError(message);
       toast.error(message);
     }
@@ -203,7 +203,7 @@ export function RegisterAtletaForm() {
                   const payload = (await response.json()) as OrganizationBySlugResponse | { error?: { message?: string } };
 
                   if (!response.ok || !("data" in payload)) {
-                    const message = "error" in payload ? payload.error?.message ?? "Slug nÃ£o encontrado." : "Slug nÃ£o encontrado.";
+                    const message = "error" in payload ? payload.error?.message ?? "Slug não encontrado." : "Slug não encontrado.";
                     setOrganizationPreview(null);
                     toast.error(message);
                     return;
@@ -213,7 +213,7 @@ export function RegisterAtletaForm() {
                   toast.success(`Assessoria encontrada: ${payload.data.name}`);
                 } catch {
                   setOrganizationPreview(null);
-                  toast.error("NÃ£o foi possÃ­vel validar o slug.");
+                  toast.error("Não foi possível validar o slug.");
                 } finally {
                   setValidatingSlug(false);
                 }
@@ -230,7 +230,7 @@ export function RegisterAtletaForm() {
               <p className="font-semibold">{organizationPreview.name}</p>
               <p>Slug: {organizationPreview.slug}</p>
               <p>
-                AprovaÃ§Ã£o de atleta: {organizationPreview.requireAthleteApproval ? "necessÃ¡ria" : "nÃ£o exigida"}
+                Aprovação de atleta: {organizationPreview.requireAthleteApproval ? "necessária" : "não exigida"}
               </p>
             </div>
           ) : null}
@@ -245,7 +245,7 @@ export function RegisterAtletaForm() {
           <Label htmlFor="inviteToken" className="text-slate-100">Token de convite</Label>
           <Input id="inviteToken" placeholder="Cole o token enviado pela assessoria" autoComplete="off" className="border-white/15 bg-[#0F2743] text-white placeholder:text-slate-400 focus-visible:ring-[#F5A623]" {...register("inviteToken")} />
           {watchedInvite.trim() && !watchedSlug.trim() ? (
-            <p className="text-xs text-emerald-300">Token de convite detectado â€” assessoria serÃ¡ identificada automaticamente.</p>
+            <p className="text-xs text-emerald-300">Token de convite detectado - assessoria será identificada automaticamente.</p>
           ) : null}
           {errors.organizationSlug ? <p className="text-xs text-amber-300">{errors.organizationSlug.message}</p> : null}
         </div>
@@ -269,7 +269,7 @@ export function RegisterAtletaForm() {
 
         <div className="space-y-3 rounded-md border border-white/10 bg-[#102D4B] p-3">
           <div className="flex items-center justify-between text-xs text-slate-200">
-            <span>Forca da senha</span>
+            <span>Força da senha</span>
             <span className="font-semibold text-white">{strengthLabel}</span>
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-white/10">
@@ -299,7 +299,7 @@ export function RegisterAtletaForm() {
         <div className="space-y-2">
           <label className="flex items-start gap-3 text-sm text-slate-200" htmlFor="termsAccepted">
             <input id="termsAccepted" type="checkbox" className="mt-0.5 h-4 w-4 rounded border-white/30 bg-transparent accent-[#F5A623]" {...register("termsAccepted")} />
-            <span>Concordo com os termos de uso e politica de privacidade da plataforma.</span>
+            <span>Concordo com os termos de uso e política de privacidade da plataforma.</span>
           </label>
           {errors.termsAccepted ? <p className="text-xs text-amber-300">{errors.termsAccepted.message}</p> : null}
         </div>
@@ -313,7 +313,7 @@ export function RegisterAtletaForm() {
         </Button>
 
         <p className="text-center text-sm text-slate-200">
-          Ja possui conta? <Link href="/login" className="font-semibold text-[#F5A623] hover:underline">Entrar</Link>
+          Já possui conta? <Link href="/login" className="font-semibold text-[#F5A623] hover:underline">Entrar</Link>
         </p>
         <p className="text-center text-sm text-slate-300">
           Admin da assessoria? <Link href="/register/assessoria" className="font-semibold text-[#F5A623] hover:underline">Cadastrar assessoria</Link>

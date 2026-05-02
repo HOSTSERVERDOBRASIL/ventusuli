@@ -39,6 +39,7 @@ import {
   type ManagementReportMetric,
 } from "@/components/finance/management-reports-section";
 import { PixQrCode } from "@/components/payment/pix-qrcode";
+import { ProfileCockpit } from "@/components/profile/profile-cockpit";
 import { ActionButton } from "@/components/system/action-button";
 import { type DataTableColumn, DataTable } from "@/components/system/data-table";
 import { EmptyState } from "@/components/system/empty-state";
@@ -46,7 +47,6 @@ import { LoadingState } from "@/components/system/loading-state";
 import { MetricCard } from "@/components/system/metric-card";
 import { Modal } from "@/components/system/modal";
 import { ModuleTabs } from "@/components/system/module-tabs";
-import { PageHeader } from "@/components/system/page-header";
 import { SectionCard } from "@/components/system/section-card";
 import { StatusBadge } from "@/components/system/status-badge";
 import { Input } from "@/components/ui/input";
@@ -74,6 +74,7 @@ import {
   simulatePayment,
 } from "@/services/payment-service";
 import { PaymentDueFilter, PaymentSortBy, PaymentSortDir, PaymentSummary } from "@/services/types";
+import { UserRole } from "@/types";
 
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const todayIso = new Date().toISOString().slice(0, 10);
@@ -1769,21 +1770,112 @@ export default function AdminFinanceiroPage() {
   };
 
   return (
-    <div className="space-y-6 text-white">
-      <PageHeader
-        title="Financeiro e conciliacao"
-        subtitle="Centro operacional de cobrancas PIX com fila de trabalho, conciliacao e historico."
-        actions={
-          <div className="flex gap-2">
-            <ActionButton intent="secondary" onClick={() => void loadPayments()}>
-              <RefreshCw className="mr-2 h-4 w-4" /> Atualizar
-            </ActionButton>
-            <ActionButton onClick={exportCsv} disabled={rows.length === 0}>
-              <Download className="mr-2 h-4 w-4" /> Exportar CSV
-            </ActionButton>
-          </div>
-        }
-      />
+    <ProfileCockpit
+      role={UserRole.FINANCE}
+      title="Financeiro e conciliação"
+      subtitle="Centro operacional de cobranças PIX com fila de trabalho, conciliação e histórico."
+      eyebrow="Controle financeiro"
+      metrics={[
+        {
+          label: "Entradas do período",
+          value: BRL.format((periodPaymentSummary.totalPago + currentCashIncomeCents) / 100),
+          description: `Fechamento de ${periodLabel}.`,
+          icon: Wallet,
+          tone: "green",
+        },
+        {
+          label: "Em aberto",
+          value: BRL.format(queue.totalOpenAmount / 100),
+          description: `${queue.totalOpenCount} cobrança(s) pendente(s).`,
+          icon: ClipboardList,
+          tone: "amber",
+        },
+        {
+          label: "Saldo final",
+          value: BRL.format(closingCashBalanceCents / 100),
+          description: "Caixa inicial, entradas e saídas consolidadas.",
+          icon: BarChart3,
+          tone: "cyan",
+        },
+      ]}
+      actions={[
+        {
+          href: "#finance-reports",
+          label: "Relatórios",
+          description: "DRE, fluxo de caixa e exportação gerencial.",
+          icon: FileText,
+        },
+        {
+          href: "#finance-cashbook",
+          label: "Caixa",
+          description: "Entradas, saídas e lançamentos manuais.",
+          icon: Wallet,
+        },
+        {
+          href: "#finance-ledger",
+          label: "Contas",
+          description: "Títulos a pagar, a receber e baixas.",
+          icon: CreditCard,
+        },
+      ]}
+      focusItems={[
+        {
+          title: "Cobranças vencidas",
+          description: `${queue.overdueCount} cobrança(s), somando ${BRL.format(
+            queue.overdueAmount / 100,
+          )}.`,
+          status: "Cobrança",
+          href: "#finance-overview",
+        },
+        {
+          title: "Fluxo do período",
+          description: `Entradas de ${BRL.format(
+            (periodPaymentSummary.totalPago + currentCashIncomeCents) / 100,
+          )} e saídas de ${BRL.format(currentCashExpenseCents / 100)}.`,
+          status: "Caixa",
+          href: "#finance-cashbook",
+        },
+        {
+          title: "Resultado gerencial",
+          description:
+            dreSummary.operatingResultCents >= 0
+              ? "Resultado operacional positivo no recorte atual."
+              : "Resultado operacional negativo pede revisão de despesas ou cobrança.",
+          status: "DRE",
+          href: "#finance-reports",
+        },
+      ]}
+      activityItems={queueRows.slice(0, 4).map((row) => ({
+        title: row.athleteName,
+        description: `${row.eventName} - ${dueLabel(row)} - ${BRL.format(row.amountCents / 100)}`,
+        status: row.status,
+      }))}
+      insightItems={[
+        {
+          title: "Carteira em aberto",
+          description: `${queue.totalOpenCount} título(s) abertos para acompanhamento.`,
+          status: "Receber",
+        },
+        {
+          title: "Contas futuras",
+          description: `${BRL.format(manualSummary.openPayableCents / 100)} em contas a pagar.`,
+          status: "Pagar",
+        },
+        {
+          title: "Conciliação",
+          description: `${queue.recentSettlementsCount} baixa(s) recente(s) para conferência.`,
+          status: "PIX",
+        },
+      ]}
+    >
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <ActionButton intent="secondary" onClick={() => void loadPayments()}>
+          <RefreshCw className="mr-2 h-4 w-4" /> Atualizar
+        </ActionButton>
+        <ActionButton onClick={exportCsv} disabled={rows.length === 0}>
+          <Download className="mr-2 h-4 w-4" /> Exportar CSV
+        </ActionButton>
+      </div>
 
       <SectionCard
         title="Modulo financeiro da associacao"
@@ -3082,6 +3174,6 @@ export default function AdminFinanceiroPage() {
           />
         )}
       </Modal>
-    </div>
+    </ProfileCockpit>
   );
 }

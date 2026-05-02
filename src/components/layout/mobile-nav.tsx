@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { resolveOrganizationLogo } from "@/lib/brand";
 import { useAuthToken } from "@/components/auth/AuthTokenProvider";
 import { isNavItemActive, splitNavBySection, type NavItem } from "@/components/layout/nav-items";
 import { ProfileSwitcher } from "@/components/layout/ProfileSwitcher";
@@ -56,24 +57,18 @@ export function MobileNav({ isOpen, onClose }: MobileNavProps) {
   const navScope = activeRole ? [activeRole] : userRoles;
   const groups = splitNavBySection(navScope);
   const navGroups = [
-    { title: "Inicio", items: groups.home },
+    { title: "Início", items: groups.home },
     { title: "Provas e agenda", items: groups.events },
     { title: "Financeiro", items: groups.finance },
-    { title: "Pontos e beneficios", items: groups.points },
-    { title: "Comunicacao", items: groups.communication },
-    { title: "Tecnico", items: groups.coaching },
-    { title: "Administracao", items: groups.admin },
+    { title: "Pontos e benefícios", items: groups.points },
+    { title: "Comunicação", items: groups.communication },
+    { title: "Técnico", items: groups.coaching },
+    { title: "Administração", items: groups.admin },
     { title: "Plataforma", items: groups.platform },
     { title: "Conta", items: groups.account },
   ];
 
-  const organizationLogo = (() => {
-    const logoUrl = organization?.logo_url?.trim();
-    if (!logoUrl) return "/branding/ventu-suli-logo.png";
-    if (logoUrl.toLowerCase().includes("cdn.seudominio.com/logo.png"))
-      return "/branding/ventu-suli-logo.png";
-    return logoUrl;
-  })();
+  const organizationLogo = resolveOrganizationLogo(organization?.logo_url);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -110,11 +105,12 @@ export function MobileNav({ isOpen, onClose }: MobileNavProps) {
       >
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border border-[#1E90FF]/40 bg-transparent shadow-[0_10px_24px_rgba(3,10,22,0.45)]">
+            <div className="relative flex h-12 w-12 items-center justify-center overflow-hidden">
               <img
                 src={organizationLogo}
                 alt="Logo da assessoria"
-                className="h-full w-full scale-[1.35] object-cover mix-blend-screen drop-shadow-[0_8px_16px_rgba(3,10,22,0.45)]"
+                referrerPolicy="no-referrer"
+                className="h-full w-full object-contain drop-shadow-[0_8px_16px_rgba(3,10,22,0.45)]"
               />
             </div>
             <p className="text-sm font-semibold text-white">{organization?.name ?? "Menu"}</p>

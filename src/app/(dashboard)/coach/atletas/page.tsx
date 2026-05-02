@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { toast } from "sonner";
 import { useAuthToken } from "@/components/auth/AuthTokenProvider";
@@ -9,6 +9,7 @@ import { AthletesSummaryCards } from "@/components/athletes/athletes-summary-car
 import { ActionButton } from "@/components/system/action-button";
 import { EmptyState } from "@/components/system/empty-state";
 import { LoadingState } from "@/components/system/loading-state";
+import { MetricStrip } from "@/components/system/metric-strip";
 import { PageHeader } from "@/components/system/page-header";
 import { SectionCard } from "@/components/system/section-card";
 import { Input } from "@/components/ui/input";
@@ -39,13 +40,14 @@ export default function CoachAtletasPage() {
     "ALL",
   );
   const [sortBy, setSortBy] = useState<
-    "name" | "registrations" | "nextEvent" | "pending" | "paid" | "lastPayment"
+    "createdAt" | "name" | "registrations" | "nextEvent" | "pending" | "paid" | "lastPayment"
   >("nextEvent");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ page: 1, pageSize: 10, total: 0, totalPages: 1 });
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setErrorMessage(null);
     try {
@@ -54,7 +56,7 @@ export default function CoachAtletasPage() {
         status,
         financial,
         sortBy,
-        sortDir: "asc",
+        sortDir,
         page,
         pageSize: 10,
         accessToken,
@@ -73,7 +75,7 @@ export default function CoachAtletasPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [accessToken, financial, page, query, sortBy, sortDir, status]);
 
   useEffect(() => {
     let cancelled = false;
@@ -85,7 +87,7 @@ export default function CoachAtletasPage() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken, page, query, status, financial, sortBy]);
+  }, [load]);
 
   const technicalFocus = useMemo(() => {
     const pendingApproval = rows.filter((item) => item.status === "PENDING_APPROVAL").length;
@@ -103,24 +105,38 @@ export default function CoachAtletasPage() {
 
       {loading ? <LoadingState lines={3} /> : <AthletesSummaryCards summary={summary} />}
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <SectionCard title="Aprovação pendente" description="Atletas aguardando liberação">
-          <p className="text-2xl font-bold text-white">{technicalFocus.pendingApproval}</p>
-        </SectionCard>
-        <SectionCard title="Com prova próxima" description="Atletas com evento futuro cadastrado">
-          <p className="text-2xl font-bold text-white">{technicalFocus.withUpcomingEvent}</p>
-        </SectionCard>
-        <SectionCard title="Bloqueados" description="Atletas com acesso bloqueado">
-          <p className="text-2xl font-bold text-white">{technicalFocus.blocked}</p>
-        </SectionCard>
-      </div>
+      <MetricStrip
+        title="Foco técnico"
+        description="Prioridades esportivas e operacionais da base atual."
+        columnsClassName="sm:grid-cols-3"
+        items={[
+          {
+            label: "Aprovação pendente",
+            value: technicalFocus.pendingApproval,
+            description: "Atletas aguardando liberação",
+            tone: "highlight",
+          },
+          {
+            label: "Com prova próxima",
+            value: technicalFocus.withUpcomingEvent,
+            description: "Atletas com evento futuro cadastrado",
+            tone: "positive",
+          },
+          {
+            label: "Bloqueados",
+            value: technicalFocus.blocked,
+            description: "Atletas com acesso bloqueado",
+            tone: technicalFocus.blocked > 0 ? "danger" : "default",
+          },
+        ]}
+      />
 
       <SectionCard
         title="Base técnica"
         description="Use filtros de status, financeiro e ordenação para priorizar atendimento esportivo."
       >
         <div className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-[1fr_220px_220px_220px]">
+          <div className="grid gap-3 md:grid-cols-[1fr_190px_190px_190px_160px]">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
@@ -176,6 +192,7 @@ export default function CoachAtletasPage() {
                 setPage(1);
                 setSortBy(
                   event.target.value as
+                    | "createdAt"
                     | "name"
                     | "registrations"
                     | "nextEvent"
@@ -187,11 +204,24 @@ export default function CoachAtletasPage() {
               className="border-white/[0.1] bg-white/[0.05] text-white"
             >
               <option value="nextEvent">Ordenar por próxima prova</option>
+              <option value="createdAt">Ordenar por cadastro</option>
               <option value="name">Ordenar por nome</option>
               <option value="registrations">Ordenar por inscrições</option>
               <option value="pending">Ordenar por pendências</option>
               <option value="paid">Ordenar por pagamentos</option>
               <option value="lastPayment">Ordenar por último pagamento</option>
+            </Select>
+
+            <Select
+              value={sortDir}
+              onChange={(event) => {
+                setPage(1);
+                setSortDir(event.target.value as "asc" | "desc");
+              }}
+              className="border-white/[0.1] bg-white/[0.05] text-white"
+            >
+              <option value="asc">Crescente</option>
+              <option value="desc">Decrescente</option>
             </Select>
           </div>
 

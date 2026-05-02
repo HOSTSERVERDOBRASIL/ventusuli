@@ -1,12 +1,23 @@
 ﻿"use client";
 
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
-import { Building2, CreditCard, FileText, Link2, Plus, Power, Trash2, UserPlus, Copy } from "lucide-react";
+import {
+  Building2,
+  CreditCard,
+  FileText,
+  Link2,
+  Plus,
+  Power,
+  Trash2,
+  UserPlus,
+  Copy,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useAuthToken } from "@/components/auth/AuthTokenProvider";
 import { ActionButton } from "@/components/system/action-button";
 import { EmptyState } from "@/components/system/empty-state";
 import { LoadingState } from "@/components/system/loading-state";
+import { MetricStrip } from "@/components/system/metric-strip";
 import { ModuleTabs, type ModuleTabItem } from "@/components/system/module-tabs";
 import { PageHeader } from "@/components/system/page-header";
 import { SectionCard } from "@/components/system/section-card";
@@ -14,6 +25,7 @@ import { StatusBadge } from "@/components/system/status-badge";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { VENTU_SULI_LOGO_SRC, resolveOrganizationLogo } from "@/lib/brand";
 import {
   FinanceProfileSettings,
   createInvite,
@@ -29,7 +41,7 @@ import { uploadImageFile } from "@/services/upload-service";
 import { UserRole } from "@/types";
 
 const ADMIN_ROLES = new Set<UserRole>([UserRole.ADMIN, UserRole.MANAGER]);
-const DEFAULT_ORG_LOGO = "/branding/ventu-suli-logo.png";
+const DEFAULT_ORG_LOGO = VENTU_SULI_LOGO_SRC;
 const MAX_LOGO_FILE_SIZE = 2 * 1024 * 1024;
 type SettingsTab = "brand" | "access" | "finance" | "invites" | "summary";
 
@@ -141,14 +153,16 @@ export default function AdminConfiguracoesPage() {
   });
 
   const canEdit = userRole ? ADMIN_ROLES.has(userRole) : false;
-  const logoPreviewUrl = form.logoUrl.trim() || settings?.logoUrl || DEFAULT_ORG_LOGO;
+  const logoPreviewUrl = resolveOrganizationLogo(
+    form.logoUrl.trim() || settings?.logoUrl || DEFAULT_ORG_LOGO,
+  );
   const activeInvites = useMemo(() => invites.filter((invite) => invite.active).length, [invites]);
   const tabs = useMemo<ModuleTabItem<SettingsTab>[]>(
     () => [
       {
         key: "brand",
         label: "Marca",
-        audience: "Gestao",
+        audience: "Gestão",
         description: "Nome, slug, logo, cor e canal de suporte.",
         icon: Building2,
         metricLabel: "Plano",
@@ -159,7 +173,7 @@ export default function AdminConfiguracoesPage() {
         key: "access",
         label: "Acesso",
         audience: "Cadastro",
-        description: "Auto-cadastro, aprovacao e entrada de atletas.",
+        description: "Auto-cadastro, aprovação e entrada de atletas.",
         icon: UserPlus,
         metricLabel: "Aprovacao",
         metricValue: form.requireAthleteApproval ? "Ativa" : "Livre",
@@ -179,7 +193,7 @@ export default function AdminConfiguracoesPage() {
         key: "invites",
         label: "Convites",
         audience: "Operacao",
-        description: "Links unicos para trazer atletas para a assessoria.",
+        description: "Links únicos para trazer atletas para a assessoria.",
         icon: Link2,
         metricLabel: "Ativos",
         metricValue: activeInvites,
@@ -189,7 +203,7 @@ export default function AdminConfiguracoesPage() {
         key: "summary",
         label: "Resumo",
         audience: "Diretoria",
-        description: "Informacoes comerciais essenciais do tenant.",
+        description: "Informações comerciais essenciais do tenant.",
         icon: FileText,
         metricLabel: "Edicao",
         metricValue: canEdit ? "Liberada" : "Leitura",
@@ -230,7 +244,9 @@ export default function AdminConfiguracoesPage() {
             financeBusinessModel: payload.financeProfile.businessModel,
             financeRevenueMode: payload.financeProfile.revenueMode,
             financeBillingDay: payload.financeProfile.billingDay?.toString() ?? "",
-            financeRecurringMonthlyFee: String(payload.financeProfile.recurringMonthlyFeeCents ?? 0),
+            financeRecurringMonthlyFee: String(
+              payload.financeProfile.recurringMonthlyFeeCents ?? 0,
+            ),
             financeRecurringChargeEnabled: payload.financeProfile.recurringChargeEnabled,
             financeRecurringGraceDays: String(payload.financeProfile.recurringGraceDays ?? 3),
             financeRecurringDescription: payload.financeProfile.recurringDescription,
@@ -253,7 +269,7 @@ export default function AdminConfiguracoesPage() {
           setError(
             loadError instanceof Error
               ? loadError.message
-              : "Nao foi possivel carregar configuracoes da assessoria.",
+              : "Não foi possível carregar configurações da assessoria.",
           );
         }
       } finally {
@@ -309,10 +325,10 @@ export default function AdminConfiguracoesPage() {
       );
       setSettings(payload);
       await refreshSession();
-      toast.success("Configuracoes salvas com sucesso.");
+      toast.success("Configurações salvas com sucesso.");
     } catch (saveError) {
       toast.error(
-        saveError instanceof Error ? saveError.message : "Falha ao salvar configuracoes.",
+        saveError instanceof Error ? saveError.message : "Falha ao salvar configurações.",
       );
     } finally {
       setSaving(false);
@@ -338,7 +354,7 @@ export default function AdminConfiguracoesPage() {
     try {
       const uploaded = await uploadImageFile(selectedFile, "branding", accessToken);
       setForm((prev) => ({ ...prev, logoUrl: uploaded.url }));
-      toast.success("Logo carregada. Clique em salvar configuracoes para aplicar.");
+      toast.success("Logo carregada. Clique em salvar configurações para aplicar.");
     } catch (uploadError) {
       toast.error(uploadError instanceof Error ? uploadError.message : "Falha ao carregar logo.");
     } finally {
@@ -374,7 +390,7 @@ export default function AdminConfiguracoesPage() {
   const handleDeleteInvite = async (invite: OrgInvite) => {
     if (
       !confirm(
-        `Excluir o convite "${invite.label ?? invite.token.slice(0, 8) + "..."}"? Esta acao nao pode ser desfeita.`,
+        `Excluir o convite "${invite.label ?? invite.token.slice(0, 8) + "..."}"? Esta ação não pode ser desfeita.`,
       )
     ) {
       return;
@@ -399,7 +415,7 @@ export default function AdminConfiguracoesPage() {
   return (
     <div className="space-y-6 text-white">
       <PageHeader
-        title="Configuracoes da assessoria"
+        title="Configurações da assessoria"
         subtitle="Branding, regras de onboarding e convites do tenant."
       />
 
@@ -407,22 +423,17 @@ export default function AdminConfiguracoesPage() {
         <LoadingState lines={4} />
       ) : error || !settings ? (
         <EmptyState
-          title="Configuracoes indisponiveis"
-          description={error ?? "Falha ao carregar configuracoes da assessoria."}
+          title="Configurações indisponíveis"
+          description={error ?? "Falha ao carregar configurações da assessoria."}
         />
       ) : (
         <>
-          <SectionCard
-            title="Modulo de configuracoes"
-            description="Separe marca, acesso, financeiro, convites e resumo comercial em abas."
-          >
-            <ModuleTabs
-              tabs={tabs}
-              activeTab={activeTab}
-              onChange={setActiveTab}
-              columnsClassName="md:grid-cols-5"
-            />
-          </SectionCard>
+          <ModuleTabs
+            tabs={tabs}
+            activeTab={activeTab}
+            onChange={setActiveTab}
+            columnsClassName="md:grid-cols-5"
+          />
 
           <SectionCard
             className={activeTab === "brand" ? undefined : "hidden"}
@@ -461,6 +472,7 @@ export default function AdminConfiguracoesPage() {
                   <img
                     src={logoPreviewUrl}
                     alt="Logo da assessoria"
+                    referrerPolicy="no-referrer"
                     className="h-full w-full object-contain"
                   />
                 </div>
@@ -499,7 +511,7 @@ export default function AdminConfiguracoesPage() {
                   ) : null}
 
                   <p className="text-[11px] text-slate-400">
-                    PNG, JPG, WEBP, GIF ou SVG com ate 2MB.
+                    PNG, JPG, WEBP, GIF ou SVG com até 2MB.
                   </p>
                 </div>
               </div>
@@ -530,12 +542,12 @@ export default function AdminConfiguracoesPage() {
             {canEdit ? (
               <div className="mt-4">
                 <ActionButton onClick={() => void onSave()} disabled={saving}>
-                  {saving ? "Salvando..." : "Salvar configuracoes"}
+                  {saving ? "Salvando..." : "Salvar configurações"}
                 </ActionButton>
               </div>
             ) : (
               <p className="mt-4 text-xs text-slate-300">
-                Apenas administradores podem alterar estas configuracoes.
+                Apenas administradores podem alterar estas configurações.
               </p>
             )}
           </SectionCard>
@@ -557,8 +569,8 @@ export default function AdminConfiguracoesPage() {
               />
               <div className="h-px bg-white/10" />
               <Toggle
-                label="Exigir aprovacao antes de liberar acesso"
-                description="Quando ativo, novos atletas ficam pendentes ate serem aprovados manualmente no painel."
+                label="Exigir aprovação antes de liberar acesso"
+                description="Quando ativo, novos atletas ficam pendentes até serem aprovados manualmente no painel."
                 checked={form.requireAthleteApproval}
                 onChange={(value) =>
                   setForm((prev) => ({ ...prev, requireAthleteApproval: value }))
@@ -569,8 +581,8 @@ export default function AdminConfiguracoesPage() {
 
             {form.requireAthleteApproval ? (
               <p className="mt-3 rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-200">
-                Atletas cadastrados ficarao com status <strong>Pendente de aprovacao</strong> ate
-                revisao no painel.
+                Atletas cadastrados ficarão com status <strong>Pendente de aprovação</strong> até
+                revisão no painel.
               </p>
             ) : null}
 
@@ -585,7 +597,7 @@ export default function AdminConfiguracoesPage() {
 
           <SectionCard
             className={activeTab === "finance" ? undefined : "hidden"}
-            title="Modelo financeiro da operacao"
+            title="Modelo financeiro da operação"
             description="Defina como a assessoria cobra, classifica e controla receitas e despesas."
           >
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -594,7 +606,8 @@ export default function AdminConfiguracoesPage() {
                 onChange={(event) =>
                   setForm((prev) => ({
                     ...prev,
-                    financeBusinessModel: event.target.value as FinanceProfileSettings["businessModel"],
+                    financeBusinessModel: event.target
+                      .value as FinanceProfileSettings["businessModel"],
                   }))
                 }
                 className="border-white/15 bg-[#0F2743] text-white"
@@ -631,7 +644,7 @@ export default function AdminConfiguracoesPage() {
                 onChange={(event) =>
                   setForm((prev) => ({ ...prev, financeBillingDay: event.target.value }))
                 }
-                placeholder="Dia padrao da cobranca"
+                placeholder="Dia padrão da cobrança"
                 className="border-white/15 bg-[#0F2743] text-white"
                 disabled={!canEdit}
               />
@@ -666,15 +679,16 @@ export default function AdminConfiguracoesPage() {
                 onChange={(event) =>
                   setForm((prev) => ({
                     ...prev,
-                    financeDefaultEntryKind: event.target.value as FinanceProfileSettings["defaultEntryKind"],
+                    financeDefaultEntryKind: event.target
+                      .value as FinanceProfileSettings["defaultEntryKind"],
                   }))
                 }
                 className="border-white/15 bg-[#0F2743] text-white"
                 disabled={!canEdit}
               >
-                <option value="RECEIVABLE">Conta a receber padrao</option>
-                <option value="PAYABLE">Conta a pagar padrao</option>
-                <option value="CASH">Livro-caixa padrao</option>
+                <option value="RECEIVABLE">Conta a receber padrão</option>
+                <option value="PAYABLE">Conta a pagar padrão</option>
+                <option value="CASH">Livro-caixa padrão</option>
               </Select>
 
               <Input
@@ -692,7 +706,7 @@ export default function AdminConfiguracoesPage() {
                 onChange={(event) =>
                   setForm((prev) => ({ ...prev, financeDefaultAccountCode: event.target.value }))
                 }
-                placeholder="Plano de contas padrao"
+                placeholder="Plano de contas padrão"
                 className="border-white/15 bg-[#0F2743] text-white"
                 disabled={!canEdit}
               />
@@ -702,7 +716,7 @@ export default function AdminConfiguracoesPage() {
                 onChange={(event) =>
                   setForm((prev) => ({ ...prev, financeDefaultCostCenter: event.target.value }))
                 }
-                placeholder="Centro de custo padrao"
+                placeholder="Centro de custo padrão"
                 className="border-white/15 bg-[#0F2743] text-white"
                 disabled={!canEdit}
               />
@@ -712,7 +726,7 @@ export default function AdminConfiguracoesPage() {
                 onChange={(event) =>
                   setForm((prev) => ({ ...prev, financeDefaultPaymentMethod: event.target.value }))
                 }
-                placeholder="Forma de pagamento padrao"
+                placeholder="Forma de pagamento padrão"
                 className="border-white/15 bg-[#0F2743] text-white"
                 disabled={!canEdit}
               />
@@ -721,7 +735,7 @@ export default function AdminConfiguracoesPage() {
             <div className="mt-4 space-y-4">
               <Toggle
                 label="Exigir vencimento para titulos em aberto"
-                description="Padroniza a cobranca e facilita o controle de inadimplencia."
+                description="Padroniza a cobrança e facilita o controle de inadimplência."
                 checked={form.financeRequireDueDateForOpenEntries}
                 onChange={(value) =>
                   setForm((prev) => ({
@@ -786,7 +800,9 @@ export default function AdminConfiguracoesPage() {
                 onChange={(event) =>
                   setForm((prev) => ({ ...prev, financeQuickNotes: event.target.value }))
                 }
-                placeholder={"Anotacoes operacionais\nMensalidade recorrente do associado\nRateio da equipe"}
+                placeholder={
+                  "Anotações operacionais\nMensalidade recorrente do associado\nRateio da equipe"
+                }
                 className="min-h-[140px] border-white/15 bg-[#0F2743] text-white"
                 disabled={!canEdit}
               />
@@ -809,7 +825,7 @@ export default function AdminConfiguracoesPage() {
             <SectionCard
               className={activeTab === "invites" ? undefined : "hidden"}
               title="Convites de entrada"
-              description="Gere links unicos para convidar atletas diretamente para sua assessoria."
+              description="Gere links únicos para convidar atletas diretamente para sua assessoria."
               action={
                 <ActionButton size="sm" onClick={() => setShowInviteForm((value) => !value)}>
                   <Plus className="mr-1.5 h-3.5 w-3.5" />
@@ -855,7 +871,7 @@ export default function AdminConfiguracoesPage() {
                     >
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium text-white">
-                          {invite.label ?? <span className="text-[#8eb0dc]">Sem rotulo</span>}
+                          {invite.label ?? <span className="text-[#8eb0dc]">Sem rótulo</span>}
                         </p>
                         <p className="mt-0.5 font-mono text-xs text-[#4a7fa8]">
                           {invite.token.slice(0, 16)}...
@@ -920,28 +936,17 @@ export default function AdminConfiguracoesPage() {
             </SectionCard>
           ) : null}
 
-          <SectionCard
+          <MetricStrip
             className={activeTab === "summary" ? undefined : "hidden"}
             title="Resumo comercial"
-            description="Informacoes essenciais da plataforma"
-          >
-            <div className="grid gap-3 md:grid-cols-3">
-              <div className="rounded-xl border border-[#24486f] bg-[#0f233d] p-3">
-                <p className="text-xs uppercase tracking-wide text-[#8eb0dc]">Assessoria</p>
-                <p className="mt-1 text-lg font-semibold text-white">{settings.name}</p>
-              </div>
-              <div className="rounded-xl border border-[#24486f] bg-[#0f233d] p-3">
-                <p className="text-xs uppercase tracking-wide text-[#8eb0dc]">Plano</p>
-                <p className="mt-1 text-lg font-semibold text-white">{settings.plan}</p>
-              </div>
-              <div className="rounded-xl border border-[#24486f] bg-[#0f233d] p-3">
-                <p className="text-xs uppercase tracking-wide text-[#8eb0dc]">Suporte</p>
-                <p className="mt-1 text-lg font-semibold text-white">
-                  {settings.supportEmail || "Nao definido"}
-                </p>
-              </div>
-            </div>
-          </SectionCard>
+            description="Informações essenciais da plataforma"
+            columnsClassName="md:grid-cols-3"
+            items={[
+              { label: "Assessoria", value: settings.name },
+              { label: "Plano", value: settings.plan, tone: "highlight" },
+              { label: "Suporte", value: settings.supportEmail || "Não definido" },
+            ]}
+          />
         </>
       )}
     </div>

@@ -47,24 +47,24 @@ export function ForgotPasswordForm() {
 
       const payload = (await response.json()) as ForgotResponse;
       if (!response.ok) {
-        const message = payload.error?.message ?? "Nao foi possivel processar a solicitacao.";
+        const message = payload.error?.message ?? "Não foi possível processar a solicitação.";
         toast.error(message);
         return;
       }
 
-      const message = payload.message ?? "Se o email existir, enviamos o link de recuperacao.";
+      const message = payload.message ?? "Se o e-mail existir, enviamos o link de recuperação.";
       setResultMessage(message);
       if (payload.debug?.resetLink) setDebugLink(payload.debug.resetLink);
       toast.success(message);
     } catch {
-      toast.error("Erro de conexao. Tente novamente.");
+      toast.error("Erro de conexão. Tente novamente.");
     }
   };
 
   return (
     <AuthShell
       title="Recupere seu acesso"
-      description="Informe seu email para receber o link de redefinicao e retomar sua jornada."
+      description="Informe seu e-mail para receber o link de redefinição e retomar sua jornada."
     >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="space-y-2">

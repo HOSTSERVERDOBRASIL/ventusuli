@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { BarChart3, ClipboardList, PackageCheck } from "lucide-react";
@@ -61,7 +61,7 @@ export default function AdminResgatesPage() {
   const [updatingAction, setUpdatingAction] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<RedemptionsTab>("overview");
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({ page: "1", limit: "100" });
@@ -79,11 +79,11 @@ export default function AdminResgatesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [statusFilter]);
 
   useEffect(() => {
     void load();
-  }, [statusFilter]);
+  }, [load]);
 
   const summary = useMemo(() => {
     const pending = rows.filter((row) => row.status === "PENDING_PAYMENT").length;

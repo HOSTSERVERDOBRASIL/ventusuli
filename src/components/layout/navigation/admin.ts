@@ -17,7 +17,7 @@ import type { NavItem } from "@/components/layout/navigation/types";
 export const adminNavItems: NavItem[] = [
   {
     href: "/admin",
-    label: "Visao Geral",
+    label: "Visão Geral",
     icon: Shield,
     roles: [...ROLE_GROUPS.tenantAdmin],
     policy: "ADMIN_ONLY",
@@ -53,7 +53,7 @@ export const adminNavItems: NavItem[] = [
   },
   {
     href: "/admin/recompensas",
-    label: "Catalogo de Recompensas",
+    label: "Catálogo de Recompensas",
     icon: Gift,
     roles: [...ROLE_GROUPS.tenantAdmin],
     policy: "ADMIN_ONLY",
@@ -89,7 +89,7 @@ export const adminNavItems: NavItem[] = [
   },
   {
     href: "/admin/configuracoes",
-    label: "Configuracoes",
+    label: "Configurações",
     icon: Settings,
     roles: [...ROLE_GROUPS.tenantAdmin],
     policy: "ADMIN_ONLY",

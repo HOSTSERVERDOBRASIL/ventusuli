@@ -1,8 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Loader2, RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Building2,
+  ClipboardList,
+  CreditCard,
+  Loader2,
+  RefreshCw,
+  ShieldCheck,
+  Users,
+} from "lucide-react";
 import { useAuthToken } from "@/components/auth/AuthTokenProvider";
+import { ProfileCockpit } from "@/components/profile/profile-cockpit";
 import { UserRole } from "@/types";
 
 type OrgPlan = "FREE" | "STARTER" | "PRO" | "ENTERPRISE";
@@ -76,8 +85,20 @@ export default function SuperAdminPage() {
       }),
     [organizations],
   );
+  const activeOrganizations = useMemo(
+    () => organizations.filter((organization) => organization.status === "ACTIVE").length,
+    [organizations],
+  );
+  const pendingOrganizations = useMemo(
+    () => organizations.filter((organization) => organization.status === "PENDING_SETUP").length,
+    [organizations],
+  );
+  const totalUsers = useMemo(
+    () => organizations.reduce((sum, organization) => sum + organization.usersCount, 0),
+    [organizations],
+  );
 
-  const loadOrganizations = async () => {
+  const loadOrganizations = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -86,7 +107,9 @@ export default function SuperAdminPage() {
         cache: "no-store",
       });
 
-      const payload = (await response.json()) as OrganizationsResponse | { error?: { message?: string } };
+      const payload = (await response.json()) as
+        | OrganizationsResponse
+        | { error?: { message?: string } };
       if (!response.ok || !("data" in payload)) {
         setError(
           "error" in payload
@@ -102,13 +125,13 @@ export default function SuperAdminPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [accessToken]);
 
   useEffect(() => {
     if (!accessToken) return;
     if (userRole !== UserRole.SUPER_ADMIN) return;
     void loadOrganizations();
-  }, [accessToken, userRole]);
+  }, [accessToken, userRole, loadOrganizations]);
 
   const createOrganization = async () => {
     if (!form.orgName.trim() || !form.adminEmail.trim()) {
@@ -134,7 +157,9 @@ export default function SuperAdminPage() {
         }),
       });
 
-      const payload = (await response.json()) as CreateOrganizationResponse | { error?: { message?: string } };
+      const payload = (await response.json()) as
+        | CreateOrganizationResponse
+        | { error?: { message?: string } };
       if (!response.ok || !("data" in payload)) {
         setError(
           "error" in payload
@@ -162,7 +187,10 @@ export default function SuperAdminPage() {
     }
   };
 
-  const patchOrganization = async (organizationId: string, changes: { plan?: OrgPlan; status?: OrgStatus }) => {
+  const patchOrganization = async (
+    organizationId: string,
+    changes: { plan?: OrgPlan; status?: OrgStatus },
+  ) => {
     try {
       const response = await fetch(`/api/super-admin/organizations/${organizationId}`, {
         method: "PATCH",
@@ -205,14 +233,100 @@ export default function SuperAdminPage() {
   }
 
   return (
-    <main className="space-y-6 p-6">
-      <header className="rounded-2xl border border-[#315d8f]/40 bg-[#102D4B]/90 p-6">
-        <h1 className="text-2xl font-semibold text-white">Centro SUPER_ADMIN</h1>
-        <p className="mt-2 text-sm text-slate-300">
-          Cadastre assessorias, controle status operacional e defina planos comerciais.
-        </p>
-      </header>
-
+    <ProfileCockpit
+      role={UserRole.SUPER_ADMIN}
+      title="Centro SUPER_ADMIN"
+      subtitle="Cadastre assessorias, controle status operacional e defina planos comerciais."
+      eyebrow="Plataforma global"
+      metrics={[
+        {
+          label: "Assessorias",
+          value: loading ? "..." : organizations.length,
+          description: "Total cadastrado na plataforma.",
+          icon: Building2,
+          tone: "blue",
+        },
+        {
+          label: "Ativas",
+          value: loading ? "..." : activeOrganizations,
+          description: "Operações liberadas para uso.",
+          icon: ShieldCheck,
+          tone: "green",
+        },
+        {
+          label: "Usuários",
+          value: loading ? "..." : totalUsers,
+          description: "Contas vinculadas às assessorias.",
+          icon: Users,
+          tone: "cyan",
+        },
+      ]}
+      actions={[
+        {
+          href: "/super-admin/organizations",
+          label: "Organizações",
+          description: "Audite, altere plano e acompanhe status das assessorias.",
+          icon: Building2,
+        },
+        {
+          href: "/super-admin/billing",
+          label: "Billing",
+          description: "Acompanhe cobranças, planos e ciclo comercial.",
+          icon: CreditCard,
+        },
+        {
+          href: "/super-admin/audit",
+          label: "Auditoria",
+          description: "Consulte logs e eventos críticos da plataforma.",
+          icon: ClipboardList,
+        },
+      ]}
+      focusItems={[
+        {
+          title: "Novas assessorias",
+          description: `${pendingOrganizations} organização(ões) pendente(s) de setup.`,
+          status: "Setup",
+          href: "/super-admin/organizations",
+        },
+        {
+          title: "Operação ativa",
+          description: `${activeOrganizations} assessoria(s) pronta(s) para operar.`,
+          status: "Ativas",
+          href: "/super-admin/organizations",
+        },
+        {
+          title: "Governança da plataforma",
+          description: "Planos, convites administrativos e status ficam no mesmo cockpit.",
+          status: "RBAC",
+          href: "/super-admin/audit",
+        },
+      ]}
+      activityItems={sortedOrganizations.slice(0, 4).map((organization) => ({
+        title: organization.name,
+        description: `${organization.plan} • ${organization.usersCount} usuário(s) • ${organization.slug}`,
+        status: formatOrgStatus(organization.status),
+      }))}
+      insightItems={[
+        {
+          title: "Convites administrativos",
+          description: `${organizations.reduce(
+            (sum, organization) => sum + organization.adminInvitesCount,
+            0,
+          )} convite(s) gerado(s).`,
+          status: "Convites",
+        },
+        {
+          title: "Planos comerciais",
+          description: "Planos FREE, STARTER, PRO e ENTERPRISE continuam editáveis por linha.",
+          status: "Planos",
+        },
+        {
+          title: "Status operacional",
+          description: "Ativação e suspensão seguem disponíveis sem sair da lista.",
+          status: "Controle",
+        },
+      ]}
+    >
       <section className="rounded-2xl border border-[#315d8f]/40 bg-[#102D4B]/80 p-5">
         <h2 className="text-base font-semibold text-white">Nova assessoria</h2>
         <div className="mt-4 grid gap-3 md:grid-cols-3">
@@ -287,7 +401,9 @@ export default function SuperAdminPage() {
       </section>
 
       {error ? (
-        <section className="rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-200">{error}</section>
+        <section className="rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-200">
+          {error}
+        </section>
       ) : null}
 
       <section className="overflow-hidden rounded-2xl border border-[#315d8f]/40 bg-[#102D4B]/80">
@@ -322,7 +438,9 @@ export default function SuperAdminPage() {
                       <select
                         value={organization.plan}
                         onChange={(e) => {
-                          void patchOrganization(organization.id, { plan: e.target.value as OrgPlan });
+                          void patchOrganization(organization.id, {
+                            plan: e.target.value as OrgPlan,
+                          });
                         }}
                         className="rounded-md border border-white/15 bg-[#0F2743] px-2 py-1 text-xs text-white outline-none"
                       >
@@ -337,7 +455,9 @@ export default function SuperAdminPage() {
                       <select
                         value={organization.status}
                         onChange={(e) => {
-                          void patchOrganization(organization.id, { status: e.target.value as OrgStatus });
+                          void patchOrganization(organization.id, {
+                            status: e.target.value as OrgStatus,
+                          });
                         }}
                         className="rounded-md border border-white/15 bg-[#0F2743] px-2 py-1 text-xs text-white outline-none"
                       >
@@ -354,14 +474,18 @@ export default function SuperAdminPage() {
                       <div className="flex gap-2">
                         <button
                           type="button"
-                          onClick={() => void patchOrganization(organization.id, { status: "ACTIVE" })}
+                          onClick={() =>
+                            void patchOrganization(organization.id, { status: "ACTIVE" })
+                          }
                           className="rounded-md border border-emerald-400/40 px-2 py-1 text-xs text-emerald-300 hover:bg-emerald-500/10"
                         >
                           Ativar
                         </button>
                         <button
                           type="button"
-                          onClick={() => void patchOrganization(organization.id, { status: "SUSPENDED" })}
+                          onClick={() =>
+                            void patchOrganization(organization.id, { status: "SUSPENDED" })
+                          }
                           className="rounded-md border border-amber-400/40 px-2 py-1 text-xs text-amber-300 hover:bg-amber-500/10"
                         >
                           Suspender
@@ -382,6 +506,6 @@ export default function SuperAdminPage() {
           </div>
         )}
       </section>
-    </main>
+    </ProfileCockpit>
   );
 }

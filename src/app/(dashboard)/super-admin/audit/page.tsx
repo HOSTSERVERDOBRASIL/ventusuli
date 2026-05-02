@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { useAuthToken } from "@/components/auth/AuthTokenProvider";
 import { type DataTableColumn, DataTable } from "@/components/system/data-table";
@@ -97,7 +97,7 @@ export default function SuperAdminAuditPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -118,12 +118,12 @@ export default function SuperAdminAuditPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [accessToken]);
 
   useEffect(() => {
     if (!accessToken) return;
     void load();
-  }, [accessToken]);
+  }, [accessToken, load]);
 
   const userColumns = useMemo<DataTableColumn<AuditResponse["recentUsers"][number]>[]>(
     () => [

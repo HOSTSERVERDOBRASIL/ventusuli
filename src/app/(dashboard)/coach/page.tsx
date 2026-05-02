@@ -4,17 +4,19 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { AlertTriangle, BellRing, CalendarDays, Dumbbell, Users } from "lucide-react";
 import { useAuthToken } from "@/components/auth/AuthTokenProvider";
+import { ProfileCockpit } from "@/components/profile/profile-cockpit";
 import { EmptyState } from "@/components/system/empty-state";
 import { LoadingState } from "@/components/system/loading-state";
 import { MetricCard } from "@/components/system/metric-card";
-import { PageHeader } from "@/components/system/page-header";
 import { SectionCard } from "@/components/system/section-card";
 import { StatusBadge } from "@/components/system/status-badge";
 import { getAthletesList } from "@/services/athletes-service";
 import { getAthleteEvents } from "@/services/events-service";
 import { getNotices } from "@/services/notice-service";
 import { AthleteListRow, NoticeItem, ServiceEvent } from "@/services/types";
+import { UserRole } from "@/types";
 
 function eventStatusLabel(status: ServiceEvent["status"]): string {
   if (status === "DRAFT") return "Rascunho";
@@ -107,12 +109,99 @@ export default function CoachHomePage() {
   }, [events]);
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Painel Coach"
-        subtitle="Acompanhamento técnico da assessoria com foco em atletas, calendário esportivo e comunicação."
-      />
-
+    <ProfileCockpit
+      role={UserRole.COACH}
+      title="Painel Coach"
+      subtitle="Acompanhamento técnico da assessoria com foco em atletas, calendário esportivo e comunicação."
+      eyebrow="Treino e acompanhamento"
+      metrics={[
+        {
+          label: "Atletas no acompanhamento",
+          value: loading ? "..." : athletes.length,
+          description: "Base acompanhada pelo coach.",
+          icon: Users,
+          tone: "blue",
+        },
+        {
+          label: "Pendentes de aprovação",
+          value: loading ? "..." : pendingApproval,
+          description: "Atletas que exigem ação inicial.",
+          icon: AlertTriangle,
+          tone: "amber",
+        },
+        {
+          label: "Próximas provas",
+          value: loading ? "..." : upcomingEvents.length,
+          description: "Agenda publicada para orientar treinos.",
+          icon: CalendarDays,
+          tone: "cyan",
+        },
+      ]}
+      actions={[
+        {
+          href: "/coach/atletas",
+          label: "Atletas",
+          description: "Acompanhe status, pendências e evolução da base.",
+          icon: Users,
+        },
+        {
+          href: "/coach/treinos",
+          label: "Treinos",
+          description: "Monte planos, sessões e feedbacks técnicos.",
+          icon: Dumbbell,
+        },
+        {
+          href: "/coach/avisos",
+          label: "Avisos",
+          description: "Veja comunicados publicados para a equipe.",
+          icon: BellRing,
+        },
+      ]}
+      focusItems={[
+        {
+          title: "Fila técnica prioritária",
+          description: `${pendingApproval} aprovação(ões) e ${pendingFinancial} pendência(s) financeira(s).`,
+          status: "Ação",
+          href: "/coach/atletas",
+        },
+        {
+          title: "Calendário esportivo",
+          description: `${upcomingEvents.length} prova(s) publicada(s) para ajustar ciclos de treino.`,
+          status: "Agenda",
+          href: "/coach/calendario",
+        },
+        {
+          title: "Comunicação da assessoria",
+          description: `${notices.length} aviso(s) recente(s) disponíveis para leitura.`,
+          status: "Avisos",
+          href: "/coach/avisos",
+        },
+      ]}
+      activityItems={upcomingEvents.slice(0, 4).map((event) => ({
+        title: event.name,
+        description: `${format(new Date(event.event_date), "dd/MM/yyyy", { locale: ptBR })} - ${
+          event.city
+        }/${event.state}`,
+        status: eventStatusLabel(event.status),
+      }))}
+      insightItems={[
+        {
+          title: "Base bloqueada",
+          description: `${blocked} atleta(s) bloqueado(s) exigem cuidado antes de novas ações.`,
+          status: "Risco",
+        },
+        {
+          title: "Pendência financeira",
+          description: `${pendingFinancial} atleta(s) com pendência podem afetar participação em provas.`,
+          status: "Financeiro",
+        },
+        {
+          title: "Treino e prova conectados",
+          description: "A agenda esportiva vira referência para prioridade técnica do coach.",
+          status: "Treino",
+        },
+      ]}
+    >
       {loading ? (
         <LoadingState lines={5} />
       ) : errorMessage ? (
@@ -240,6 +329,6 @@ export default function CoachHomePage() {
           </SectionCard>
         </>
       )}
-    </div>
+    </ProfileCockpit>
   );
 }

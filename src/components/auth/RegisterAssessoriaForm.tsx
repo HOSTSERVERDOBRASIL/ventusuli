@@ -20,14 +20,14 @@ const formSchema = registerAdminSchema
   .extend({
     confirmPassword: z.string({ required_error: "Confirme sua senha" }).min(1, "Confirme sua senha"),
     termsAccepted: z.boolean().refine((value) => value, {
-      message: "Voce precisa aceitar os termos para continuar",
+      message: "Você precisa aceitar os termos para continuar",
     }),
   })
   .superRefine(({ password, confirmPassword }, ctx) => {
     if (password !== confirmPassword) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "As senhas nao coincidem",
+        message: "As senhas não coincidem",
         path: ["confirmPassword"],
       });
     }
@@ -46,11 +46,11 @@ interface RegisterResponse {
 }
 
 const PASSWORD_RULES = [
-  { label: "Minimo de 8 caracteres", test: (value: string) => value.length >= 8 },
-  { label: "Ao menos uma letra maiuscula", test: (value: string) => /[A-Z]/.test(value) },
-  { label: "Ao menos um numero", test: (value: string) => /[0-9]/.test(value) },
-  { label: "Ao menos uma letra minuscula", test: (value: string) => /[a-z]/.test(value) },
-  { label: "Ao menos um simbolo", test: (value: string) => /[^A-Za-z0-9]/.test(value) },
+  { label: "Mínimo de 8 caracteres", test: (value: string) => value.length >= 8 },
+  { label: "Ao menos uma letra maiúscula", test: (value: string) => /[A-Z]/.test(value) },
+  { label: "Ao menos um número", test: (value: string) => /[0-9]/.test(value) },
+  { label: "Ao menos uma letra minúscula", test: (value: string) => /[a-z]/.test(value) },
+  { label: "Ao menos um símbolo", test: (value: string) => /[^A-Za-z0-9]/.test(value) },
 ] as const;
 
 export function RegisterAssessoriaForm() {
@@ -81,7 +81,7 @@ export function RegisterAssessoriaForm() {
   const passwordScore = passwordStatus.filter((item) => item.valid).length;
   const passwordPercent = (passwordScore / PASSWORD_RULES.length) * 100;
   const strengthLabel =
-    passwordScore <= 2 ? "Fraca" : passwordScore === 3 ? "Media" : passwordScore === 4 ? "Boa" : "Forte";
+    passwordScore <= 2 ? "Fraca" : passwordScore === 3 ? "Média" : passwordScore === 4 ? "Boa" : "Forte";
   const strengthColor =
     passwordScore <= 2
       ? "bg-red-400"
@@ -111,8 +111,8 @@ export function RegisterAssessoriaForm() {
       if (!response.ok || !("accessToken" in payload)) {
         const message =
           "error" in payload
-            ? (payload.error?.message ?? "Nao foi possivel criar sua assessoria.")
-            : "Nao foi possivel criar sua assessoria.";
+            ? (payload.error?.message ?? "Não foi possível criar sua assessoria.")
+            : "Não foi possível criar sua assessoria.";
         setError(message);
         toast.error(message);
         return;
@@ -122,7 +122,7 @@ export function RegisterAssessoriaForm() {
       toast.success("Assessoria criada com sucesso.");
       router.push("/dashboard");
     } catch {
-      const message = "Erro de conexao. Tente novamente em instantes.";
+      const message = "Erro de conexão. Tente novamente em instantes.";
       setError(message);
       toast.error(message);
     }
@@ -164,7 +164,7 @@ export function RegisterAssessoriaForm() {
 
         <div className="space-y-3 rounded-md border border-white/10 bg-[#102D4B] p-3">
           <div className="flex items-center justify-between text-xs text-slate-200">
-            <span>Forca da senha</span>
+            <span>Força da senha</span>
             <span className="font-semibold text-white">{strengthLabel}</span>
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-white/10">
@@ -194,7 +194,7 @@ export function RegisterAssessoriaForm() {
         <div className="space-y-2">
           <label className="flex items-start gap-3 text-sm text-slate-200" htmlFor="termsAccepted">
             <input id="termsAccepted" type="checkbox" className="mt-0.5 h-4 w-4 rounded border-white/30 bg-transparent accent-[#F5A623]" {...register("termsAccepted")} />
-            <span>Concordo com os termos de uso e politica de privacidade da plataforma.</span>
+            <span>Concordo com os termos de uso e política de privacidade da plataforma.</span>
           </label>
           {errors.termsAccepted ? <p className="text-xs text-amber-300">{errors.termsAccepted.message}</p> : null}
         </div>
@@ -208,7 +208,7 @@ export function RegisterAssessoriaForm() {
         </Button>
 
         <p className="text-center text-sm text-slate-200">
-          Ja possui conta? <Link href="/login" className="font-semibold text-[#F5A623] hover:underline">Entrar</Link>
+          Já possui conta? <Link href="/login" className="font-semibold text-[#F5A623] hover:underline">Entrar</Link>
         </p>
         <p className="text-center text-sm text-slate-300">
           E atleta? <Link href="/register/atleta" className="font-semibold text-[#F5A623] hover:underline">Cadastrar com assessoria</Link>

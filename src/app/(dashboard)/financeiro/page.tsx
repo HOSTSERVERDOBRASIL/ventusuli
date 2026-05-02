@@ -4,17 +4,19 @@ import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import Link from "next/link";
+import { CreditCard, ReceiptText, Wallet } from "lucide-react";
 import { useAuthToken } from "@/components/auth/AuthTokenProvider";
+import { ProfileCockpit } from "@/components/profile/profile-cockpit";
 import { ActionButton } from "@/components/system/action-button";
 import { type DataTableColumn, DataTable } from "@/components/system/data-table";
 import { EmptyState } from "@/components/system/empty-state";
 import { LoadingState } from "@/components/system/loading-state";
 import { MetricCard } from "@/components/system/metric-card";
-import { PageHeader } from "@/components/system/page-header";
 import { SectionCard } from "@/components/system/section-card";
 import { StatusBadge } from "@/components/system/status-badge";
 import { getRegistrations } from "@/services/registrations-service";
 import { type Inscricao, useInscricoesStore } from "@/store/inscricoes";
+import { UserRole } from "@/types";
 
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -146,16 +148,101 @@ export default function FinanceiroAtletaPage() {
   ];
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Financeiro"
-        subtitle="Visao financeira do atleta com cobrancas, pagamentos e historico."
-        actions={
-          <ActionButton asChild>
-            <Link href="/minhas-inscricoes">Gerenciar inscricoes</Link>
-          </ActionButton>
-        }
-      />
+    <ProfileCockpit
+      role={UserRole.ATHLETE}
+      title="Financeiro"
+      subtitle="Visão financeira do atleta com cobranças, pagamentos e histórico."
+      eyebrow="Pagamentos do atleta"
+      metrics={[
+        {
+          label: "Total pago",
+          value: BRL.format(summary.totalPago / 100),
+          description: "Inscrições já confirmadas.",
+          icon: Wallet,
+          tone: "green",
+        },
+        {
+          label: "Pendente",
+          value: BRL.format(summary.totalPendente / 100),
+          description: "Cobranças aguardando pagamento.",
+          icon: CreditCard,
+          tone: "amber",
+        },
+        {
+          label: "Histórico",
+          value: rows.length,
+          description: "Lançamentos ligados às inscrições.",
+          icon: ReceiptText,
+          tone: "blue",
+        },
+      ]}
+      actions={[
+        {
+          href: "/minhas-inscricoes",
+          label: "Minhas inscrições",
+          description: "Gerencie provas, pagamentos e status de participação.",
+          icon: ReceiptText,
+        },
+        {
+          href: "/provas",
+          label: "Provas",
+          description: "Encontre novas provas e distâncias disponíveis.",
+          icon: CreditCard,
+        },
+      ]}
+      focusItems={[
+        {
+          title: "Cobranças pendentes",
+          description: `${BRL.format(summary.totalPendente / 100)} aguardando pagamento.`,
+          status: "Pagar",
+          href: "/minhas-inscricoes",
+        },
+        {
+          title: "Histórico de inscrições",
+          description: `${rows.length} lançamento(s) financeiro(s) vinculados ao atleta.`,
+          status: "Histórico",
+        },
+        {
+          title: "Valores cancelados ou reembolsados",
+          description: `${BRL.format(summary.totalCancelado / 100)} fora do total pago.`,
+          status: "Baixas",
+        },
+      ]}
+      activityItems={rows.slice(0, 4).map((row) => ({
+        title: row.eventName,
+        description: `${row.distanceLabel} - ${BRL.format(row.amountCents / 100)} - ${format(
+          new Date(row.eventDate),
+          "dd/MM/yyyy",
+          { locale: ptBR },
+        )}`,
+        status: row.paymentStatus,
+      }))}
+      insightItems={[
+        {
+          title: "Pagamentos confirmados",
+          description: `${BRL.format(summary.totalPago / 100)} já conciliado no histórico.`,
+          status: "Pago",
+        },
+        {
+          title: "Próxima ação",
+          description:
+            summary.totalPendente > 0
+              ? "Regularize pendências para manter inscrições confirmadas."
+              : "Sem pendências financeiras no momento.",
+          status: "Status",
+        },
+        {
+          title: "Controle pessoal",
+          description: "O financeiro do atleta fica separado do financeiro administrativo.",
+          status: "Perfil",
+        },
+      ]}
+    >
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <ActionButton asChild>
+          <Link href="/minhas-inscricoes">Gerenciar inscrições</Link>
+        </ActionButton>
+      </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
         <MetricCard
@@ -192,6 +279,6 @@ export default function FinanceiroAtletaPage() {
           <DataTable columns={columns} data={rows} getRowKey={(row) => row.id} />
         )}
       </SectionCard>
-    </div>
+    </ProfileCockpit>
   );
 }

@@ -61,6 +61,33 @@ type LoginErrorResponse = {
 
 type PlatformOrTenantAdminRole = "SUPER_ADMIN" | "ADMIN" | "FINANCE";
 
+function normalizeSafeNextPath(nextParam: string | null): string | null {
+  const value = nextParam?.trim();
+  if (!value || !value.startsWith("/") || value.startsWith("//") || value.startsWith("/\\")) {
+    return null;
+  }
+
+  try {
+    const decoded = decodeURIComponent(value);
+    if (decoded.startsWith("//") || decoded.startsWith("/\\")) return null;
+
+    const url = new URL(value, "https://ventu-suli.local");
+    if (url.origin !== "https://ventu-suli.local") return null;
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return null;
+  }
+}
+
+function isScopedPath(path: string | null, scope: string): path is string {
+  return (
+    path === scope ||
+    Boolean(path?.startsWith(`${scope}/`)) ||
+    Boolean(path?.startsWith(`${scope}?`)) ||
+    Boolean(path?.startsWith(`${scope}#`))
+  );
+}
+
 function resolvePostLoginPath(
   role: string,
   hasCpf: boolean,
@@ -73,40 +100,40 @@ function resolvePostLoginPath(
   ).includes(role as PlatformOrTenantAdminRole);
 
   if (role === "COACH") {
-    if (nextParam && nextParam.startsWith("/coach")) return nextParam;
+    if (isScopedPath(nextParam, "/coach")) return nextParam;
     return "/coach";
   }
 
   if (role === "MANAGER") {
-    if (nextParam && (nextParam.startsWith("/gestor") || nextParam.startsWith("/admin"))) {
+    if (isScopedPath(nextParam, "/gestor") || isScopedPath(nextParam, "/admin")) {
       return nextParam;
     }
     return "/gestor";
   }
 
   if (role === "ORGANIZER") {
-    if (nextParam && nextParam.startsWith("/organizador")) return nextParam;
+    if (isScopedPath(nextParam, "/organizador")) return nextParam;
     return "/organizador";
   }
 
   if (role === "SUPPORT") {
-    if (nextParam && nextParam.startsWith("/suporte")) return nextParam;
+    if (isScopedPath(nextParam, "/suporte")) return nextParam;
     return "/suporte";
   }
 
   if (role === "MODERATOR") {
-    if (nextParam && nextParam.startsWith("/moderador")) return nextParam;
+    if (isScopedPath(nextParam, "/moderador")) return nextParam;
     return "/moderador";
   }
 
   if (role === "PARTNER") {
-    if (nextParam && nextParam.startsWith("/parceiro")) return nextParam;
+    if (isScopedPath(nextParam, "/parceiro")) return nextParam;
     return "/parceiro";
   }
 
   if (isPlatformOrTenantAdmin) {
     if (role === "SUPER_ADMIN") {
-      if (nextParam && nextParam.startsWith("/super-admin")) return nextParam;
+      if (isScopedPath(nextParam, "/super-admin")) return nextParam;
       return "/super-admin";
     }
 
@@ -114,21 +141,21 @@ function resolvePostLoginPath(
       return "/onboarding/assessoria";
     }
     if (role === "FINANCE") {
-      if (nextParam && nextParam.startsWith("/admin/financeiro")) return nextParam;
+      if (isScopedPath(nextParam, "/admin/financeiro")) return nextParam;
       return "/admin/financeiro";
     }
-    if (nextParam && nextParam.startsWith("/admin")) return nextParam;
+    if (isScopedPath(nextParam, "/admin")) return nextParam;
     return "/admin";
   }
 
   if (role === "PREMIUM_ATHLETE") {
     if (!hasCpf) return "/onboarding/atleta";
-    if (nextParam && nextParam.startsWith("/") && !nextParam.startsWith("/admin")) return nextParam;
+    if (nextParam && !isScopedPath(nextParam, "/admin")) return nextParam;
     return "/premium";
   }
 
   if (!hasCpf) return "/onboarding/atleta";
-  if (nextParam && nextParam.startsWith("/") && !nextParam.startsWith("/admin")) return nextParam;
+  if (nextParam && !isScopedPath(nextParam, "/admin")) return nextParam;
   return "/";
 }
 
@@ -151,11 +178,11 @@ export function LoginForm() {
 
   useEffect(() => {
     if (reason === "expired") {
-      toast.info("Sua sessao expirou. Faca login novamente.");
+      toast.info("Sua sessão expirou. Faça login novamente.");
     }
 
     if (reason === "inactive") {
-      toast.info("Sua conta nao esta ativa para acesso.");
+      toast.info("Sua conta não está ativa para acesso.");
     }
   }, [reason]);
 
@@ -199,12 +226,13 @@ export function LoginForm() {
       if (!response.ok) {
         const message =
           "error" in payload
-            ? (payload.error?.message ?? "Nao foi possivel autenticar. Tente novamente.")
-            : "Nao foi possivel autenticar. Tente novamente.";
+            ? (payload.error?.message ?? "Não foi possível autenticar. Tente novamente.")
+            : "Não foi possível autenticar. Tente novamente.";
 
         if (
           response.status === 403 &&
           (message.toLowerCase().includes("aguardando aprovacao") ||
+            message.toLowerCase().includes("aguardando aprovação") ||
             message.toLowerCase().includes("aguardando"))
         ) {
           router.push("/aguardando-aprovacao");
@@ -217,7 +245,7 @@ export function LoginForm() {
       }
 
       if ("mfa_required" in payload && payload.mfa_required) {
-        const nextPath = searchParams.get("next");
+        const nextPath = normalizeSafeNextPath(searchParams.get("next"));
         const url = new URL("/mfa", window.location.origin);
         url.searchParams.set("token", payload.mfa_token);
         if (payload.mfa_setup_required) url.searchParams.set("setup", "1");
@@ -231,7 +259,7 @@ export function LoginForm() {
       }
 
       if (!("accessToken" in payload)) {
-        const message = "Nao foi possivel autenticar. Tente novamente.";
+        const message = "Não foi possível autenticar. Tente novamente.";
         setError(message);
         toast.error(message);
         return;
@@ -250,8 +278,8 @@ export function LoginForm() {
         profile: payload.profile ?? null,
       });
 
-      toast.success("Login realizado com sucesso.");
-      const nextPath = searchParams.get("next");
+      toast.success("Acesso validado. Direcionando...");
+      const nextPath = normalizeSafeNextPath(searchParams.get("next"));
       const roles = payload.user.roles?.length ? payload.user.roles : [payload.user.role];
       if (roles.length > 1 && searchParams.get("profile") !== "1") {
         const profileUrl = new URL("/selecionar-perfil", window.location.origin);
@@ -270,7 +298,7 @@ export function LoginForm() {
       );
       router.push(destination);
     } catch {
-      const message = "Erro de conexao. Tente novamente em instantes.";
+      const message = "Erro de conexão. Tente novamente em instantes.";
       setError(message);
       toast.error(message);
     }
@@ -279,16 +307,13 @@ export function LoginForm() {
   return (
     <AuthShell
       fitViewport
+      logoScale="hero"
       title={
         <>
-          Bem-vindo de <span className="text-[#ffc229]">volta!</span>
+          Acesse sua <span className="text-[#ffc229]">conta</span>
         </>
       }
-      description={
-        <>
-          Continue sua <span className="text-[#ffc229]">evolucao</span> no Ventu Suli.
-        </>
-      }
+      description={<>Entre para seguir direto ao painel do seu perfil.</>}
     >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-3" noValidate>
         {error ? (
@@ -385,19 +410,19 @@ export function LoginForm() {
             </span>
           ) : (
             <span className="flex items-center justify-center gap-2 text-center leading-5 sm:gap-3">
-              <span>{isValid ? "Entrar e evoluir" : "Preencha para continuar"}</span>
+              <span>{isValid ? "Entrar no painel" : "Informe e-mail e senha"}</span>
               <ArrowRight className="h-5 w-5" />
             </span>
           )}
         </Button>
 
         <p className="flex flex-wrap items-center justify-center gap-2 text-[13px] font-semibold text-slate-100">
-          Ainda nao tem conta?
+          Ainda não tem conta?
           <Link
             href={registrationHref}
             className="inline-flex items-center gap-2 font-extrabold text-[#ffc229] transition hover:text-[#ffd872]"
           >
-            Comecar agora
+            Começar agora
             <ArrowRight className="h-5 w-5" />
           </Link>
         </p>
@@ -421,7 +446,7 @@ export function LoginForm() {
               <>
                 100% focado na
                 <br />
-                sua evolucao
+                sua evolução
               </>
             }
           />
@@ -438,14 +463,14 @@ export function LoginForm() {
         </div>
 
         <p className="text-center text-[12px] leading-5 text-slate-300">
-          Ao continuar, voce concorda com nossos
+          Ao continuar, você concorda com nossos
           <br />
           <Link href="#" className="font-bold text-sky-300 transition hover:text-sky-200">
             Termos de Uso
           </Link>{" "}
           -{" "}
           <Link href="#" className="font-bold text-sky-300 transition hover:text-sky-200">
-            Politica de Privacidade
+            Política de Privacidade
           </Link>
           .
         </p>

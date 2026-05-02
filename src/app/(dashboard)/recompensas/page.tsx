@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { ActionButton } from "@/components/system/action-button";
@@ -171,7 +171,7 @@ export default function RecompensasPage() {
   const [calculations, setCalculations] = useState<Record<string, CalculationResult>>({});
   const [processingId, setProcessingId] = useState<string | null>(null);
 
-  const loadRewards = async () => {
+  const loadRewards = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -224,12 +224,12 @@ export default function RecompensasPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [accessToken]);
 
   useEffect(() => {
     if (!hydrated) return;
     void loadRewards();
-  }, [accessToken, hydrated]);
+  }, [hydrated, loadRewards]);
 
   const handleCalculate = async (item: RewardItem) => {
     setProcessingId(item.id);
