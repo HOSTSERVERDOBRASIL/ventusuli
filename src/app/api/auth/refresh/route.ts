@@ -107,7 +107,14 @@ export async function POST(req: NextRequest) {
       return sessionExpiredResponse("TOKEN_EXPIRED", "Sessao demo expirada. Faca login novamente.");
     }
 
-    const refreshedAccess = generateAccessToken(payload.sub, payload.role, payload.org, "ACTIVE", "7d");
+    const refreshedAccess = generateAccessToken(
+      payload.sub,
+      payload.role,
+      payload.org,
+      "ACTIVE",
+      "7d",
+      payload.roles,
+    );
     const response = NextResponse.json(
       {
         user: { id: payload.sub, role: payload.role, email: null, name: null },
@@ -145,6 +152,10 @@ export async function POST(req: NextRequest) {
             organization_id: true,
             account_status: true,
             athlete_profile: { select: { id: true, athlete_status: true } },
+            access_profiles: {
+              where: { active: true },
+              select: { role: true },
+            },
           },
         },
       },
@@ -217,6 +228,7 @@ export async function POST(req: NextRequest) {
   const role = result.user.role as UserRole;
   const roles = buildEffectiveRoles({
     primaryRole: role,
+    accessRoles: result.user.access_profiles.map((profile) => profile.role as UserRole),
     hasAthleteProfile: Boolean(result.user.athlete_profile),
   });
   const accessToken = generateAccessToken(result.user.id, role, result.user.organization_id, "ACTIVE", "15m", roles);

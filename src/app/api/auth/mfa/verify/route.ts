@@ -88,6 +88,10 @@ export async function POST(req: NextRequest) {
       athlete_profile: {
         select: { id: true },
       },
+      access_profiles: {
+        where: { active: true },
+        select: { role: true },
+      },
       organization: {
         select: {
           status: true,
@@ -104,6 +108,7 @@ export async function POST(req: NextRequest) {
   let recoveryCodes: string[] | undefined;
   const roles = buildEffectiveRoles({
     primaryRole: role,
+    accessRoles: userRecord.access_profiles.map((profile) => profile.role as unknown as UserRole),
     hasAthleteProfile: Boolean(userRecord.athlete_profile),
   });
 

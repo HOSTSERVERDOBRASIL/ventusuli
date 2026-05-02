@@ -29,11 +29,15 @@ export function normalizeRoles(roles: Array<UserRole | string | null | undefined
 
 export function buildEffectiveRoles(params: {
   primaryRole: UserRole | string;
+  accessRoles?: Array<UserRole | string | null | undefined> | null;
   hasAthleteProfile?: boolean | null;
 }): UserRole[] {
+  const explicitRoles = normalizeRoles([params.primaryRole, ...(params.accessRoles ?? [])]);
+  const hasPremiumAthlete = explicitRoles.includes(UserRole.PREMIUM_ATHLETE);
+
   return normalizeRoles([
-    params.primaryRole,
-    params.hasAthleteProfile ? UserRole.ATHLETE : null,
+    ...explicitRoles,
+    params.hasAthleteProfile && !hasPremiumAthlete ? UserRole.ATHLETE : null,
   ]);
 }
 

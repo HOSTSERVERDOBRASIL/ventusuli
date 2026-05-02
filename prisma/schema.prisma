@@ -491,6 +491,7 @@ model Organization {
   sponsor_campaigns         SponsorCampaign[]
   sponsor_placements        SponsorPlacement[]
   sponsor_metrics           SponsorMetric[]
+  user_access_profiles      UserAccessProfile[]
 
   @@index([slug])
   @@index([status])
@@ -516,6 +517,7 @@ model User {
   password_reset_tokens      PasswordResetToken[]
   auth_challenges            AuthChallenge[]
   mfa_settings               UserMfaSettings?
+  access_profiles            UserAccessProfile[]
   athlete_profile            AthleteProfile?
   created_events             Event[]                 @relation("EventCreator")
   registrations              Registration[]
@@ -563,6 +565,25 @@ model User {
   @@index([email])
   @@index([role])
   @@map("users")
+  @@schema("public")
+}
+
+model UserAccessProfile {
+  id              String       @id @default(uuid())
+  user_id         String
+  user            User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  role            UserRole
+  active          Boolean      @default(true)
+  assigned_by     String?
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+
+  @@unique([user_id, role])
+  @@index([organization_id, role, active])
+  @@index([user_id, active])
+  @@map("user_access_profiles")
   @@schema("public")
 }
 

@@ -47,6 +47,10 @@ export async function GET(req: NextRequest) {
         athlete_profile: {
           select: { cpf: true, athlete_status: true },
         },
+        access_profiles: {
+          where: { active: true },
+          select: { role: true },
+        },
         organization: {
           select: {
             id: true,
@@ -73,6 +77,7 @@ export async function GET(req: NextRequest) {
 
     const roles = buildEffectiveRoles({
       primaryRole: user.role,
+      accessRoles: user.access_profiles.map((profile) => profile.role),
       hasAthleteProfile: Boolean(user.athlete_profile),
     });
     const hasCpf = user.athlete_profile ? Boolean(user.athlete_profile.cpf) : true;

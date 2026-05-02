@@ -211,6 +211,10 @@ export async function POST(req: NextRequest) {
         athlete_profile: {
           select: { id: true },
         },
+        access_profiles: {
+          where: { active: true },
+          select: { role: true },
+        },
       },
     });
 
@@ -229,6 +233,7 @@ export async function POST(req: NextRequest) {
       "7d",
       buildEffectiveRoles({
         primaryRole: demoUser.role as UserRole,
+        accessRoles: demoUser.access_profiles.map((profile) => profile.role as UserRole),
         hasAthleteProfile: Boolean(demoUser.athlete_profile),
       }),
     );
@@ -244,6 +249,7 @@ export async function POST(req: NextRequest) {
           role: demoUser.role,
           roles: buildEffectiveRoles({
             primaryRole: demoUser.role as UserRole,
+            accessRoles: demoUser.access_profiles.map((profile) => profile.role as UserRole),
             hasAthleteProfile: Boolean(demoUser.athlete_profile),
           }),
         },
@@ -279,6 +285,10 @@ export async function POST(req: NextRequest) {
       account_status: true,
       athlete_profile: {
         select: { id: true, athlete_status: true },
+      },
+      access_profiles: {
+        where: { active: true },
+        select: { role: true },
       },
       organization: {
         select: {
@@ -321,6 +331,7 @@ export async function POST(req: NextRequest) {
   const role = user.role as UserRole;
   const roles = buildEffectiveRoles({
     primaryRole: role,
+    accessRoles: user.access_profiles.map((profile) => profile.role as UserRole),
     hasAthleteProfile: Boolean(user.athlete_profile),
   });
   const mfaEnabled = Boolean(user.mfa_settings?.enabled && user.mfa_settings?.totp_secret);
