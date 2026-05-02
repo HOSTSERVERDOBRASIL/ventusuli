@@ -48,10 +48,16 @@ export default function EditarEventoPage() {
       name: string;
       city: string;
       state: string;
+      address?: string;
+      latitude?: number | null;
+      longitude?: number | null;
+      check_in_radius_m?: number;
+      proximity_radius_m?: number;
       event_date: string;
       registration_deadline?: string;
       description?: string;
       image_url?: string;
+      external_url?: string;
       distances: Array<{
         label: string;
         distance_km: number;

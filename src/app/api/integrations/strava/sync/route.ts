@@ -9,7 +9,8 @@ import {
 } from "@/lib/integrations/strava-service";
 
 function canUse(role: UserRole): boolean {
-  return role === UserRole.ATHLETE;
+  const value = String(role);
+  return value === "ATHLETE" || value === "PREMIUM_ATHLETE";
 }
 
 export async function GET(req: NextRequest) {

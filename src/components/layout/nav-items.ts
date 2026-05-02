@@ -6,6 +6,7 @@ import { accountNavItems } from "@/components/layout/navigation/account";
 import { adminNavItems } from "@/components/layout/navigation/admin";
 import { athleteNavItems } from "@/components/layout/navigation/athlete";
 import { coachNavItems } from "@/components/layout/navigation/coach";
+import { extendedNavItems } from "@/components/layout/navigation/extended";
 import { platformNavItems } from "@/components/layout/navigation/platform";
 import {
   NAV_SECTIONS,
@@ -19,6 +20,7 @@ export const navItems: NavItem[] = [
   ...athleteNavItems,
   ...adminNavItems,
   ...coachNavItems,
+  ...extendedNavItems,
   ...platformNavItems,
   ...accountNavItems,
 ];

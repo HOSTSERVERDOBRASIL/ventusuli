@@ -1,4 +1,5 @@
 import { DashboardData } from "@/services/types";
+import { buildEmptyGamificationSnapshot } from "@/lib/gamification/snapshot";
 
 // Development fixture only. Do not use as runtime fallback in production flows.
 export const DEMO_DASHBOARD_EXPERIENCE: NonNullable<DashboardData["experience"]> = {
@@ -75,6 +76,7 @@ export const DEMO_DASHBOARD_EXPERIENCE: NonNullable<DashboardData["experience"]>
       { id: "rk-13", name: "Joao Pires", points: 1815, position: 13 },
     ],
   },
+  gamification: buildEmptyGamificationSnapshot(),
   communityPreview: {
     tabs: ["Feed", "Treinos", "Eventos", "Resultados"],
     posts: [],

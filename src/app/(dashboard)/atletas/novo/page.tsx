@@ -44,7 +44,7 @@ const INITIAL_FORM: FormState = {
 
 export default function NovoAtletaPage() {
   const router = useRouter();
-  const { accessToken, userRole } = useAuthToken();
+  const { accessToken, userRoles } = useAuthToken();
 
   const [mode, setMode] = useState<"QUICK" | "FULL">("QUICK");
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
@@ -55,7 +55,7 @@ export default function NovoAtletaPage() {
     temporaryPassword: string;
   } | null>(null);
 
-  const canManage = userRole === UserRole.ADMIN;
+  const canManage = userRoles.includes(UserRole.ADMIN) || userRoles.includes(UserRole.MANAGER);
 
   const isValid = useMemo(() => {
     if (!form.name.trim() || !form.email.trim()) return false;

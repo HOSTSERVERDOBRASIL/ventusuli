@@ -12,11 +12,20 @@ export const MFA_EMAIL_OTP_TTL_MS = 5 * 60 * 1000;
 export const MFA_MAX_ATTEMPTS = 5;
 const DEFAULT_MFA_REQUIRED_ROLES: UserRole[] = [];
 
-export function isPrivilegedRole(role: UserRole): boolean {
-  return role === "SUPER_ADMIN" || role === "ADMIN" || role === "FINANCE";
+export function isPrivilegedRole(role: UserRole | string): boolean {
+  const value = String(role);
+  return (
+    value === "SUPER_ADMIN" ||
+    value === "ADMIN" ||
+    value === "MANAGER" ||
+    value === "FINANCE" ||
+    value === "ORGANIZER" ||
+    value === "SUPPORT" ||
+    value === "MODERATOR"
+  );
 }
 
-export function isMfaMandatoryForRole(role: UserRole): boolean {
+export function isMfaMandatoryForRole(role: UserRole | string): boolean {
   const configuredRoles = process.env.MFA_REQUIRED_ROLES;
   const requiredRoles = (configuredRoles?.trim() ? configuredRoles : DEFAULT_MFA_REQUIRED_ROLES.join(","))
     .split(",")
@@ -24,7 +33,7 @@ export function isMfaMandatoryForRole(role: UserRole): boolean {
     .filter(Boolean);
 
   if (requiredRoles.includes("ALL")) return true;
-  return requiredRoles.includes(role);
+  return requiredRoles.includes(String(role));
 }
 
 export function maskEmail(email: string): string {

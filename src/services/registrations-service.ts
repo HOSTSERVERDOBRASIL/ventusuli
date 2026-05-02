@@ -11,11 +11,21 @@ export interface ServiceRegistration {
   eventId: string;
   eventName: string;
   eventDate: string;
+  eventAddress?: string | null;
+  eventLatitude?: number | null;
+  eventLongitude?: number | null;
+  checkInRadiusM?: number;
+  proximityRadiusM?: number;
   distanceId?: string;
   distanceLabel: string;
   status: RegistrationStatus;
   paymentStatus: PaymentStatus;
   amountCents: number;
+  attendanceStatus?: "PENDING" | "PRESENT" | "ABSENT";
+  checkInAt?: string | null;
+  checkInDistanceM?: number | null;
+  checkOutAt?: string | null;
+  checkOutDistanceM?: number | null;
 }
 
 interface CreateRegistrationInput {
@@ -29,6 +39,19 @@ interface RegistrationApiResponse {
 
 interface RegistrationListApiResponse {
   data: ServiceRegistration[];
+}
+
+interface RegistrationCheckInApiResponse {
+  data: {
+    registrationId: string;
+    action: "CHECK_IN" | "CHECK_OUT";
+    distanceMeters: number;
+    checkInRadiusM: number;
+    proximityRadiusM: number;
+    checkInAt: string | null;
+    checkOutAt: string | null;
+    attendanceStatus: "PENDING" | "PRESENT" | "ABSENT";
+  };
 }
 
 export function getInitialRegistrations(): ServiceRegistration[] {
@@ -84,6 +107,9 @@ export async function getAthleteIdentity(accessToken?: string | null): Promise<A
         state?: string | null;
         birth_date?: string | null;
         gender?: string | null;
+        sport_level?: AthleteIdentity["sportLevel"];
+        sport_goal?: string | null;
+        next_competition_date?: string | null;
         emergency_contact?: AthleteEmergencyContact | null;
       };
     };
@@ -111,6 +137,9 @@ export async function getAthleteIdentity(accessToken?: string | null): Promise<A
     state: p?.state ?? null,
     birthDate: p?.birth_date ?? null,
     gender: p?.gender ?? null,
+    sportLevel: p?.sport_level ?? null,
+    sportGoal: p?.sport_goal ?? null,
+    nextCompetitionDate: p?.next_competition_date ?? null,
     emergencyContact: p?.emergency_contact ?? null,
   };
 }
@@ -122,6 +151,9 @@ export interface UpdateProfileInput {
   state?: string | null;
   birth_date?: string | null;
   gender?: string | null;
+  sport_level?: AthleteIdentity["sportLevel"] | null;
+  sport_goal?: string | null;
+  next_competition_date?: string | null;
   emergency_contact?: { name: string; phone: string; relation?: string } | null;
   avatar_url?: string | null;
 }
@@ -211,4 +243,33 @@ export async function cancelRegistration(
   accessToken?: string | null,
 ): Promise<ServiceRegistration> {
   return patchRegistration(registration.id, "CANCEL", accessToken);
+}
+
+export async function checkInRegistration(
+  registrationId: string,
+  input: {
+    action: "CHECK_IN" | "CHECK_OUT";
+    latitude: number;
+    longitude: number;
+  },
+  accessToken?: string | null,
+): Promise<RegistrationCheckInApiResponse["data"]> {
+  const response = await fetch(`/api/registrations/${registrationId}/checkin`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...buildAuthHeaders(accessToken),
+    },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    const errorPayload = (await response.json().catch(() => null)) as {
+      error?: { message?: string };
+    } | null;
+    throw new Error(errorPayload?.error?.message ?? "Nao foi possivel registrar presenca.");
+  }
+
+  const payload = (await response.json()) as RegistrationCheckInApiResponse;
+  return payload.data;
 }

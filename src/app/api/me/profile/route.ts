@@ -42,6 +42,10 @@ const emergencyContactSchema = z.object({
   relation: z.string().trim().optional(),
 });
 
+const sportLevelSchema = z.enum(["BEGINNER", "INTERMEDIATE", "ADVANCED", "ELITE"], {
+  message: "Nivel esportivo invalido.",
+});
+
 const patchProfileSchema = z.object({
   cpf: z
     .string()
@@ -69,6 +73,16 @@ const patchProfileSchema = z.object({
     .enum(["M", "F", "O"], { message: "Genero invalido. Use M, F ou O." })
     .nullable()
     .optional(),
+  sport_level: sportLevelSchema.nullable().optional(),
+  sport_goal: z.string().trim().max(160).nullable().optional(),
+  next_competition_date: z
+    .string()
+    .trim()
+    .refine((v) => !Number.isNaN(new Date(v).getTime()), {
+      message: "Data da proxima prova invalida.",
+    })
+    .nullable()
+    .optional(),
   emergency_contact: emergencyContactSchema.nullable().optional(),
   avatar_url: z
     .string()
@@ -82,7 +96,7 @@ const patchProfileSchema = z.object({
 });
 
 function isAthleteRole(role: string): boolean {
-  return role === "ATHLETE";
+  return role === "ATHLETE" || role === "PREMIUM_ATHLETE";
 }
 
 function hasMinimumOnboardingData(profile: {
@@ -122,6 +136,12 @@ export async function PATCH(req: NextRequest) {
   if (data.birth_date !== undefined)
     profileData.birth_date = data.birth_date ? new Date(data.birth_date) : null;
   if (data.gender !== undefined) profileData.gender = data.gender;
+  if (data.sport_level !== undefined) profileData.sport_level = data.sport_level;
+  if (data.sport_goal !== undefined) profileData.sport_goal = data.sport_goal;
+  if (data.next_competition_date !== undefined)
+    profileData.next_competition_date = data.next_competition_date
+      ? new Date(data.next_competition_date)
+      : null;
   if (data.emergency_contact !== undefined)
     profileData.emergency_contact = data.emergency_contact ?? null;
 
@@ -155,6 +175,9 @@ export async function PATCH(req: NextRequest) {
         state: true,
         birth_date: true,
         gender: true,
+        sport_level: true,
+        sport_goal: true,
+        next_competition_date: true,
         emergency_contact: true,
       },
     });
@@ -185,6 +208,9 @@ export async function PATCH(req: NextRequest) {
           state: true,
           birth_date: true,
           gender: true,
+          sport_level: true,
+          sport_goal: true,
+          next_competition_date: true,
           emergency_contact: true,
         },
       });

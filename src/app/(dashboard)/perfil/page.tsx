@@ -47,6 +47,13 @@ const BRAZILIAN_STATES = [
 ];
 
 const GENDER_LABELS: Record<string, string> = { M: "Masculino", F: "Feminino", O: "Outro" };
+const SPORT_LEVEL_LABELS: Record<string, string> = {
+  BEGINNER: "Iniciante",
+  INTERMEDIATE: "Intermediario",
+  ADVANCED: "Avancado",
+  ELITE: "Performance",
+};
+
 interface FormState {
   cpf: string;
   phone: string;
@@ -54,6 +61,9 @@ interface FormState {
   state: string;
   birth_date: string;
   gender: string;
+  sport_level: string;
+  sport_goal: string;
+  next_competition_date: string;
   ec_name: string;
   ec_phone: string;
   ec_relation: string;
@@ -67,6 +77,11 @@ function toFormState(identity: AthleteIdentity): FormState {
     state: identity.state ?? "",
     birth_date: identity.birthDate ? identity.birthDate.slice(0, 10) : "",
     gender: identity.gender ?? "",
+    sport_level: identity.sportLevel ?? "",
+    sport_goal: identity.sportGoal ?? "",
+    next_competition_date: identity.nextCompetitionDate
+      ? identity.nextCompetitionDate.slice(0, 10)
+      : "",
     ec_name: identity.emergencyContact?.name ?? "",
     ec_phone: identity.emergencyContact?.phone ?? "",
     ec_relation: identity.emergencyContact?.relation ?? "",
@@ -119,6 +134,9 @@ export default function PerfilPage() {
     state: "",
     birth_date: "",
     gender: "",
+    sport_level: "",
+    sport_goal: "",
+    next_competition_date: "",
     ec_name: "",
     ec_phone: "",
     ec_relation: "",
@@ -228,6 +246,11 @@ export default function PerfilPage() {
           state: form.state || null,
           birth_date: form.birth_date || null,
           gender: form.gender || null,
+          sport_level: form.sport_level
+            ? (form.sport_level as "BEGINNER" | "INTERMEDIATE" | "ADVANCED" | "ELITE")
+            : null,
+          sport_goal: form.sport_goal.trim() || null,
+          next_competition_date: form.next_competition_date || null,
           emergency_contact: hasEc
             ? {
                 name: form.ec_name.trim(),
@@ -562,6 +585,21 @@ export default function PerfilPage() {
                     label="GÃªnero"
                     value={identity.gender ? GENDER_LABELS[identity.gender] : null}
                   />
+                  <ProfileField
+                    label="Nivel esportivo"
+                    value={identity.sportLevel ? SPORT_LEVEL_LABELS[identity.sportLevel] : null}
+                  />
+                  <ProfileField label="Objetivo" value={identity.sportGoal} />
+                  <ProfileField
+                    label="Proxima prova alvo"
+                    value={
+                      identity.nextCompetitionDate
+                        ? new Date(identity.nextCompetitionDate).toLocaleDateString("pt-BR", {
+                            timeZone: "UTC",
+                          })
+                        : null
+                    }
+                  />
                 </div>
 
                 {identity.emergencyContact ? (
@@ -678,6 +716,54 @@ export default function PerfilPage() {
                       value={form.birth_date}
                       onChange={(e) => setForm((f) => ({ ...f, birth_date: e.target.value }))}
                     />
+                  </div>
+
+                  <div>
+                    <label className={labelClass()}>Nivel esportivo</label>
+                    <select
+                      className={inputClass()}
+                      value={form.sport_level}
+                      onChange={(e) => setForm((f) => ({ ...f, sport_level: e.target.value }))}
+                    >
+                      <option value="">Selecionar</option>
+                      <option value="BEGINNER">Iniciante</option>
+                      <option value="INTERMEDIATE">Intermediario</option>
+                      <option value="ADVANCED">Avancado</option>
+                      <option value="ELITE">Performance</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className={labelClass()}>Proxima prova alvo</label>
+                    <input
+                      className={inputClass()}
+                      type="date"
+                      value={form.next_competition_date}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, next_competition_date: e.target.value }))
+                      }
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className={labelClass()}>Meta principal</label>
+                    <select
+                      className={inputClass()}
+                      value={form.sport_goal}
+                      onChange={(e) => setForm((f) => ({ ...f, sport_goal: e.target.value }))}
+                    >
+                      <option value="">Selecionar</option>
+                      <option value="Correr minha primeira prova de 5K">Primeira prova de 5K</option>
+                      <option value="Evoluir para 10K com seguranca">Evoluir para 10K</option>
+                      <option value="Preparar minha primeira meia maratona 21K">
+                        Primeira meia maratona
+                      </option>
+                      <option value="Preparar maratona 42K">Maratona 42K</option>
+                      <option value="Melhorar pace e buscar recorde pessoal">
+                        Melhorar pace / RP
+                      </option>
+                      <option value="Correr por saude e consistencia">Saude e consistencia</option>
+                    </select>
                   </div>
                 </div>
 

@@ -7,7 +7,8 @@ import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/request-auth";
 
 function isNoticeManager(role: UserRole): boolean {
-  return role === UserRole.ADMIN;
+  const value = String(role);
+  return value === "ADMIN" || value === "MANAGER" || value === "MODERATOR";
 }
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {

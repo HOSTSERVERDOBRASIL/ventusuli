@@ -13,23 +13,23 @@ import { UserRole } from "@/types";
  */
 export default function AtletasLegacyRedirectPage() {
   const router = useRouter();
-  const { hydrated, userRole } = useAuthToken();
+  const { hydrated, userRoles } = useAuthToken();
 
   useEffect(() => {
     if (!hydrated) return;
 
-    if (userRole === UserRole.ADMIN) {
+    if (userRoles.includes(UserRole.ADMIN) || userRoles.includes(UserRole.MANAGER)) {
       router.replace("/admin/atletas");
       return;
     }
 
-    if (userRole === UserRole.COACH) {
+    if (userRoles.includes(UserRole.COACH)) {
       router.replace("/coach/atletas");
       return;
     }
 
     router.replace("/dashboard");
-  }, [hydrated, router, userRole]);
+  }, [hydrated, router, userRoles]);
 
   return (
     <main className="flex min-h-[40vh] items-center justify-center">

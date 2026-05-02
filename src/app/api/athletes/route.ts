@@ -21,7 +21,8 @@ const querySchema = z.object({
 });
 
 function canManageAthletes(role: UserRole): boolean {
-  return role === UserRole.ADMIN || role === UserRole.COACH;
+  const value = String(role);
+  return value === "ADMIN" || value === "MANAGER" || value === "COACH" || value === "SUPPORT";
 }
 
 function getInternalNote(value: unknown): string | null {

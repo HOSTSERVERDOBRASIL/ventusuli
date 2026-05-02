@@ -24,10 +24,21 @@ function statusFromFlag(flag: "COMPLETED" | "PARTIAL" | "MISSED") {
   return "MISSED";
 }
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: { id: string } },
-) {
+function mergeAthleteNotes(
+  current: string | null,
+  observation?: string | null,
+  discomfortNotes?: string | null,
+): string | null {
+  const feedbackNote = (observation || discomfortNotes || "").trim();
+  if (!feedbackNote) return current;
+
+  const entry = `[feedback] ${feedbackNote}`;
+  if (!current) return entry;
+  if (current.includes(entry)) return current;
+  return `${current}\n${entry}`;
+}
+
+export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = getAuthContext(req);
   if (!auth) return apiError("UNAUTHORIZED", "Token de acesso ausente.", 401);
 
@@ -54,6 +65,7 @@ export async function POST(
       id: true,
       training_plan_id: true,
       coach_id: true,
+      athlete_notes: true,
     },
   });
 
@@ -73,9 +85,12 @@ export async function POST(
         actual_distance_m: parsed.data.actualDistanceM ?? null,
         actual_pace: parsed.data.actualPace ?? null,
         actual_heart_rate: parsed.data.actualHeartRate ?? null,
-        athlete_notes: parsed.data.observation ?? parsed.data.discomfortNotes ?? null,
-        completed_at:
-          parsed.data.completedFlag === "MISSED" ? null : new Date(),
+        athlete_notes: mergeAthleteNotes(
+          session.athlete_notes,
+          parsed.data.observation,
+          parsed.data.discomfortNotes,
+        ),
+        completed_at: parsed.data.completedFlag === "MISSED" ? null : new Date(),
       },
     });
 
@@ -123,7 +138,8 @@ export async function POST(
         : (perceivedEffort ?? 0) >= 5
           ? {
               type: "LOAD_REDUCTION",
-              summary: "Esforco muito alto. Sugestao: reduzir intensidade ou inserir descanso adicional.",
+              summary:
+                "Esforco muito alto. Sugestao: reduzir intensidade ou inserir descanso adicional.",
               rationale: "RPE 5/5 sem margem de recuperacao aumenta risco de sobrecarga.",
             }
           : parsed.data.completedFlag === "COMPLETED" && (perceivedEffort ?? 0) <= 2
@@ -134,8 +150,10 @@ export async function POST(
               }
             : {
                 type: "MONITORING",
-                summary: "Sessao registrada com sucesso. Manter monitoramento e comparar proximas respostas.",
-                rationale: "Nao houve sinal critico, mas o historico deve orientar a revisao humana.",
+                summary:
+                  "Sessao registrada com sucesso. Manter monitoramento e comparar proximas respostas.",
+                rationale:
+                  "Nao houve sinal critico, mas o historico deve orientar a revisao humana.",
               };
 
     await tx.aIRecommendation.create({

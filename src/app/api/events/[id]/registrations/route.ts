@@ -2,10 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma, UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { apiError } from "@/lib/api-error";
+import { reverseEventPointsForRegistrationInTransaction } from "@/lib/points/pointsService";
 import { getAuthContext, isFinanceRole } from "@/lib/request-auth";
 
 function isAdminRole(role: UserRole): boolean {
-  return role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN;
+  const value = String(role);
+  return (
+    value === "ADMIN" ||
+    value === "SUPER_ADMIN" ||
+    value === "MANAGER" ||
+    value === "ORGANIZER"
+  );
 }
 
 interface RouteParams {
@@ -24,6 +31,10 @@ interface RegistrationAttendanceRow {
   attendance_status: string;
   attendance_checked_at: Date | null;
   attendance_checked_by: string | null;
+  check_in_at: Date | null;
+  check_in_distance_m: number | null;
+  check_out_at: Date | null;
+  check_out_distance_m: number | null;
 }
 
 function mapRegistration(row: RegistrationAttendanceRow) {
@@ -39,6 +50,10 @@ function mapRegistration(row: RegistrationAttendanceRow) {
     attendance_status: row.attendance_status,
     attendance_checked_at: row.attendance_checked_at,
     attendance_checked_by: row.attendance_checked_by,
+    check_in_at: row.check_in_at,
+    check_in_distance_m: row.check_in_distance_m,
+    check_out_at: row.check_out_at,
+    check_out_distance_m: row.check_out_distance_m,
   };
 }
 
@@ -55,7 +70,11 @@ async function getEventRegistrationRows(eventId: string, organizationId: string)
       r.registered_at,
       r.attendance_status::text AS attendance_status,
       r.attendance_checked_at,
-      checker.name AS attendance_checked_by
+      checker.name AS attendance_checked_by,
+      r.check_in_at,
+      r.check_in_distance_m,
+      r.check_out_at,
+      r.check_out_distance_m
     FROM public.registrations r
     INNER JOIN public.users athlete ON athlete.id = r.user_id
     INNER JOIN public.event_distances d ON d.id = r.distance_id
@@ -105,15 +124,21 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
   }
 
   const source = body as Record<string, unknown> | null;
-  const registrationId = typeof source?.registrationId === "string" ? source.registrationId.trim() : "";
+  const registrationId =
+    typeof source?.registrationId === "string" ? source.registrationId.trim() : "";
   const action = source?.action;
 
-  if (!registrationId || (action !== "MARK_PRESENT" && action !== "MARK_ABSENT" && action !== "RESET")) {
+  if (
+    !registrationId ||
+    (action !== "MARK_PRESENT" && action !== "MARK_ABSENT" && action !== "RESET")
+  ) {
     return apiError("VALIDATION_ERROR", "Dados invalidos para validar presenca.", 400);
   }
 
-  const existing = await prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
-    SELECT id
+  const existing = await prisma.$queryRaw<
+    Array<{ id: string; user_id: string; event_id: string }>
+  >(Prisma.sql`
+    SELECT id, user_id, event_id
     FROM public.registrations
     WHERE id = ${registrationId}
       AND event_id = ${params.id}
@@ -134,17 +159,54 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
 
   const checkedAt = action === "RESET" ? Prisma.sql`NULL` : Prisma.sql`NOW()`;
   const checkedBy = action === "RESET" ? Prisma.sql`NULL` : Prisma.sql`${auth.userId}`;
+  const resetCheckInFields =
+    action === "RESET"
+      ? Prisma.sql`,
+      check_in_at = NULL,
+      check_in_latitude = NULL,
+      check_in_longitude = NULL,
+      check_in_distance_m = NULL,
+      check_out_at = NULL,
+      check_out_latitude = NULL,
+      check_out_longitude = NULL,
+      check_out_distance_m = NULL`
+      : Prisma.empty;
 
-  await prisma.$executeRaw(Prisma.sql`
-    UPDATE public.registrations
-    SET
-      attendance_status = ${attendanceStatus},
-      attendance_checked_at = ${checkedAt},
-      attendance_checked_by = ${checkedBy}
-    WHERE id = ${registrationId}
-      AND event_id = ${params.id}
-      AND organization_id = ${auth.organizationId}
-  `);
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw(Prisma.sql`
+        UPDATE public.registrations
+        SET
+          attendance_status = ${attendanceStatus},
+          attendance_checked_at = ${checkedAt},
+          attendance_checked_by = ${checkedBy}
+          ${resetCheckInFields}
+        WHERE id = ${registrationId}
+          AND event_id = ${params.id}
+          AND organization_id = ${auth.organizationId}
+      `);
+
+      if (action !== "MARK_PRESENT") {
+        await reverseEventPointsForRegistrationInTransaction(tx, {
+          orgId: auth.organizationId,
+          userId: existing[0].user_id,
+          eventId: existing[0].event_id,
+          registrationId,
+          createdBy: auth.userId,
+        });
+      }
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "points_balance_cannot_be_negative") {
+      return apiError(
+        "VALIDATION_ERROR",
+        "Nao foi possivel alterar a presenca porque o atleta nao possui saldo suficiente para estornar os pontos desta prova.",
+        409,
+      );
+    }
+
+    return apiError("INTERNAL_ERROR", "Nao foi possivel atualizar presenca.", 500);
+  }
 
   const rows = await getEventRegistrationRows(params.id, auth.organizationId);
   const updated = rows.find((row) => row.registration_id === registrationId);

@@ -28,7 +28,7 @@ import {
 import { uploadImageFile } from "@/services/upload-service";
 import { UserRole } from "@/types";
 
-const ADMIN_ROLES = new Set<UserRole>([UserRole.ADMIN]);
+const ADMIN_ROLES = new Set<UserRole>([UserRole.ADMIN, UserRole.MANAGER]);
 const DEFAULT_ORG_LOGO = "/branding/ventu-suli-logo.png";
 const MAX_LOGO_FILE_SIZE = 2 * 1024 * 1024;
 type SettingsTab = "brand" | "access" | "finance" | "invites" | "summary";

@@ -1,7 +1,9 @@
 import { UserRole } from "@/types";
+import type { GamificationSnapshot } from "@/lib/gamification/types";
 
 export type EventStatus = "DRAFT" | "PUBLISHED" | "CANCELLED" | "FINISHED";
 export type RegistrationStatus = "INTERESTED" | "PENDING_PAYMENT" | "CONFIRMED" | "CANCELLED";
+export type AttendanceStatus = "PENDING" | "PRESENT" | "ABSENT";
 export type PaymentStatus = "PENDING" | "PAID" | "EXPIRED" | "REFUNDED" | "CANCELLED";
 export type DashboardCalendarEntryType = "RACE" | "DEADLINE" | "COMMITMENT";
 export type CommunityReactionType = "LIKE" | "FIRE" | "APPLAUSE";
@@ -118,10 +120,16 @@ export interface ServiceEvent {
   name: string;
   city: string;
   state: string;
+  address?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  check_in_radius_m?: number;
+  proximity_radius_m?: number;
   event_date: string;
   registration_deadline?: string | null;
   description?: string | null;
   image_url?: string | null;
+  external_url?: string | null;
   status: EventStatus;
   distances: ServiceEventDistance[];
   registrations_count: number;
@@ -131,10 +139,16 @@ export interface EventUpsertPayload {
   name: string;
   city: string;
   state: string;
+  address?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  check_in_radius_m?: number;
+  proximity_radius_m?: number;
   event_date: string;
   registration_deadline?: string;
   description?: string;
   image_url?: string;
+  external_url?: string;
   distances: Array<{
     label: string;
     distance_km: number;
@@ -243,6 +257,7 @@ export interface DashboardData {
         position: number;
       }>;
     };
+    gamification: GamificationSnapshot;
     communityPreview: CommunityFeedData;
   };
   experienceSource?: "LIVE" | "EMPTY";
@@ -268,6 +283,9 @@ export interface AthleteIdentity {
   state: string | null;
   birthDate: string | null;
   gender: string | null;
+  sportLevel?: SportLevel | null;
+  sportGoal?: string | null;
+  nextCompetitionDate?: string | null;
   athleteStatus?: "PENDING_APPROVAL" | "ACTIVE" | "REJECTED" | "BLOCKED" | null;
   signupSource?: "SLUG" | "INVITE" | "ADMIN" | null;
   onboardingCompletedAt?: string | null;
@@ -497,6 +515,13 @@ export interface CreateAthleteByAdminResponse {
 export interface AthleteDetailRegistration {
   id: string;
   status: RegistrationStatus;
+  attendanceStatus: AttendanceStatus;
+  attendanceCheckedAt: string | null;
+  attendanceCheckedBy: string | null;
+  checkInAt: string | null;
+  checkInDistanceM: number | null;
+  checkOutAt: string | null;
+  checkOutDistanceM: number | null;
   registeredAt: string;
   event: {
     id: string;
@@ -544,6 +569,10 @@ export interface AthleteDetail {
     registrationsCount: number;
     paidAmountCents: number;
     pendingAmountCents: number;
+    presentCount: number;
+    absentCount: number;
+    pendingAttendanceCount: number;
+    participationRate: number;
     nextEventName: string | null;
     nextEventDate: string | null;
   };
@@ -632,6 +661,7 @@ export interface TrainingSessionSummary {
   perceivedEffort: number | null;
   coachNotes: string | null;
   athleteNotes: string | null;
+  startedAt: string | null;
   completedAt: string | null;
   exercises: TrainingDayExercise[];
   feedback: TrainingSessionFeedback | null;

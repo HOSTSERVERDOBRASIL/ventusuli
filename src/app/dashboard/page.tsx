@@ -13,8 +13,14 @@ import { UserRole } from "@/types";
  * Routes:
  *   SUPER_ADMIN                   â†’  /super-admin
  *   ADMIN                        â†’  /admin
+ *   MANAGER                      â†’  /gestor
  *   FINANCE                      â†’  /admin/financeiro
+ *   ORGANIZER                    â†’  /organizador
  *   COACH                        â†’  /coach
+ *   SUPPORT                      â†’  /suporte
+ *   MODERATOR                    â†’  /moderador
+ *   PARTNER                      â†’  /parceiro
+ *   PREMIUM_ATHLETE              â†’  /premium
  *   ATHLETE with CPF             â†’  /  (main athlete dashboard)
  *   ATHLETE without CPF          â†’  /onboarding/atleta
  *   Unauthenticated              â†’  /login
@@ -41,13 +47,43 @@ export default function DashboardDispatcher() {
       return;
     }
 
+    if (userRoles.includes(UserRole.MANAGER)) {
+      router.replace("/gestor");
+      return;
+    }
+
     if (userRoles.includes(UserRole.FINANCE)) {
       router.replace("/admin/financeiro");
       return;
     }
 
+    if (userRoles.includes(UserRole.ORGANIZER)) {
+      router.replace("/organizador");
+      return;
+    }
+
     if (userRoles.includes(UserRole.COACH)) {
       router.replace("/coach");
+      return;
+    }
+
+    if (userRoles.includes(UserRole.SUPPORT)) {
+      router.replace("/suporte");
+      return;
+    }
+
+    if (userRoles.includes(UserRole.MODERATOR)) {
+      router.replace("/moderador");
+      return;
+    }
+
+    if (userRoles.includes(UserRole.PARTNER)) {
+      router.replace("/parceiro");
+      return;
+    }
+
+    if (userRoles.includes(UserRole.PREMIUM_ATHLETE)) {
+      router.replace("/premium");
       return;
     }
 

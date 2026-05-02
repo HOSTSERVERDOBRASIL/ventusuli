@@ -33,14 +33,40 @@ import { AthleteDetail, ServiceEvent } from "@/services/types";
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
 function toneFromStatus(status: string): "positive" | "warning" | "danger" | "neutral" {
-  if (status === "PAID" || status === "CONFIRMED" || status === "PUBLISHED" || status === "ACTIVE")
+  if (
+    status === "PAID" ||
+    status === "CONFIRMED" ||
+    status === "PUBLISHED" ||
+    status === "ACTIVE" ||
+    status === "PRESENT"
+  )
     return "positive";
-  if (status === "PENDING" || status === "PENDING_PAYMENT" || status === "DRAFT" || status === "PENDING_APPROVAL")
+  if (
+    status === "PENDING" ||
+    status === "PENDING_PAYMENT" ||
+    status === "DRAFT" ||
+    status === "PENDING_APPROVAL"
+  )
     return "warning";
-  if (status === "CANCELLED" || status === "EXPIRED" || status === "REJECTED" || status === "BLOCKED")
+  if (
+    status === "CANCELLED" ||
+    status === "EXPIRED" ||
+    status === "REJECTED" ||
+    status === "BLOCKED" ||
+    status === "ABSENT"
+  )
     return "danger";
   return "neutral";
 }
+
+const ATTENDANCE_LABEL: Record<
+  NonNullable<AthleteDetail>["registrations"][number]["attendanceStatus"],
+  string
+> = {
+  PENDING: "Pendente",
+  PRESENT: "Presente",
+  ABSENT: "Ausente",
+};
 
 function athleteStatusLabel(status: AthleteDetail["profile"]["athleteStatus"]): string {
   if (status === "ACTIVE") return "Ativo";
@@ -163,6 +189,25 @@ export default function AtletaDetalhePage() {
       cell: (row) =>
         row.payment ? <StatusBadge tone={toneFromStatus(row.payment.status)} label={row.payment.status} /> : "-",
       className: "min-w-[130px]",
+    },
+    {
+      key: "attendance",
+      header: "Participacao",
+      cell: (row) => (
+        <div className="space-y-1">
+          <StatusBadge
+            tone={toneFromStatus(row.attendanceStatus)}
+            label={ATTENDANCE_LABEL[row.attendanceStatus]}
+          />
+          {row.checkInAt ? (
+            <p className="text-[11px] text-slate-400">
+              Check-in {format(new Date(row.checkInAt), "HH:mm", { locale: ptBR })}
+              {row.checkInDistanceM != null ? ` | ${row.checkInDistanceM}m` : ""}
+            </p>
+          ) : null}
+        </div>
+      ),
+      className: "min-w-[150px]",
     },
     {
       key: "amount",
@@ -309,10 +354,18 @@ export default function AtletaDetalhePage() {
         </div>
       ) : null}
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <div className="rounded-xl border border-white/10 bg-[#0f233d] p-3">
           <p className="text-xs uppercase tracking-wide text-slate-300">Inscrições</p>
           <p className="mt-2 text-2xl font-bold text-white">{athlete.summary.registrationsCount}</p>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-[#0f233d] p-3">
+          <p className="text-xs uppercase tracking-wide text-slate-300">Participacao</p>
+          <p className="mt-2 text-2xl font-bold text-white">{athlete.summary.participationRate}%</p>
+          <p className="mt-1 text-xs text-slate-300">
+            {athlete.summary.presentCount} presentes / {athlete.summary.absentCount} ausentes /{" "}
+            {athlete.summary.pendingAttendanceCount} pendentes
+          </p>
         </div>
         <div className="rounded-xl border border-white/10 bg-[#0f233d] p-3">
           <p className="text-xs uppercase tracking-wide text-slate-300">Pendente</p>
@@ -484,7 +537,7 @@ export default function AtletaDetalhePage() {
         </SectionCard>
       </div>
 
-      <SectionCard title="Histórico" description="Inscrições e pagamentos do atleta">
+      <SectionCard title="Histórico" description="Inscrições, pagamentos e participacao do atleta">
         {athlete.registrations.length === 0 ? (
           <EmptyState title="Sem histórico" description="Este atleta ainda não possui inscrições registradas." />
         ) : (

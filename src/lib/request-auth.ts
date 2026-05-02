@@ -2,7 +2,19 @@
 import type { UserRole } from "@prisma/client";
 import { ACCESS_TOKEN_COOKIE } from "@/lib/cookies";
 
-const ROLE_VALUES: readonly UserRole[] = ["SUPER_ADMIN", "ADMIN", "FINANCE", "COACH", "ATHLETE"];
+const ROLE_VALUES = [
+  "SUPER_ADMIN",
+  "ADMIN",
+  "FINANCE",
+  "COACH",
+  "ATHLETE",
+  "ORGANIZER",
+  "MANAGER",
+  "PREMIUM_ATHLETE",
+  "SUPPORT",
+  "MODERATOR",
+  "PARTNER",
+] as const;
 
 export interface AuthContext {
   userId: string;
@@ -17,8 +29,8 @@ export type AccessTokenPrecedence = "bearer-first" | "cookie-first";
 
 function parseRole(raw: string | null): UserRole | null {
   if (!raw) return null;
-  const role = raw.toUpperCase() as UserRole;
-  return ROLE_VALUES.includes(role) ? role : null;
+  const role = raw.toUpperCase();
+  return ROLE_VALUES.includes(role as (typeof ROLE_VALUES)[number]) ? (role as UserRole) : null;
 }
 
 function parseRoles(raw: string | null, fallback: UserRole): UserRole[] {
@@ -64,17 +76,32 @@ export function getAuthContext(req: NextRequest): AuthContext | null {
 }
 
 export function isAdminRole(role: UserRole): boolean {
-  return role === "ADMIN";
+  const value = String(role);
+  return (
+    value === "ADMIN" ||
+    value === "MANAGER" ||
+    value === "MODERATOR" ||
+    value === "PARTNER"
+  );
 }
 
 export function isFinanceRole(role: UserRole): boolean {
-  return role === "ADMIN" || role === "FINANCE";
+  const value = String(role);
+  return value === "ADMIN" || value === "FINANCE" || value === "MANAGER";
 }
 
 export function isStaffRole(role: UserRole): boolean {
-  return role === "ADMIN" || role === "FINANCE" || role === "COACH";
+  const value = String(role);
+  return (
+    value === "ADMIN" ||
+    value === "FINANCE" ||
+    value === "COACH" ||
+    value === "MANAGER" ||
+    value === "ORGANIZER" ||
+    value === "SUPPORT"
+  );
 }
 
 export function isSuperAdminRole(role: UserRole): boolean {
-  return role === "SUPER_ADMIN";
+  return String(role) === "SUPER_ADMIN";
 }

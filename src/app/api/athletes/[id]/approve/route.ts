@@ -8,7 +8,7 @@ interface RouteParams {
 }
 
 function canManageAthletes(role: string): boolean {
-  return role === "ADMIN";
+  return role === "ADMIN" || role === "MANAGER";
 }
 
 export async function POST(req: NextRequest, { params }: RouteParams) {

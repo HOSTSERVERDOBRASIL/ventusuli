@@ -16,6 +16,9 @@ export default function OnboardingAtletaPage() {
   const [phone, setPhone] = useState("");
   const [city, setCity] = useState("");
   const [stateUf, setStateUf] = useState("");
+  const [sportLevel, setSportLevel] = useState("BEGINNER");
+  const [sportGoal, setSportGoal] = useState("Correr minha primeira prova de 5K");
+  const [nextCompetitionDate, setNextCompetitionDate] = useState("");
   const [cpfError, setCpfError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
@@ -67,6 +70,9 @@ export default function OnboardingAtletaPage() {
           cpf: digits,
           city: city.trim(),
           state: stateUf.trim().toUpperCase(),
+          sport_level: sportLevel as "BEGINNER" | "INTERMEDIATE" | "ADVANCED" | "ELITE",
+          sport_goal: sportGoal.trim() || null,
+          next_competition_date: nextCompetitionDate || null,
           ...(phone.trim() ? { phone: phone.trim() } : {}),
         },
         accessToken,
@@ -107,7 +113,7 @@ export default function OnboardingAtletaPage() {
   }
 
   return (
-    <div className="mx-auto max-w-lg space-y-8 py-10 text-white">
+    <div className="mx-auto max-w-3xl space-y-8 py-10 text-white">
       {/* Header */}
       <div className="text-center">
         <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-[#2f5d8f] bg-[#0f233d]">
@@ -117,8 +123,8 @@ export default function OnboardingAtletaPage() {
           Bem-vindo{currentUser?.name ? `, ${currentUser.name.split(" ")[0]}` : ""}!
         </h1>
         <p className="mt-2 text-sm text-[#8eb0dc]">
-          Para se inscrever em provas e confirmar pagamentos, precisamos do seu CPF.
-          {" "}Tambem precisamos da sua cidade e UF para completar seu cadastro.
+          Para recomendar provas, treinos e metas melhores, precisamos do seu CPF,
+          cidade, UF e objetivo de corrida.
           <br />
           Leva menos de 30 segundos.
         </p>
@@ -132,6 +138,19 @@ export default function OnboardingAtletaPage() {
           <li>Confirmação de inscrição na prova</li>
           <li>Identificação no kit e na largada</li>
         </ul>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-3">
+        {[
+          { title: "Pagamento", text: "CPF libera inscricao e cobranca PIX." },
+          { title: "Prova certa", text: "Nivel e objetivo calibram as recomendacoes." },
+          { title: "Seguranca", text: "Cidade e contato ajudam a assessoria na operacao." },
+        ].map((item) => (
+          <div key={item.title} className="rounded-xl border border-[#24486f] bg-[#0a1d36] p-4">
+            <p className="text-sm font-semibold text-[#c4d8f6]">{item.title}</p>
+            <p className="mt-2 text-xs leading-5 text-[#8eb0dc]">{item.text}</p>
+          </div>
+        ))}
       </div>
 
       {/* Form */}
@@ -192,6 +211,59 @@ export default function OnboardingAtletaPage() {
               onChange={(e) => setStateUf(e.target.value.toUpperCase())}
               className="w-full rounded-xl border border-[#24486f] bg-[#0f233d] px-4 py-3 text-base text-white placeholder:text-[#4a7fa8] focus:outline-none focus:ring-2 focus:ring-[#3a8fd4]"
             />
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-[#24486f] bg-[#0a1d36] p-4">
+          <p className="mb-3 text-xs uppercase tracking-wide text-[#8eb0dc]">
+            Objetivo de corrida
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs uppercase tracking-wide text-[#8eb0dc]">
+                Nivel atual
+              </label>
+              <select
+                value={sportLevel}
+                onChange={(e) => setSportLevel(e.target.value)}
+                className="w-full rounded-xl border border-[#24486f] bg-[#0f233d] px-4 py-3 text-base text-white focus:outline-none focus:ring-2 focus:ring-[#3a8fd4]"
+              >
+                <option value="BEGINNER">Iniciante</option>
+                <option value="INTERMEDIATE">Intermediario</option>
+                <option value="ADVANCED">Avancado</option>
+                <option value="ELITE">Performance</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs uppercase tracking-wide text-[#8eb0dc]">
+                Proxima prova alvo
+              </label>
+              <input
+                type="date"
+                value={nextCompetitionDate}
+                onChange={(e) => setNextCompetitionDate(e.target.value)}
+                className="w-full rounded-xl border border-[#24486f] bg-[#0f233d] px-4 py-3 text-base text-white focus:outline-none focus:ring-2 focus:ring-[#3a8fd4]"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-xs uppercase tracking-wide text-[#8eb0dc]">
+                Meta principal
+              </label>
+              <select
+                value={sportGoal}
+                onChange={(e) => setSportGoal(e.target.value)}
+                className="w-full rounded-xl border border-[#24486f] bg-[#0f233d] px-4 py-3 text-base text-white focus:outline-none focus:ring-2 focus:ring-[#3a8fd4]"
+              >
+                <option value="Correr minha primeira prova de 5K">Primeira prova de 5K</option>
+                <option value="Evoluir para 10K com seguranca">Evoluir para 10K</option>
+                <option value="Preparar minha primeira meia maratona 21K">
+                  Primeira meia maratona
+                </option>
+                <option value="Preparar maratona 42K">Maratona 42K</option>
+                <option value="Melhorar pace e buscar recorde pessoal">Melhorar pace / RP</option>
+                <option value="Correr por saude e consistencia">Saude e consistencia</option>
+              </select>
+            </div>
           </div>
         </div>
 

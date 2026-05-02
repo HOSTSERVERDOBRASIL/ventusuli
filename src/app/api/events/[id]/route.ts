@@ -6,44 +6,75 @@ import { apiError } from "@/lib/api-error";
 import { getAuthContext } from "@/lib/request-auth";
 import { isAllowedImageUrl } from "@/lib/storage/image-url";
 
-const patchEventSchema = z.object({
-  name: z.string().trim().min(3).optional(),
-  city: z.string().trim().min(1).optional(),
-  state: z
-    .string()
-    .trim()
-    .length(2)
-    .transform((v) => v.toUpperCase())
-    .optional(),
-  address: z.string().trim().max(255).nullable().optional(),
-  event_date: z.string().datetime().optional(),
-  registration_deadline: z.string().datetime().nullable().optional(),
-  description: z.string().trim().max(5000).nullable().optional(),
-  image_url: z
-    .string()
-    .trim()
-    .min(1)
-    .refine((value) => isAllowedImageUrl(value), {
-      message: "Imagem da prova invalida. Use upload oficial ou URL http/https.",
-    })
-    .nullable()
-    .optional(),
-  external_url: z.string().url().nullable().optional(),
-  status: z.nativeEnum(EventStatus).optional(),
-  distances: z
-    .array(
-      z.object({
-        label: z.string().trim().min(1).max(50),
-        distance_km: z.number().positive(),
-        price_cents: z.number().int().min(0),
-        max_slots: z.number().int().positive().nullable().optional(),
-      }),
-    )
-    .optional(),
-});
+const patchEventSchema = z
+  .object({
+    name: z.string().trim().min(3).optional(),
+    city: z.string().trim().min(1).optional(),
+    state: z
+      .string()
+      .trim()
+      .length(2)
+      .transform((v) => v.toUpperCase())
+      .optional(),
+    address: z.string().trim().max(255).nullable().optional(),
+    latitude: z.number().min(-90).max(90).nullable().optional(),
+    longitude: z.number().min(-180).max(180).nullable().optional(),
+    check_in_radius_m: z.number().int().min(25).max(1000).optional(),
+    proximity_radius_m: z.number().int().min(50).max(2000).optional(),
+    event_date: z.string().datetime().optional(),
+    registration_deadline: z.string().datetime().nullable().optional(),
+    description: z.string().trim().max(5000).nullable().optional(),
+    image_url: z
+      .string()
+      .trim()
+      .min(1)
+      .refine((value) => isAllowedImageUrl(value), {
+        message: "Imagem da prova invalida. Use upload oficial ou URL http/https.",
+      })
+      .nullable()
+      .optional(),
+    external_url: z.string().url().nullable().optional(),
+    status: z.nativeEnum(EventStatus).optional(),
+    distances: z
+      .array(
+        z.object({
+          label: z.string().trim().min(1).max(50),
+          distance_km: z.number().positive(),
+          price_cents: z.number().int().min(0),
+          max_slots: z.number().int().positive().nullable().optional(),
+        }),
+      )
+      .optional(),
+  })
+  .refine(
+    (value) => {
+      const hasLatitude = value.latitude !== undefined;
+      const hasLongitude = value.longitude !== undefined;
+      if (hasLatitude !== hasLongitude) return false;
+      return !hasLatitude || (value.latitude == null) === (value.longitude == null);
+    },
+    {
+      message: "Informe latitude e longitude do ponto exato da prova.",
+    },
+  )
+  .refine(
+    (value) =>
+      value.check_in_radius_m === undefined ||
+      value.proximity_radius_m === undefined ||
+      value.proximity_radius_m >= value.check_in_radius_m,
+    {
+      message: "O raio de proximidade deve ser maior ou igual ao raio de check-in.",
+    },
+  );
 
 function isAdminRole(role: UserRole): boolean {
-  return role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN;
+  const value = String(role);
+  return (
+    value === "ADMIN" ||
+    value === "SUPER_ADMIN" ||
+    value === "MANAGER" ||
+    value === "ORGANIZER"
+  );
 }
 
 function prismaToApiError(error: unknown): NextResponse {
@@ -122,7 +153,11 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
 
   const parsed = patchEventSchema.safeParse(body);
   if (!parsed.success) {
-    return apiError("VALIDATION_ERROR", parsed.error.errors[0]?.message ?? "Dados invÃ¡lidos.", 400);
+    return apiError(
+      "VALIDATION_ERROR",
+      parsed.error.errors[0]?.message ?? "Dados invÃ¡lidos.",
+      400,
+    );
   }
 
   const input = parsed.data;
@@ -146,9 +181,23 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
       ? targetDistanceLabels.length
       : current.distances.length;
     const nextStatus = input.status ?? current.status;
+    const finalLatitude = input.latitude !== undefined ? input.latitude : current.latitude;
+    const finalLongitude = input.longitude !== undefined ? input.longitude : current.longitude;
+    const finalCheckInRadius = input.check_in_radius_m ?? current.check_in_radius_m;
+    const finalProximityRadius = input.proximity_radius_m ?? current.proximity_radius_m;
 
     if (nextStatus === EventStatus.PUBLISHED && finalDistancesCount < 1) {
       return apiError("VALIDATION_ERROR", "Prova publicada deve ter ao menos uma distÃ¢ncia.", 400);
+    }
+    if (finalProximityRadius < finalCheckInRadius) {
+      return apiError(
+        "VALIDATION_ERROR",
+        "O raio de proximidade deve ser maior ou igual ao raio de check-in.",
+        400,
+      );
+    }
+    if (nextStatus === EventStatus.PUBLISHED && (finalLatitude == null || finalLongitude == null)) {
+      return apiError("VALIDATION_ERROR", "Informe o ponto exato da prova antes de publicar.", 400);
     }
 
     await prisma.$transaction(async (tx) => {
@@ -159,6 +208,14 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
           ...(input.city !== undefined ? { city: input.city } : {}),
           ...(input.state !== undefined ? { state: input.state } : {}),
           ...(input.address !== undefined ? { address: input.address } : {}),
+          ...(input.latitude !== undefined ? { latitude: input.latitude } : {}),
+          ...(input.longitude !== undefined ? { longitude: input.longitude } : {}),
+          ...(input.check_in_radius_m !== undefined
+            ? { check_in_radius_m: input.check_in_radius_m }
+            : {}),
+          ...(input.proximity_radius_m !== undefined
+            ? { proximity_radius_m: input.proximity_radius_m }
+            : {}),
           ...(input.event_date !== undefined ? { event_date: new Date(input.event_date) } : {}),
           ...(input.registration_deadline !== undefined
             ? {

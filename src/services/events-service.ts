@@ -15,11 +15,17 @@ interface ApiEventInput {
   name: string;
   city: string | null;
   state: string | null;
+  address?: string | null;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+  check_in_radius_m?: number | null;
+  proximity_radius_m?: number | null;
   event_date: string;
   registration_deadline?: string | null;
   status: string;
   description?: string | null;
   image_url?: string | null;
+  external_url?: string | null;
   distances: ApiEventDistanceInput[];
   registrations_count?: number;
 }
@@ -44,6 +50,10 @@ export interface ServiceEventRegistration {
   attendance_status: "PENDING" | "PRESENT" | "ABSENT";
   attendance_checked_at?: string | null;
   attendance_checked_by?: string | null;
+  check_in_at?: string | null;
+  check_in_distance_m?: number | null;
+  check_out_at?: string | null;
+  check_out_distance_m?: number | null;
 }
 
 interface EventRegistrationsApiResponse {
@@ -68,16 +78,28 @@ function normalizeDistance(distance: ApiEventDistanceInput): ServiceEventDistanc
   };
 }
 
+function normalizeOptionalNumber(value: number | string | null | undefined): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = typeof value === "string" ? Number(value) : value;
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function mapApiEvent(event: ApiEventInput): ServiceEvent {
   return {
     id: event.id,
     name: event.name,
     city: event.city ?? "",
     state: event.state ?? "",
+    address: event.address ?? null,
+    latitude: normalizeOptionalNumber(event.latitude),
+    longitude: normalizeOptionalNumber(event.longitude),
+    check_in_radius_m: event.check_in_radius_m ?? 100,
+    proximity_radius_m: event.proximity_radius_m ?? 200,
     event_date: event.event_date,
     registration_deadline: event.registration_deadline ?? null,
     description: event.description ?? null,
     image_url: event.image_url ?? null,
+    external_url: event.external_url ?? null,
     status: event.status as ServiceEvent["status"],
     distances: event.distances.map(normalizeDistance),
     registrations_count: event.registrations_count ?? 0,

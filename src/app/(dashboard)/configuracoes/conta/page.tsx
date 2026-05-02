@@ -28,7 +28,7 @@ function stravaStatusLabel(status: StravaConnectionStatus | null): string {
 }
 
 export default function ConfiguracoesContaPage() {
-  const { accessToken, userRole } = useAuthToken();
+  const { accessToken, userRole, userRoles } = useAuthToken();
   const [stravaStatus, setStravaStatus] = useState<StravaConnectionStatus | null>(null);
   const [stravaError, setStravaError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -38,7 +38,11 @@ export default function ConfiguracoesContaPage() {
   const [creatingInvite, setCreatingInvite] = useState(false);
   const [lastInvite, setLastInvite] = useState<OrgInvite | null>(null);
 
-  const isAthlete = userRole === UserRole.ATHLETE;
+  const isAthlete =
+    userRole === UserRole.ATHLETE ||
+    userRole === UserRole.PREMIUM_ATHLETE ||
+    userRoles.includes(UserRole.ATHLETE) ||
+    userRoles.includes(UserRole.PREMIUM_ATHLETE);
   const stravaUnavailable = Boolean(stravaStatus?.unavailable);
 
   const loadStatus = async () => {

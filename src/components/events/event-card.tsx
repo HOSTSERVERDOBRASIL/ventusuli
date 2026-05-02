@@ -3,6 +3,8 @@ import { ptBR } from "date-fns/locale";
 import { CalendarDays, MapPin, Users } from "lucide-react";
 import { EventStatusBadge } from "@/components/events/event-status-badge";
 import { type EventView } from "@/components/events/types";
+import { StatusBadge } from "@/components/system/status-badge";
+import type { RaceRecommendationTone } from "@/lib/race-recommendations";
 
 const currency = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -11,11 +13,16 @@ export function EventCard({
   mode = "athlete",
   ctaLabel,
   ctaDisabled,
+  recommendation,
 }: {
   event: EventView;
   mode?: "admin" | "athlete";
   ctaLabel?: string;
   ctaDisabled?: boolean;
+  recommendation?: {
+    label: string;
+    tone: RaceRecommendationTone;
+  } | null;
 }) {
   const defaultLabel = mode === "admin" ? "Gerenciar" : "Ver detalhes";
   const minPrice = event.distances.reduce(
@@ -49,6 +56,11 @@ export function EventCard({
         <div className="absolute left-3 top-3">
           <EventStatusBadge status={event.status} />
         </div>
+        {recommendation ? (
+          <div className="absolute right-3 top-3">
+            <StatusBadge label={recommendation.label} tone={recommendation.tone} />
+          </div>
+        ) : null}
 
         {/* Title + city pinned to bottom of image */}
         <div className="absolute bottom-0 left-0 right-0 p-3">

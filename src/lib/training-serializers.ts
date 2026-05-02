@@ -52,6 +52,7 @@ export function mapTrainingSession(
     perceived_effort: number | null;
     coach_notes: string | null;
     athlete_notes: string | null;
+    started_at: Date | null;
     completed_at: Date | null;
     training_day: {
       id: string;
@@ -105,6 +106,7 @@ export function mapTrainingSession(
     perceivedEffort: session.perceived_effort,
     coachNotes: session.coach_notes,
     athleteNotes: session.athlete_notes,
+    startedAt: session.started_at?.toISOString() ?? null,
     completedAt: session.completed_at?.toISOString() ?? null,
     exercises: session.training_day.items.map((item) => ({
       id: item.id,
@@ -177,6 +179,7 @@ export function mapTrainingPlan(
           perceived_effort: number | null;
           coach_notes: string | null;
           athlete_notes: string | null;
+          started_at: Date | null;
           completed_at: Date | null;
           feedback: {
             id: string;
@@ -253,6 +256,7 @@ export function mapTrainingPlan(
           perceived_effort: session?.perceived_effort ?? null,
           coach_notes: session?.coach_notes ?? null,
           athlete_notes: session?.athlete_notes ?? null,
+          started_at: session?.started_at ?? null,
           completed_at: session?.completed_at ?? null,
           feedback: session?.feedback ?? null,
           training_day: {

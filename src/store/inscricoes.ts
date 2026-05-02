@@ -12,10 +12,20 @@ export interface Inscricao {
   eventId: string;
   eventName: string;
   eventDate: string;
+  eventAddress?: string | null;
+  eventLatitude?: number | null;
+  eventLongitude?: number | null;
+  checkInRadiusM?: number;
+  proximityRadiusM?: number;
   distanceLabel: string;
   status: RegistrationStatus;
   paymentStatus: PaymentStatus;
   amountCents: number;
+  attendanceStatus?: "PENDING" | "PRESENT" | "ABSENT";
+  checkInAt?: string | null;
+  checkInDistanceM?: number | null;
+  checkOutAt?: string | null;
+  checkOutDistanceM?: number | null;
 }
 
 interface InscricoesState {
@@ -67,20 +77,19 @@ export const useInscricoesStore = create<InscricoesState>()(
         } catch {
           return;
         }
-        const normalized: Inscricao[] = parsed
-          .filter((item): item is Inscricao => {
-            return Boolean(
-              item &&
-                item.id &&
-                item.eventId &&
-                item.eventName &&
-                item.eventDate &&
-                item.distanceLabel &&
-                item.status &&
-                item.paymentStatus &&
-                typeof item.amountCents === "number",
-            );
-          });
+        const normalized: Inscricao[] = parsed.filter((item): item is Inscricao => {
+          return Boolean(
+            item &&
+            item.id &&
+            item.eventId &&
+            item.eventName &&
+            item.eventDate &&
+            item.distanceLabel &&
+            item.status &&
+            item.paymentStatus &&
+            typeof item.amountCents === "number",
+          );
+        });
 
         if (normalized.length === 0) return;
 

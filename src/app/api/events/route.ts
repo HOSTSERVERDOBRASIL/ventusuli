@@ -14,42 +14,59 @@ const listQuerySchema = z.object({
   search: z.string().trim().min(1).max(120).optional(),
 });
 
-const createEventSchema = z.object({
-  name: z.string().trim().min(3, "Nome deve ter ao menos 3 caracteres"),
-  city: z.string().trim().min(1, "Cidade Ã© obrigatÃ³ria"),
-  state: z
-    .string()
-    .trim()
-    .length(2, "Estado deve ter 2 caracteres")
-    .transform((v) => v.toUpperCase()),
-  address: z.string().trim().max(255).optional(),
-  event_date: z.string().datetime(),
-  registration_deadline: z.string().datetime().optional(),
-  description: z.string().trim().max(5000).optional(),
-  image_url: z
-    .string()
-    .trim()
-    .min(1)
-    .refine((value) => isAllowedImageUrl(value), {
-      message: "Imagem da prova invalida. Use upload oficial ou URL http/https.",
-    })
-    .optional(),
-  external_url: z.string().url().optional(),
-  status: z.nativeEnum(EventStatus).optional(),
-  distances: z
-    .array(
-      z.object({
-        label: z.string().trim().min(1).max(50),
-        distance_km: z.number().positive(),
-        price_cents: z.number().int().min(0),
-        max_slots: z.number().int().positive().optional(),
-      }),
-    )
-    .min(1, "Informe ao menos uma distÃ¢ncia"),
-});
+const createEventSchema = z
+  .object({
+    name: z.string().trim().min(3, "Nome deve ter ao menos 3 caracteres"),
+    city: z.string().trim().min(1, "Cidade Ã© obrigatÃ³ria"),
+    state: z
+      .string()
+      .trim()
+      .length(2, "Estado deve ter 2 caracteres")
+      .transform((v) => v.toUpperCase()),
+    address: z.string().trim().max(255).optional(),
+    latitude: z.number().min(-90).max(90).nullable().optional(),
+    longitude: z.number().min(-180).max(180).nullable().optional(),
+    check_in_radius_m: z.number().int().min(25).max(1000).optional(),
+    proximity_radius_m: z.number().int().min(50).max(2000).optional(),
+    event_date: z.string().datetime(),
+    registration_deadline: z.string().datetime().optional(),
+    description: z.string().trim().max(5000).optional(),
+    image_url: z
+      .string()
+      .trim()
+      .min(1)
+      .refine((value) => isAllowedImageUrl(value), {
+        message: "Imagem da prova invalida. Use upload oficial ou URL http/https.",
+      })
+      .optional(),
+    external_url: z.string().url().optional(),
+    status: z.nativeEnum(EventStatus).optional(),
+    distances: z
+      .array(
+        z.object({
+          label: z.string().trim().min(1).max(50),
+          distance_km: z.number().positive(),
+          price_cents: z.number().int().min(0),
+          max_slots: z.number().int().positive().optional(),
+        }),
+      )
+      .min(1, "Informe ao menos uma distÃ¢ncia"),
+  })
+  .refine((value) => (value.latitude == null) === (value.longitude == null), {
+    message: "Informe latitude e longitude do ponto exato da prova.",
+  })
+  .refine((value) => (value.proximity_radius_m ?? 200) >= (value.check_in_radius_m ?? 100), {
+    message: "O raio de proximidade deve ser maior ou igual ao raio de check-in.",
+  });
 
 function isAdminRole(role: UserRole): boolean {
-  return role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN;
+  const value = String(role);
+  return (
+    value === "ADMIN" ||
+    value === "SUPER_ADMIN" ||
+    value === "MANAGER" ||
+    value === "ORGANIZER"
+  );
 }
 
 function prismaToApiError(error: unknown): NextResponse {
@@ -153,10 +170,21 @@ export async function POST(req: NextRequest) {
 
   const parsed = createEventSchema.safeParse(body);
   if (!parsed.success) {
-    return apiError("VALIDATION_ERROR", parsed.error.errors[0]?.message ?? "Dados invÃ¡lidos.", 400);
+    return apiError(
+      "VALIDATION_ERROR",
+      parsed.error.errors[0]?.message ?? "Dados invÃ¡lidos.",
+      400,
+    );
   }
 
   const input = parsed.data;
+
+  if (
+    input.status === EventStatus.PUBLISHED &&
+    (input.latitude == null || input.longitude == null)
+  ) {
+    return apiError("VALIDATION_ERROR", "Informe o ponto exato da prova antes de publicar.", 400);
+  }
 
   try {
     const eventId = await prisma.$transaction(async (tx) => {
@@ -168,6 +196,10 @@ export async function POST(req: NextRequest) {
           city: input.city,
           state: input.state,
           address: input.address,
+          latitude: input.latitude ?? null,
+          longitude: input.longitude ?? null,
+          check_in_radius_m: input.check_in_radius_m ?? 100,
+          proximity_radius_m: input.proximity_radius_m ?? 200,
           event_date: new Date(input.event_date),
           registration_deadline: input.registration_deadline
             ? new Date(input.registration_deadline)

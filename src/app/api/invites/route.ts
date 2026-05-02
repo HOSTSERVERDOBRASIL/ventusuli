@@ -25,7 +25,8 @@ function generateInviteToken(): string {
 }
 
 function canCreateInvite(role: UserRole): boolean {
-  return role === UserRole.ADMIN || role === UserRole.ATHLETE;
+  const value = String(role);
+  return value === "ADMIN" || value === "MANAGER" || value === "ATHLETE" || value === "PREMIUM_ATHLETE";
 }
 
 interface InviteRow {
@@ -78,7 +79,7 @@ export async function GET(req: NextRequest) {
     }
 
     const invites =
-      auth.role === UserRole.ATHLETE
+      String(auth.role) === "ATHLETE" || String(auth.role) === "PREMIUM_ATHLETE"
         ? await prisma.$queryRaw<InviteRow[]>`
             SELECT
               id,
@@ -148,7 +149,8 @@ export async function POST(req: NextRequest) {
     }
 
     const { label, invitedEmail, invitedName, max_uses, expires_at } = parsed.data;
-    const isAthleteInvite = auth.role === UserRole.ATHLETE;
+    const isAthleteInvite =
+      String(auth.role) === "ATHLETE" || String(auth.role) === "PREMIUM_ATHLETE";
 
     if (isAthleteInvite && !invitedEmail) {
       return apiError("VALIDATION_ERROR", "Informe o e-mail do amigo convidado.", 400);

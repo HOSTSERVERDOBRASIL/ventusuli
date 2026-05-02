@@ -4,7 +4,18 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CircleCheck, Clock3, Handshake, XCircle } from "lucide-react";
+import {
+  CalendarDays,
+  CircleCheck,
+  Clock3,
+  Copy,
+  Download,
+  Handshake,
+  MapPin,
+  Navigation,
+  ShieldCheck,
+  XCircle,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useAuthToken } from "@/components/auth/AuthTokenProvider";
 import { ActionButton } from "@/components/system/action-button";
@@ -16,10 +27,13 @@ import { SectionCard } from "@/components/system/section-card";
 import { StatusBadge } from "@/components/system/status-badge";
 import {
   cancelRegistration,
+  checkInRegistration,
   confirmRegistrationPayment,
   getRegistrations,
   markRegistrationInterested,
 } from "@/services/registrations-service";
+import { distanceInMeters } from "@/lib/geo-distance";
+import { downloadTextCardAsPng } from "@/lib/share-card";
 import { type Inscricao, useInscricoesStore } from "@/store/inscricoes";
 import { UserRole } from "@/types";
 
@@ -58,14 +72,39 @@ const PAYMENT_TONE: Record<
   CANCELLED: "danger",
 };
 
+async function getCurrentPosition(): Promise<{
+  latitude: number;
+  longitude: number;
+}> {
+  if (typeof navigator === "undefined" || !navigator.geolocation) {
+    throw new Error("Geolocalizacao indisponivel neste dispositivo.");
+  }
+
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(
+      (position) =>
+        resolve({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        }),
+      () => reject(new Error("Nao foi possivel acessar sua localizacao.")),
+      { enableHighAccuracy: true, maximumAge: 15_000, timeout: 8_000 },
+    );
+  });
+}
+
 export default function MinhasInscricoesPage() {
-  const { accessToken, userRole } = useAuthToken();
-  const canPay = userRole === UserRole.ATHLETE;
+  const { accessToken, userRoles } = useAuthToken();
+  const canPay =
+    userRoles.includes(UserRole.ATHLETE) || userRoles.includes(UserRole.PREMIUM_ATHLETE);
   const inscricoes = useInscricoesStore((state) => state.inscricoes);
   const setInscricoes = useInscricoesStore((state) => state.setInscricoes);
   const hydrate = useInscricoesStore((state) => state.hydrate);
   const upsertInscricao = useInscricoesStore((state) => state.upsertInscricao);
+  const updateInscricao = useInscricoesStore((state) => state.updateInscricao);
   const [cancelTarget, setCancelTarget] = useState<Inscricao | null>(null);
+  const [attendanceBusyId, setAttendanceBusyId] = useState<string | null>(null);
+  const [distanceByRegistration, setDistanceByRegistration] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -107,6 +146,204 @@ export default function MinhasInscricoesPage() {
       ),
     [inscricoes],
   );
+
+  const nextRace = useMemo(() => {
+    const now = Date.now();
+    return [...inscricoes]
+      .filter((item) => item.status !== "CANCELLED")
+      .filter((item) => new Date(item.eventDate).getTime() >= now - 86_400_000)
+      .sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime())[0];
+  }, [inscricoes]);
+
+  function buildRaceShareLines(row: Inscricao) {
+    return [
+      `${row.eventName} - ${row.distanceLabel}`,
+      `Data: ${format(new Date(row.eventDate), "dd/MM/yyyy", { locale: ptBR })}`,
+      `Inscricao: ${STATUS_LABEL[row.status]}`,
+      `Pagamento: ${PAYMENT_LABEL[row.paymentStatus]}`,
+      `Valor: ${currency.format(row.amountCents / 100)}`,
+    ];
+  }
+
+  function getEventPoint(row: Inscricao) {
+    if (typeof row.eventLatitude !== "number" || typeof row.eventLongitude !== "number") {
+      return null;
+    }
+    return { latitude: row.eventLatitude, longitude: row.eventLongitude };
+  }
+
+  async function checkCurrentDistance(row: Inscricao) {
+    const eventPoint = getEventPoint(row);
+    if (!eventPoint) {
+      toast.error("Ponto exato da prova ainda nao foi configurado.");
+      return null;
+    }
+
+    const position = await getCurrentPosition();
+    const distance = distanceInMeters(eventPoint, position);
+    setDistanceByRegistration((current) => ({ ...current, [row.id]: distance }));
+    return { position, distance };
+  }
+
+  async function verifyRaceLocation(row: Inscricao) {
+    try {
+      const result = await checkCurrentDistance(row);
+      if (!result) return;
+
+      const checkInRadius = row.checkInRadiusM ?? 100;
+      const proximityRadius = row.proximityRadiusM ?? 200;
+      if (result.distance <= checkInRadius) {
+        toast.success(`Check-in liberado: voce esta a ${result.distance}m.`);
+      } else if (result.distance <= proximityRadius) {
+        toast.message(`Voce esta proximo: ${result.distance}m do ponto da prova.`);
+      } else {
+        toast.error(`Voce esta a ${result.distance}m. Aproxime-se do ponto da prova.`);
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Nao foi possivel verificar localizacao.",
+      );
+    }
+  }
+
+  async function handleRaceAttendance(row: Inscricao, action: "CHECK_IN" | "CHECK_OUT") {
+    setAttendanceBusyId(row.id);
+    try {
+      const result = await checkCurrentDistance(row);
+      if (!result) return;
+
+      const updated = await checkInRegistration(
+        row.id,
+        {
+          action,
+          latitude: result.position.latitude,
+          longitude: result.position.longitude,
+        },
+        accessToken,
+      );
+
+      updateInscricao(row.id, (current) => ({
+        ...current,
+        attendanceStatus: updated.attendanceStatus,
+        checkInAt: updated.checkInAt,
+        checkInDistanceM: action === "CHECK_IN" ? updated.distanceMeters : current.checkInDistanceM,
+        checkOutAt: updated.checkOutAt,
+        checkOutDistanceM:
+          action === "CHECK_OUT" ? updated.distanceMeters : current.checkOutDistanceM,
+      }));
+
+      toast.success(action === "CHECK_IN" ? "Check-in confirmado." : "Check-out confirmado.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Nao foi possivel registrar presenca.");
+    } finally {
+      setAttendanceBusyId(null);
+    }
+  }
+
+  async function copyRaceCard(row: Inscricao) {
+    const text = ["Minha proxima largada", ...buildRaceShareLines(row), "Ventu Suli"].join("\n");
+
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Resumo da prova copiado.");
+    } catch {
+      toast.error("Nao foi possivel copiar o resumo.");
+    }
+  }
+
+  function downloadRaceCard(row: Inscricao) {
+    const safeName = row.eventName.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "prova";
+    downloadTextCardAsPng({
+      title: row.eventName,
+      subtitle: `${row.distanceLabel} | ${format(new Date(row.eventDate), "dd/MM/yyyy", {
+        locale: ptBR,
+      })}`,
+      lines: buildRaceShareLines(row),
+      filename: `ventu-suli-${safeName}.png`,
+    });
+    toast.success("Card PNG gerado.");
+  }
+
+  function renderAttendancePanel(row: Inscricao) {
+    const currentDistance = distanceByRegistration[row.id];
+    const hasPoint = Boolean(getEventPoint(row));
+    const checkInRadius = row.checkInRadiusM ?? 100;
+    const proximityRadius = row.proximityRadiusM ?? 200;
+    const isBusy = attendanceBusyId === row.id;
+    const distanceTone =
+      currentDistance == null
+        ? "neutral"
+        : currentDistance <= checkInRadius
+          ? "positive"
+          : currentDistance <= proximityRadius
+            ? "warning"
+            : "danger";
+    const distanceLabel =
+      currentDistance == null
+        ? "local nao verificado"
+        : currentDistance <= checkInRadius
+          ? `${currentDistance}m | check-in liberado`
+          : currentDistance <= proximityRadius
+            ? `${currentDistance}m | proximo`
+            : `${currentDistance}m | fora do raio`;
+
+    return (
+      <div className="rounded-xl border border-sky-300/20 bg-[#0f233d] p-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="inline-flex items-center gap-2 text-sm font-semibold text-white">
+              <MapPin className="h-4 w-4 text-sky-200" />
+              Presenca por GPS
+            </p>
+            <p className="mt-1 text-xs leading-5 text-slate-400">
+              {hasPoint
+                ? row.eventAddress || "Ponto exato configurado"
+                : "Ponto exato pendente no cadastro da prova"}
+            </p>
+          </div>
+          <StatusBadge label={distanceLabel} tone={distanceTone} />
+        </div>
+
+        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+          <ActionButton
+            size="sm"
+            intent="secondary"
+            disabled={!hasPoint || isBusy}
+            onClick={() => void verifyRaceLocation(row)}
+          >
+            <Navigation className="mr-2 h-4 w-4" />
+            Ver local
+          </ActionButton>
+          <ActionButton
+            size="sm"
+            disabled={!hasPoint || isBusy || row.status !== "CONFIRMED" || Boolean(row.checkInAt)}
+            onClick={() => void handleRaceAttendance(row, "CHECK_IN")}
+          >
+            <CircleCheck className="mr-2 h-4 w-4" />
+            {row.checkInAt ? "Check-in ok" : "Check-in"}
+          </ActionButton>
+          <ActionButton
+            size="sm"
+            intent="secondary"
+            disabled={!hasPoint || isBusy || !row.checkInAt || Boolean(row.checkOutAt)}
+            onClick={() => void handleRaceAttendance(row, "CHECK_OUT")}
+          >
+            <ShieldCheck className="mr-2 h-4 w-4" />
+            {row.checkOutAt ? "Check-out ok" : "Check-out"}
+          </ActionButton>
+        </div>
+
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <p className="text-xs text-slate-400">
+            Check-in: {row.checkInAt ? "registrado" : `${checkInRadius}m`}
+          </p>
+          <p className="text-xs text-slate-400">
+            Proximidade: {row.checkOutAt ? "check-out registrado" : `${proximityRadius}m`}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const btnBase =
     "inline-flex h-7 items-center gap-1 rounded-lg px-2.5 text-[11px] font-semibold transition whitespace-nowrap";
@@ -262,6 +499,115 @@ export default function MinhasInscricoesPage() {
           </ActionButton>
         }
       />
+
+      {nextRace ? (
+        <SectionCard
+          title="Proxima largada"
+          description="Resumo pronto para conferir logistica e compartilhar"
+        >
+          <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+            <div className="rounded-xl border border-[#F5A623]/25 bg-[linear-gradient(135deg,#17385e,#0f233d)] p-5">
+              <p className="text-xs uppercase tracking-[0.12em] text-amber-200">
+                Ventu Suli Run Card
+              </p>
+              <h2 className="mt-3 text-2xl font-bold text-white">{nextRace.eventName}</h2>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <StatusBadge
+                  tone={STATUS_TONE[nextRace.status]}
+                  label={STATUS_LABEL[nextRace.status]}
+                />
+                <StatusBadge
+                  tone={PAYMENT_TONE[nextRace.paymentStatus]}
+                  label={PAYMENT_LABEL[nextRace.paymentStatus]}
+                />
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+                  <p className="text-xs uppercase tracking-wide text-white/40">Distancia</p>
+                  <p className="mt-1 text-lg font-bold text-white">{nextRace.distanceLabel}</p>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+                  <p className="text-xs uppercase tracking-wide text-white/40">Data</p>
+                  <p className="mt-1 text-lg font-bold text-white">
+                    {format(new Date(nextRace.eventDate), "dd/MM", { locale: ptBR })}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+                  <p className="text-xs uppercase tracking-wide text-white/40">Valor</p>
+                  <p className="mt-1 text-lg font-bold text-white">
+                    {currency.format(nextRace.amountCents / 100)}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <ActionButton asChild size="sm">
+                  <Link href={`/provas/${nextRace.eventId}`}>Ver prova</Link>
+                </ActionButton>
+                <ActionButton size="sm" onClick={() => downloadRaceCard(nextRace)}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Baixar PNG
+                </ActionButton>
+                <ActionButton
+                  size="sm"
+                  intent="secondary"
+                  onClick={() => void copyRaceCard(nextRace)}
+                >
+                  <Copy className="mr-2 h-4 w-4" />
+                  Copiar texto
+                </ActionButton>
+              </div>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+              <div className="sm:col-span-2 lg:col-span-1">{renderAttendancePanel(nextRace)}</div>
+              {[
+                {
+                  label: "Inscricao",
+                  done: nextRace.status === "CONFIRMED",
+                  hint:
+                    nextRace.status === "CONFIRMED"
+                      ? "Confirmada para a largada."
+                      : "Finalize a inscricao antes da prova.",
+                },
+                {
+                  label: "Pagamento",
+                  done: nextRace.paymentStatus === "PAID",
+                  hint:
+                    nextRace.paymentStatus === "PAID"
+                      ? "Pagamento baixado."
+                      : "Pagamento ainda precisa de atencao.",
+                },
+                {
+                  label: "Calendario",
+                  done: true,
+                  hint: format(new Date(nextRace.eventDate), "dd 'de' MMMM yyyy", {
+                    locale: ptBR,
+                  }),
+                },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  className="rounded-xl border border-white/10 bg-[#0f233d] p-3"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="inline-flex items-center gap-2 text-sm font-semibold text-white">
+                      {item.label === "Calendario" ? (
+                        <CalendarDays className="h-4 w-4 text-sky-200" />
+                      ) : null}
+                      {item.label}
+                    </p>
+                    <StatusBadge
+                      label={item.done ? "ok" : "pendente"}
+                      tone={item.done ? "positive" : "warning"}
+                    />
+                  </div>
+                  <p className="mt-2 text-xs leading-5 text-slate-400">{item.hint}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </SectionCard>
+      ) : null}
 
       <SectionCard title="Histórico" description="Atualização visual em tempo real">
         {loading ? (

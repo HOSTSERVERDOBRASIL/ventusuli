@@ -10,7 +10,8 @@ const noteSchema = z.object({
 });
 
 function canManageAthletes(role: UserRole): boolean {
-  return role === UserRole.ADMIN;
+  const value = String(role);
+  return value === "ADMIN" || value === "MANAGER";
 }
 
 interface RouteParams {

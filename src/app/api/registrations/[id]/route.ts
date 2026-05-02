@@ -25,6 +25,11 @@ async function loadRegistration(registrationId: string, userId: string, organiza
         select: {
           id: true,
           name: true,
+          address: true,
+          latitude: true,
+          longitude: true,
+          check_in_radius_m: true,
+          proximity_radius_m: true,
           event_date: true,
         },
       },
@@ -56,11 +61,21 @@ function mapRegistrationResponse(
     eventId: registration.event.id,
     eventName: registration.event.name,
     eventDate: registration.event.event_date.toISOString(),
+    eventAddress: registration.event.address,
+    eventLatitude: registration.event.latitude ? Number(registration.event.latitude) : null,
+    eventLongitude: registration.event.longitude ? Number(registration.event.longitude) : null,
+    checkInRadiusM: registration.event.check_in_radius_m,
+    proximityRadiusM: registration.event.proximity_radius_m,
     distanceId: registration.distance.id,
     distanceLabel: registration.distance.label,
     status: registration.status,
     paymentStatus: registration.payment?.status ?? PaymentStatus.PENDING,
     amountCents: registration.payment?.amount_cents ?? registration.distance.price_cents,
+    attendanceStatus: registration.attendance_status,
+    checkInAt: registration.check_in_at?.toISOString() ?? null,
+    checkInDistanceM: registration.check_in_distance_m,
+    checkOutAt: registration.check_out_at?.toISOString() ?? null,
+    checkOutDistanceM: registration.check_out_distance_m,
   };
 }
 

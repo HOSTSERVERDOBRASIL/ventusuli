@@ -12,7 +12,8 @@ import { UserRole } from "@/types";
 import { buildEffectiveRoles } from "@/lib/access-profiles";
 
 async function resolveHasCpf(userId: string, role: PrismaUserRole): Promise<boolean> {
-  if (role !== PrismaUserRole.ATHLETE) return true;
+  const value = String(role);
+  if (value !== "ATHLETE" && value !== "PREMIUM_ATHLETE") return true;
 
   const athleteProfile = await prisma.athleteProfile.findUnique({
     where: { user_id: userId },

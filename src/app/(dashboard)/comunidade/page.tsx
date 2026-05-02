@@ -23,7 +23,7 @@ const COMMUNITY_TABS = ["Feed", "Treinos", "Eventos", "Resultados"] as const;
 const PAGE_SIZE = 12;
 
 export default function ComunidadePage() {
-  const { accessToken, userRole } = useAuthToken();
+  const { accessToken, userRole, userRoles } = useAuthToken();
   const [feed, setFeed] = useState<CommunityFeedData | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -32,7 +32,13 @@ export default function ComunidadePage() {
   const [postTab, setPostTab] = useState<(typeof COMMUNITY_TABS)[number]>("Feed");
   const [publishing, setPublishing] = useState(false);
 
-  const canPublish = userRole === UserRole.ATHLETE || userRole === UserRole.ADMIN || userRole === UserRole.SUPER_ADMIN;
+  const canPublish =
+    userRole === UserRole.ATHLETE ||
+    userRole === UserRole.PREMIUM_ATHLETE ||
+    userRole === UserRole.ADMIN ||
+    userRole === UserRole.SUPER_ADMIN ||
+    userRoles.includes(UserRole.ATHLETE) ||
+    userRoles.includes(UserRole.PREMIUM_ATHLETE);
   const canReact = canPublish;
   const hasPosts = (feed?.posts?.length ?? 0) > 0;
   const hasMore = feed?.cursor?.hasMore ?? feed?.pagination?.hasMore ?? false;

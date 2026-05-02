@@ -16,12 +16,15 @@ async function parseError(response: Response, fallback: string): Promise<Error> 
   }
 }
 
-export async function getCoachTrainingDashboard(accessToken?: string | null): Promise<CoachTrainingDashboard> {
+export async function getCoachTrainingDashboard(
+  accessToken?: string | null,
+): Promise<CoachTrainingDashboard> {
   const response = await fetch("/api/coach/training/dashboard", {
     cache: "no-store",
     headers: buildAuthHeaders(accessToken),
   });
-  if (!response.ok) throw await parseError(response, "Nao foi possivel carregar dashboard tecnico.");
+  if (!response.ok)
+    throw await parseError(response, "Nao foi possivel carregar dashboard tecnico.");
   const payload = (await response.json()) as { data: CoachTrainingDashboard };
   return payload.data;
 }
@@ -141,6 +144,43 @@ export async function submitWorkoutFeedback(
   if (!response.ok) throw await parseError(response, "Nao foi possivel registrar feedback.");
 }
 
+export async function checkInWorkoutSession(
+  sessionId: string,
+  input: {
+    action: "START" | "SAFE_PING" | "CHECK_OUT";
+    note?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+  },
+  accessToken?: string | null,
+): Promise<{
+  sessionId: string;
+  status: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  saved: boolean;
+}> {
+  const response = await fetch(`/api/me/training/sessions/${sessionId}/checkin`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...buildAuthHeaders(accessToken),
+    },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) throw await parseError(response, "Nao foi possivel salvar check-in.");
+  const payload = (await response.json()) as {
+    data: {
+      sessionId: string;
+      status: string;
+      startedAt: string | null;
+      completedAt: string | null;
+      saved: boolean;
+    };
+  };
+  return payload.data;
+}
+
 export async function updateAthleteTrainingProfile(
   athleteId: string,
   input: Partial<AthleteTrainingProfile>,
@@ -154,7 +194,8 @@ export async function updateAthleteTrainingProfile(
     },
     body: JSON.stringify(input),
   });
-  if (!response.ok) throw await parseError(response, "Nao foi possivel atualizar perfil esportivo.");
+  if (!response.ok)
+    throw await parseError(response, "Nao foi possivel atualizar perfil esportivo.");
   const payload = (await response.json()) as { data: AthleteTrainingProfile | null };
   return payload.data;
 }

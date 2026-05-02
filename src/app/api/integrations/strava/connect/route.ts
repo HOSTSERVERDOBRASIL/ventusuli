@@ -17,7 +17,8 @@ import { handleApiException } from "@/lib/api-error";
 import { logError, withRequestContext } from "@/lib/logger";
 
 function canConnect(role: UserRole): boolean {
-  return role === UserRole.ATHLETE;
+  const value = String(role);
+  return value === "ATHLETE" || value === "PREMIUM_ATHLETE";
 }
 
 export async function GET(req: NextRequest) {

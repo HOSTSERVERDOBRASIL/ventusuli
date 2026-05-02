@@ -5,7 +5,13 @@ import { apiError } from "@/lib/api-error";
 import { getAuthContext } from "@/lib/request-auth";
 
 function isAdminRole(role: UserRole): boolean {
-  return role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN;
+  const value = String(role);
+  return (
+    value === "ADMIN" ||
+    value === "SUPER_ADMIN" ||
+    value === "MANAGER" ||
+    value === "ORGANIZER"
+  );
 }
 
 function prismaToApiError(error: unknown): NextResponse {
@@ -54,6 +60,9 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     }
     if (event.distances.length < 1) {
       return apiError("VALIDATION_ERROR", "Adicione ao menos uma distÃ¢ncia para publicar.", 400);
+    }
+    if (event.latitude == null || event.longitude == null) {
+      return apiError("VALIDATION_ERROR", "Informe o ponto exato da prova antes de publicar.", 400);
     }
 
     const published = await prisma.event.update({

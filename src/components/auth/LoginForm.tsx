@@ -77,6 +77,33 @@ function resolvePostLoginPath(
     return "/coach";
   }
 
+  if (role === "MANAGER") {
+    if (nextParam && (nextParam.startsWith("/gestor") || nextParam.startsWith("/admin"))) {
+      return nextParam;
+    }
+    return "/gestor";
+  }
+
+  if (role === "ORGANIZER") {
+    if (nextParam && nextParam.startsWith("/organizador")) return nextParam;
+    return "/organizador";
+  }
+
+  if (role === "SUPPORT") {
+    if (nextParam && nextParam.startsWith("/suporte")) return nextParam;
+    return "/suporte";
+  }
+
+  if (role === "MODERATOR") {
+    if (nextParam && nextParam.startsWith("/moderador")) return nextParam;
+    return "/moderador";
+  }
+
+  if (role === "PARTNER") {
+    if (nextParam && nextParam.startsWith("/parceiro")) return nextParam;
+    return "/parceiro";
+  }
+
   if (isPlatformOrTenantAdmin) {
     if (role === "SUPER_ADMIN") {
       if (nextParam && nextParam.startsWith("/super-admin")) return nextParam;
@@ -92,6 +119,12 @@ function resolvePostLoginPath(
     }
     if (nextParam && nextParam.startsWith("/admin")) return nextParam;
     return "/admin";
+  }
+
+  if (role === "PREMIUM_ATHLETE") {
+    if (!hasCpf) return "/onboarding/atleta";
+    if (nextParam && nextParam.startsWith("/") && !nextParam.startsWith("/admin")) return nextParam;
+    return "/premium";
   }
 
   if (!hasCpf) return "/onboarding/atleta";
@@ -219,6 +252,14 @@ export function LoginForm() {
 
       toast.success("Login realizado com sucesso.");
       const nextPath = searchParams.get("next");
+      const roles = payload.user.roles?.length ? payload.user.roles : [payload.user.role];
+      if (roles.length > 1 && searchParams.get("profile") !== "1") {
+        const profileUrl = new URL("/selecionar-perfil", window.location.origin);
+        if (nextPath) profileUrl.searchParams.set("next", nextPath);
+        router.push(profileUrl.pathname + profileUrl.search);
+        return;
+      }
+
       const hasCpf = payload.profile?.hasCpf ?? true;
       const destination = resolvePostLoginPath(
         payload.user.role,

@@ -7,7 +7,9 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   Award,
+  Copy,
   Crown,
+  Download,
   Flag,
   Medal,
   Minus,
@@ -17,6 +19,7 @@ import {
   Trophy,
   AlertTriangle,
 } from "lucide-react";
+import { toast } from "sonner";
 import {
   Cell,
   Line,
@@ -29,12 +32,16 @@ import {
   YAxis,
 } from "recharts";
 import { useAuthToken } from "@/components/auth/AuthTokenProvider";
+import { AchievementGrid } from "@/components/gamification/AchievementGrid";
+import { LevelProgressCard } from "@/components/gamification/LevelProgressCard";
+import { XpBreakdownCard } from "@/components/gamification/XpBreakdownCard";
 import { ActionButton } from "@/components/system/action-button";
 import { EmptyState } from "@/components/system/empty-state";
 import { LoadingState } from "@/components/system/loading-state";
 import { PageHeader } from "@/components/system/page-header";
 import { SectionCard } from "@/components/system/section-card";
 import { StatusBadge } from "@/components/system/status-badge";
+import { downloadTextCardAsPng } from "@/lib/share-card";
 import { getDashboardData } from "@/services/dashboard-service";
 import { DashboardData, type DashboardRankingPeriod } from "@/services/types";
 
@@ -107,17 +114,56 @@ export default function EvolucaoPage() {
   }, [accessToken, userRole, rankingPeriod, reloadKey]);
 
   const experience = data?.experience;
+  const gamification = experience?.gamification;
   const warnings = data?.dataWarnings ?? [];
   const highlights = useMemo(() => experience?.highlights ?? [], [experience]);
   const hasExperienceContent = Boolean(
     experience &&
-    (experience.highlights.length > 0 ||
+    (gamification ||
+      experience.highlights.length > 0 ||
       experience.sportsMetrics.length > 0 ||
       experience.evolutionSeries.length > 0 ||
       experience.distanceDistribution.length > 0 ||
       experience.personalRecords.length > 0 ||
       (data?.metrics.kmNoAno ?? 0) > 0),
   );
+
+  function buildEvolutionShareLines() {
+    if (!experience) return [];
+    return [
+      ...highlights.slice(0, 4).map((item) => `${item.label}: ${item.value}`),
+      experience.groupRanking
+        ? `Ranking: #${experience.groupRanking.user.position} (${experience.groupRanking.user.points} pts)`
+        : null,
+    ].filter((item): item is string => Boolean(item));
+  }
+
+  async function copyEvolutionCard() {
+    const lines = buildEvolutionShareLines();
+    if (!lines.length) return;
+    const text = ["Meu resumo de evolucao", ...lines, "Ventu Suli"].join("\n");
+
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Resumo de evolucao copiado.");
+    } catch {
+      toast.error("Nao foi possivel copiar o resumo.");
+    }
+  }
+
+  function downloadEvolutionCard() {
+    const lines = buildEvolutionShareLines();
+    if (!lines.length) return;
+    downloadTextCardAsPng({
+      title: "Meu corre em numeros",
+      subtitle: experience?.groupRanking
+        ? `Ranking #${experience.groupRanking.user.position} no grupo`
+        : "Resumo esportivo Ventu Suli",
+      lines,
+      filename: "ventu-suli-evolucao.png",
+    });
+    toast.success("Card PNG gerado.");
+  }
 
   return (
     <div className="space-y-6">
@@ -193,6 +239,17 @@ export default function EvolucaoPage() {
             </SectionCard>
           ) : null}
 
+          {gamification ? (
+            <>
+              <div className="grid gap-3 xl:grid-cols-[1fr_0.85fr]">
+                <LevelProgressCard gamification={gamification} />
+                <XpBreakdownCard totalXp={gamification.totalXp} items={gamification.breakdown} />
+              </div>
+
+              <AchievementGrid achievements={gamification.achievements} />
+            </>
+          ) : null}
+
           <SectionCard title="Destaques da temporada" description="Resumo de evolucao consolidada">
             {highlights.length ? (
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -220,6 +277,51 @@ export default function EvolucaoPage() {
                 description="Sincronize atividades para gerar destaques da temporada."
               />
             )}
+          </SectionCard>
+
+          <SectionCard
+            title="Card compartilhavel"
+            description="Resumo curto para postar no grupo, WhatsApp ou Instagram"
+          >
+            <div className="grid gap-4 lg:grid-cols-[1fr_auto]">
+              <div className="rounded-xl border border-[#F5A623]/25 bg-[linear-gradient(135deg,#17385e,#0f233d)] p-5">
+                <p className="text-xs uppercase tracking-[0.12em] text-amber-200">
+                  Meu corre em numeros
+                </p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  {highlights.slice(0, 4).map((item) => (
+                    <div
+                      key={item.id}
+                      className="rounded-xl border border-white/10 bg-white/[0.04] p-3"
+                    >
+                      <p className="text-xs text-white/45">{item.label}</p>
+                      <p className="mt-1 text-2xl font-bold text-white">{item.value}</p>
+                    </div>
+                  ))}
+                </div>
+                {experience.groupRanking ? (
+                  <p className="mt-4 text-sm font-semibold text-sky-100">
+                    Ranking do grupo: #{experience.groupRanking.user.position} com{" "}
+                    {experience.groupRanking.user.points} pts
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="flex flex-col justify-center gap-2 lg:w-56">
+                <ActionButton className="w-full" onClick={downloadEvolutionCard}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Baixar PNG
+                </ActionButton>
+                <ActionButton
+                  className="w-full"
+                  intent="secondary"
+                  onClick={() => void copyEvolutionCard()}
+                >
+                  <Copy className="mr-2 h-4 w-4" />
+                  Copiar texto
+                </ActionButton>
+              </div>
+            </div>
           </SectionCard>
 
           <SectionCard title="Metricas esportivas" description="Leitura de tendencia por ciclo">

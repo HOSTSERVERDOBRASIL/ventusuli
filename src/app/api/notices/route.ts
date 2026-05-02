@@ -32,12 +32,16 @@ const listQuerySchema = z.object({
 });
 
 function isNoticeManager(role: UserRole): boolean {
-  return role === UserRole.ADMIN;
+  const value = String(role);
+  return value === "ADMIN" || value === "MANAGER" || value === "MODERATOR";
 }
 
 function audienceFilterForRole(role: UserRole): NoticeAudience[] {
-  if (role === UserRole.ATHLETE) return [NoticeAudience.ALL, NoticeAudience.ATHLETES];
-  if (role === UserRole.COACH) return [NoticeAudience.ALL, NoticeAudience.COACHES];
+  const value = String(role);
+  if (value === "ATHLETE" || value === "PREMIUM_ATHLETE") {
+    return [NoticeAudience.ALL, NoticeAudience.ATHLETES];
+  }
+  if (value === "COACH") return [NoticeAudience.ALL, NoticeAudience.COACHES];
   return [NoticeAudience.ALL, NoticeAudience.ADMINS];
 }
 

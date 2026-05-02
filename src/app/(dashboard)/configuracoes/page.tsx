@@ -7,7 +7,7 @@ import { UserRole } from "@/types";
 
 export default function ConfiguracoesDispatcherPage() {
   const router = useRouter();
-  const { hydrated, userRole } = useAuthToken();
+  const { hydrated, userRole, userRoles } = useAuthToken();
 
   useEffect(() => {
     if (!hydrated) return;
@@ -17,18 +17,31 @@ export default function ConfiguracoesDispatcherPage() {
       return;
     }
 
-    if (userRole === UserRole.ADMIN) {
+    if (userRoles.includes(UserRole.ADMIN) || userRoles.includes(UserRole.MANAGER)) {
       router.replace("/admin/configuracoes");
       return;
     }
 
-    if (userRole === UserRole.ATHLETE || userRole === UserRole.COACH) {
+    if (
+      userRoles.some((role) =>
+        [
+          UserRole.ATHLETE,
+          UserRole.PREMIUM_ATHLETE,
+          UserRole.COACH,
+          UserRole.ORGANIZER,
+          UserRole.SUPPORT,
+          UserRole.MODERATOR,
+          UserRole.PARTNER,
+          UserRole.FINANCE,
+        ].includes(role),
+      )
+    ) {
       router.replace("/configuracoes/conta");
       return;
     }
 
     router.replace("/super-admin");
-  }, [hydrated, router, userRole]);
+  }, [hydrated, router, userRole, userRoles]);
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#0A1628] px-4 text-slate-100">

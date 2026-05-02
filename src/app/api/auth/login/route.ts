@@ -53,7 +53,7 @@ function accountStatusMessage(
 }
 
 async function resolveHasCpf(userId: string, role: UserRole): Promise<boolean> {
-  if (role !== UserRole.ATHLETE) return true;
+  if (role !== UserRole.ATHLETE && role !== UserRole.PREMIUM_ATHLETE) return true;
 
   const athleteProfile = await prisma.athleteProfile.findUnique({
     where: { user_id: userId },

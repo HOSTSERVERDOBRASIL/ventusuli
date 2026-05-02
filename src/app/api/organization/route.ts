@@ -58,7 +58,8 @@ const updateSchema = z.object({
 });
 
 function canEditOrganization(role: UserRole): boolean {
-  return role === UserRole.ADMIN;
+  const value = String(role);
+  return value === "ADMIN" || value === "MANAGER";
 }
 
 function getSettingsValue<T>(settings: unknown, ...keys: string[]): T | undefined {

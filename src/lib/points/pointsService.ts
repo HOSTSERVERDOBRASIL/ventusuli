@@ -21,6 +21,15 @@ export type LedgerSource =
 
 export type EventTriggerSource = "PARTICIPATION" | "EARLY_SIGNUP" | "EARLY_PAYMENT" | "CAMPAIGN_BONUS";
 
+const EVENT_POINT_SOURCE_TYPES = [
+  "EVENT_PARTICIPATION",
+  "EARLY_SIGNUP",
+  "EARLY_PAYMENT",
+  "CAMPAIGN_BONUS",
+] as const;
+
+type EventPointSourceType = (typeof EVENT_POINT_SOURCE_TYPES)[number];
+
 interface LedgerRow {
   id: string;
   organizationId: string;
@@ -79,6 +88,13 @@ interface EventPointRuleRow {
   earlySignupBonus: number;
   earlyPaymentBonus: number;
   campaignBonus: number;
+}
+
+interface EventPointNetRow {
+  sourceType: EventPointSourceType;
+  netPoints: number | bigint | null;
+  creditCount: number | bigint;
+  debitCount: number | bigint;
 }
 
 function toNumber(value: number | bigint | null | undefined): number {
@@ -301,17 +317,118 @@ export async function creditEventPoints(p: {
   };
 
   const points = pointsByTrigger[p.triggerSource];
-  const referenceCode = `EVT-${p.eventId}-${p.userId}-${p.triggerSource}`;
+  const sourceType = sourceByTrigger[p.triggerSource];
 
-  return creditPoints({
-    orgId: p.orgId,
-    userId: p.userId,
-    eventId: p.eventId,
-    registrationId: p.registrationId,
-    sourceType: sourceByTrigger[p.triggerSource],
-    points,
-    description: `Pontuacao automatica: ${p.triggerSource}`,
-    referenceCode,
-    createdBy: p.createdBy,
+  return prisma.$transaction(async (tx) => {
+    const netRows = await tx.$queryRaw<EventPointNetRow[]>`
+      SELECT
+        "sourceType" AS "sourceType",
+        COALESCE(SUM(points), 0) AS "netPoints",
+        COUNT(*) FILTER (WHERE type = 'CREDIT')::bigint AS "creditCount",
+        COUNT(*) FILTER (WHERE type = 'DEBIT')::bigint AS "debitCount"
+      FROM public."AthletePointLedger"
+      WHERE "organizationId" = ${p.orgId}
+        AND "userId" = ${p.userId}
+        AND "eventId" = ${p.eventId}
+        AND "registrationId" = ${p.registrationId}
+        AND "sourceType" = ${sourceType}
+      GROUP BY "sourceType"
+      LIMIT 1
+    `;
+    const net = toNumber(netRows[0]?.netPoints);
+
+    if (net > 0) {
+      const latest = await tx.$queryRaw<LedgerRow[]>`
+        SELECT *
+        FROM public."AthletePointLedger"
+        WHERE "organizationId" = ${p.orgId}
+          AND "userId" = ${p.userId}
+          AND "eventId" = ${p.eventId}
+          AND "registrationId" = ${p.registrationId}
+          AND "sourceType" = ${sourceType}
+        ORDER BY "createdAt" DESC, id DESC
+        LIMIT 1
+      `;
+
+      return { entry: mapLedgerRow(latest[0]), created: false };
+    }
+
+    const creditCount = toNumber(netRows[0]?.creditCount);
+    const baseReferenceCode = `EVT-${p.eventId}-${p.userId}-${p.triggerSource}`;
+    const referenceCode =
+      creditCount === 0 ? baseReferenceCode : `${baseReferenceCode}-C${creditCount + 1}`;
+
+    return creditPointsInTransaction(tx, {
+      orgId: p.orgId,
+      userId: p.userId,
+      eventId: p.eventId,
+      registrationId: p.registrationId,
+      sourceType,
+      points,
+      description: `Pontuacao automatica: ${p.triggerSource}`,
+      referenceCode,
+      createdBy: p.createdBy,
+    });
   });
+}
+
+export async function reverseEventPointsForRegistrationInTransaction(
+  tx: Prisma.TransactionClient,
+  p: {
+    orgId: string;
+    userId: string;
+    eventId: string;
+    registrationId: string;
+    createdBy: string;
+  },
+): Promise<{ reversedPoints: number; created: number; skipped: number }> {
+  const rows = await tx.$queryRaw<EventPointNetRow[]>(Prisma.sql`
+    SELECT
+      "sourceType" AS "sourceType",
+      COALESCE(SUM(points), 0) AS "netPoints",
+      COUNT(*) FILTER (WHERE type = 'CREDIT')::bigint AS "creditCount",
+      COUNT(*) FILTER (WHERE type = 'DEBIT')::bigint AS "debitCount"
+    FROM public."AthletePointLedger"
+    WHERE "organizationId" = ${p.orgId}
+      AND "userId" = ${p.userId}
+      AND "eventId" = ${p.eventId}
+      AND "registrationId" = ${p.registrationId}
+      AND "sourceType" IN (${Prisma.join(EVENT_POINT_SOURCE_TYPES)})
+    GROUP BY "sourceType"
+  `);
+
+  let reversedPoints = 0;
+  let created = 0;
+  let skipped = 0;
+
+  for (const row of rows) {
+    const netPoints = toNumber(row.netPoints);
+    if (netPoints <= 0) {
+      skipped += 1;
+      continue;
+    }
+
+    const debitCount = toNumber(row.debitCount);
+    const referenceCode = `REV-EVT-${p.eventId}-${p.userId}-${row.sourceType}-${debitCount + 1}`;
+    const result = await debitPointsInTransaction(tx, {
+      orgId: p.orgId,
+      userId: p.userId,
+      eventId: p.eventId,
+      registrationId: p.registrationId,
+      sourceType: row.sourceType,
+      points: -netPoints,
+      description: "Estorno automatico por mudanca de presenca da prova",
+      referenceCode,
+      createdBy: p.createdBy,
+    });
+
+    if (result.created) {
+      created += 1;
+      reversedPoints += netPoints;
+    } else {
+      skipped += 1;
+    }
+  }
+
+  return { reversedPoints, created, skipped };
 }

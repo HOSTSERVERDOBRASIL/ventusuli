@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuthToken } from "@/components/auth/AuthTokenProvider";
+import { StatusBadge } from "@/components/system/status-badge";
 import {
   createRegistrationDraft,
   getAthleteIdentity,
@@ -24,9 +25,32 @@ import {
 } from "@/services/registrations-service";
 import { useInscricoesStore } from "@/store/inscricoes";
 import { getEventById } from "@/services/events-service";
-import { ServiceEvent } from "@/services/types";
+import { AthleteIdentity, ServiceEvent } from "@/services/types";
+import { getRaceDistanceRecommendation } from "@/lib/race-recommendations";
 
 const currency = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+
+const EMPTY_ATHLETE: AthleteIdentity = {
+  name: "Atleta",
+  email: "atleta@ventu.app",
+  avatarUrl: null,
+  memberNumber: null,
+  memberSince: null,
+  accountStatus: null,
+  cpf: null,
+  phone: null,
+  city: null,
+  state: null,
+  birthDate: null,
+  gender: null,
+  sportLevel: null,
+  sportGoal: null,
+  nextCompetitionDate: null,
+  athleteStatus: null,
+  signupSource: null,
+  onboardingCompletedAt: null,
+  emergencyContact: null,
+};
 
 export default function InscricaoPage() {
   const params = useParams<{ id: string }>();
@@ -46,21 +70,7 @@ export default function InscricaoPage() {
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [athlete, setAthlete] = useState<{
-    name: string;
-    email: string;
-    cpf: string | null;
-    phone: string | null;
-    city: string | null;
-    state: string | null;
-  }>({
-    name: "Atleta",
-    email: "atleta@ventu.app",
-    cpf: null,
-    phone: null,
-    city: null,
-    state: null,
-  });
+  const [athlete, setAthlete] = useState<AthleteIdentity>(EMPTY_ATHLETE);
 
   const selectedLabel = searchParams.get("distancia");
   const distance = useMemo(
@@ -169,6 +179,47 @@ export default function InscricaoPage() {
     return Math.min(96, Math.max(8, ratio));
   }, [nowMs, payment.isPaid, paymentStartedAt, step]);
 
+  const distanceRecommendation = useMemo(() => {
+    if (!event || !distance) return null;
+    return getRaceDistanceRecommendation(distance, athlete, event.event_date);
+  }, [athlete, distance, event]);
+
+  const raceChecklist = useMemo(
+    () => [
+      {
+        label: "CPF",
+        done: Boolean(athlete.cpf),
+        hint: athlete.cpf ? "Pronto para pagamento." : "Obrigatorio para gerar a cobranca.",
+      },
+      {
+        label: "Contato de emergencia",
+        done: Boolean(athlete.emergencyContact),
+        hint: athlete.emergencyContact ? "Contato registrado." : "Inclua um contato no perfil.",
+      },
+      {
+        label: "Dados de localizacao",
+        done: Boolean(athlete.city && athlete.state),
+        hint:
+          athlete.city && athlete.state
+            ? `${athlete.city}/${athlete.state}`
+            : "Ajuda na logistica da assessoria.",
+      },
+      {
+        label: "Pagamento",
+        done: payment.isPaid,
+        hint: payment.isPaid ? "Confirmado." : step === 2 ? "Aguardando PIX." : "Proximo passo.",
+      },
+    ],
+    [
+      athlete.city,
+      athlete.cpf,
+      athlete.emergencyContact,
+      athlete.state,
+      payment.isPaid,
+      step,
+    ],
+  );
+
   useEffect(() => {
     hasHandledPaidFlowRef.current = false;
     hasShownPaidToastRef.current = false;
@@ -254,6 +305,22 @@ export default function InscricaoPage() {
               <p>Prova: {event.name}</p>
               <p>Distância: {distance.label}</p>
               <p>Valor: {currency.format(distance.price_cents / 100)}</p>
+              {distanceRecommendation ? (
+                <div className="mt-3 rounded-xl border border-white/10 bg-[#0F2743] p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-semibold uppercase tracking-[0.08em] text-sky-200">
+                      Leitura esportiva
+                    </p>
+                    <StatusBadge
+                      label={distanceRecommendation.label}
+                      tone={distanceRecommendation.tone}
+                    />
+                  </div>
+                  <p className="mt-2 text-xs leading-5 text-slate-300">
+                    {distanceRecommendation.reason}
+                  </p>
+                </div>
+              ) : null}
             </CardContent>
           </Card>
 
@@ -293,6 +360,28 @@ export default function InscricaoPage() {
                   </div>
                 </div>
               ) : null}
+            </CardContent>
+          </Card>
+
+          <Card className="border-white/10 bg-[linear-gradient(180deg,#1a3557,#142b47)] text-white lg:col-span-2">
+            <CardHeader>
+              <CardTitle>Checklist do dia da prova</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-2 md:grid-cols-4">
+                {raceChecklist.map((item) => (
+                  <div key={item.label} className="rounded-xl border border-white/10 bg-[#0F2743] p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-white">{item.label}</p>
+                      <StatusBadge
+                        label={item.done ? "ok" : "pendente"}
+                        tone={item.done ? "positive" : "warning"}
+                      />
+                    </div>
+                    <p className="mt-2 text-xs leading-5 text-slate-400">{item.hint}</p>
+                  </div>
+                ))}
+              </div>
             </CardContent>
           </Card>
 

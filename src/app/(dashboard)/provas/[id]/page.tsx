@@ -5,7 +5,16 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarDays, CircleCheck, Clock3, MapPin, Route, Users } from "lucide-react";
+import {
+  CalendarDays,
+  CircleCheck,
+  Clock3,
+  ExternalLink,
+  MapPin,
+  Route,
+  ShieldCheck,
+  Users,
+} from "lucide-react";
 import { useAuthToken } from "@/components/auth/AuthTokenProvider";
 import { ActionButton } from "@/components/system/action-button";
 import { EmptyState } from "@/components/system/empty-state";
@@ -15,19 +24,28 @@ import { SectionCard } from "@/components/system/section-card";
 import { EventStatusBadge } from "@/components/events/event-status-badge";
 import { StatusBadge } from "@/components/system/status-badge";
 import { getEventById } from "@/services/events-service";
-import { ServiceEvent } from "@/services/types";
+import { getAthleteIdentity } from "@/services/registrations-service";
+import { AthleteIdentity, ServiceEvent } from "@/services/types";
 import { useInscricoesStore } from "@/store/inscricoes";
 import { UserRole } from "@/types";
+import { getEventRecommendation, getRaceDistanceRecommendation } from "@/lib/race-recommendations";
+import {
+  buildRaceLogistics,
+  buildRacePelotons,
+  buildRaceSafetyChecklist,
+} from "@/lib/race-logistics";
 
 const currency = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
 export default function ProvaDetalhePage() {
   const params = useParams<{ id: string }>();
-  const { accessToken, userRole } = useAuthToken();
-  const canRegister = userRole === UserRole.ATHLETE;
+  const { accessToken, userRoles } = useAuthToken();
+  const canRegister =
+    userRoles.includes(UserRole.ATHLETE) || userRoles.includes(UserRole.PREMIUM_ATHLETE);
   const inscricoes = useInscricoesStore((state) => state.inscricoes);
   const hydrate = useInscricoesStore((state) => state.hydrate);
   const [event, setEvent] = useState<ServiceEvent | null>(null);
+  const [athlete, setAthlete] = useState<AthleteIdentity | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -43,8 +61,14 @@ export default function ProvaDetalhePage() {
       setLoading(true);
       setError(null);
       try {
-        const payload = await getEventById(params.id, accessToken);
-        if (!cancelled) setEvent(payload);
+        const [payload, athletePayload] = await Promise.all([
+          getEventById(params.id, accessToken),
+          canRegister ? getAthleteIdentity(accessToken).catch(() => null) : Promise.resolve(null),
+        ]);
+        if (!cancelled) {
+          setEvent(payload);
+          setAthlete(athletePayload);
+        }
       } catch {
         if (!cancelled) {
           setEvent(null);
@@ -59,7 +83,7 @@ export default function ProvaDetalhePage() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken, params.id, reloadKey]);
+  }, [accessToken, canRegister, params.id, reloadKey]);
 
   const inscritosNaProva = useMemo(() => {
     if (!event) return [];
@@ -75,6 +99,51 @@ export default function ProvaDetalhePage() {
     const vagas = event.distances.reduce((sum, distance) => sum + (distance.max_slots ?? 0), 0);
     return { inscritos, vagas };
   }, [event]);
+
+  const bestRecommendation = useMemo(
+    () => (event ? getEventRecommendation(event, athlete) : null),
+    [athlete, event],
+  );
+
+  const raceLogistics = useMemo(() => (event ? buildRaceLogistics(event) : []), [event]);
+  const racePelotons = useMemo(
+    () => (event ? buildRacePelotons(event, athlete) : []),
+    [athlete, event],
+  );
+  const raceSafetyChecklist = useMemo(
+    () => (event ? buildRaceSafetyChecklist(athlete, event) : []),
+    [athlete, event],
+  );
+
+  const eventChecklist = useMemo(() => {
+    if (!event) return [];
+    const deadlineOpen = event.registration_deadline
+      ? new Date(event.registration_deadline).getTime() >= Date.now()
+      : true;
+
+    return [
+      {
+        label: "Inscricao",
+        done: inscritosNaProva.length > 0,
+        hint: inscritosNaProva.length > 0 ? "Voce ja esta nessa prova." : "Escolha uma distancia.",
+      },
+      {
+        label: "Janela",
+        done: deadlineOpen,
+        hint: deadlineOpen ? "Inscricao dentro do prazo." : "Prazo encerrado.",
+      },
+      {
+        label: "CPF",
+        done: !canRegister || Boolean(athlete?.cpf),
+        hint: athlete?.cpf ? "Perfil pronto para pagamento." : "Complete o perfil antes de pagar.",
+      },
+      {
+        label: "Emergencia",
+        done: !canRegister || Boolean(athlete?.emergencyContact),
+        hint: athlete?.emergencyContact ? "Contato registrado." : "Adicione um contato de apoio.",
+      },
+    ];
+  }, [athlete?.cpf, athlete?.emergencyContact, canRegister, event, inscritosNaProva.length]);
 
   if (loading) {
     return <LoadingState lines={5} />;
@@ -141,6 +210,11 @@ export default function ProvaDetalhePage() {
               const isRegistered = inscritosNaProva.some(
                 (item) => item.distanceLabel === distance.label,
               );
+              const recommendation = getRaceDistanceRecommendation(
+                distance,
+                athlete,
+                event.event_date,
+              );
 
               return (
                 <article
@@ -158,6 +232,15 @@ export default function ProvaDetalhePage() {
                       tone={isSoldOut ? "danger" : "info"}
                       label={isSoldOut ? "Esgotado" : "Disponivel"}
                     />
+                  </div>
+                  <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-semibold uppercase tracking-[0.08em] text-sky-200">
+                        Leitura esportiva
+                      </p>
+                      <StatusBadge label={recommendation.label} tone={recommendation.tone} />
+                    </div>
+                    <p className="mt-2 text-xs leading-5 text-slate-300">{recommendation.reason}</p>
                   </div>
 
                   <div className="mt-3 space-y-1 text-sm text-slate-200">
@@ -224,6 +307,95 @@ export default function ProvaDetalhePage() {
           </SectionCard>
 
           <SectionCard
+            title="Logistica da largada"
+            description="Pontos praticos para chegar pronto"
+          >
+            <div className="space-y-2">
+              {raceLogistics.map((item) => (
+                <div
+                  key={item.label}
+                  className="rounded-xl border border-white/10 bg-[#0f233d] p-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-white">{item.label}</p>
+                      <p className="mt-1 text-xs leading-5 text-slate-400">{item.value}</p>
+                    </div>
+                    <StatusBadge
+                      label={item.status === "ready" ? "ok" : "atencao"}
+                      tone={item.status === "ready" ? "positive" : "warning"}
+                    />
+                  </div>
+                </div>
+              ))}
+              {event.external_url ? (
+                <ActionButton asChild size="sm" intent="secondary" className="mt-1 w-full">
+                  <a href={event.external_url} target="_blank" rel="noreferrer">
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    Site oficial
+                  </a>
+                </ActionButton>
+              ) : null}
+            </div>
+          </SectionCard>
+
+          {bestRecommendation ? (
+            <SectionCard title="Melhor encaixe" description="Sugestao baseada no perfil atual">
+              <div className="rounded-xl border border-white/10 bg-[#0f233d] p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-white">{bestRecommendation.title}</p>
+                    <p className="mt-2 text-xs leading-5 text-slate-300">
+                      {bestRecommendation.reason}
+                    </p>
+                  </div>
+                  <StatusBadge label={bestRecommendation.label} tone={bestRecommendation.tone} />
+                </div>
+              </div>
+            </SectionCard>
+          ) : null}
+
+          <SectionCard title="Dia da prova" description="Checklist essencial para largar tranquilo">
+            <div className="grid gap-2">
+              {eventChecklist.map((item) => (
+                <div
+                  key={item.label}
+                  className="rounded-xl border border-white/10 bg-[#0f233d] p-3"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-white">{item.label}</p>
+                    <StatusBadge
+                      label={item.done ? "ok" : "pendente"}
+                      tone={item.done ? "positive" : "warning"}
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-slate-400">{item.hint}</p>
+                </div>
+              ))}
+              {raceSafetyChecklist.map((item) => (
+                <div
+                  key={`safety-${item.label}`}
+                  className="rounded-xl border border-white/10 bg-[#0f233d] p-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="inline-flex items-center gap-2 text-sm font-semibold text-white">
+                        <ShieldCheck className="h-4 w-4 text-sky-200" />
+                        {item.label}
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-slate-400">{item.value}</p>
+                    </div>
+                    <StatusBadge
+                      label={item.status === "ready" ? "ok" : "atencao"}
+                      tone={item.status === "ready" ? "positive" : "warning"}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </SectionCard>
+
+          <SectionCard
             title="Janela de inscricao"
             description="Planeje seu pagamento e confirmacao"
           >
@@ -237,6 +409,44 @@ export default function ProvaDetalhePage() {
           </SectionCard>
         </div>
       </div>
+
+      {racePelotons.length ? (
+        <SectionCard
+          title="Pelotoes sugeridos"
+          description="Grupos de largada para combinar ritmo, distancia e acompanhamento"
+        >
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {racePelotons.map((peloton) => (
+              <article
+                key={peloton.id}
+                className="rounded-xl border border-white/10 bg-[#0f233d] p-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-white">{peloton.name}</p>
+                    <p className="mt-1 text-xs text-slate-400">{peloton.distanceLabel}</p>
+                  </div>
+                  <StatusBadge
+                    label={peloton.capacityLabel}
+                    tone={peloton.capacityLabel === "lotado" ? "danger" : "info"}
+                  />
+                </div>
+                <div className="mt-3 space-y-2 text-xs text-slate-300">
+                  <p className="inline-flex items-center gap-1.5">
+                    <Clock3 className="h-3.5 w-3.5 text-sky-200" />
+                    Encontro {peloton.meetingTime}
+                  </p>
+                  <p className="inline-flex items-center gap-1.5">
+                    <Route className="h-3.5 w-3.5 text-sky-200" />
+                    {peloton.paceRange}
+                  </p>
+                  <p className="leading-5 text-slate-400">{peloton.routeNote}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </SectionCard>
+      ) : null}
 
       <SectionCard title="Descricao da prova" description="Contexto do evento e proposta esportiva">
         <p className="text-sm leading-relaxed text-slate-200">

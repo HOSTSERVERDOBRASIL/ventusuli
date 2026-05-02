@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useFieldArray, useForm } from "react-hook-form";
+import { type Resolver, useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
 import { Plus, Trash2 } from "lucide-react";
 import { format } from "date-fns";
@@ -18,6 +18,14 @@ import { EventCard } from "@/components/events/event-card";
 import type { EventStatus, EventView } from "@/components/events/types";
 import { uploadImageFile } from "@/services/upload-service";
 
+function optionalNumber(schema: z.ZodNumber) {
+  return z.preprocess(
+    (value) =>
+      value === "" || (typeof value === "number" && Number.isNaN(value)) ? undefined : value,
+    schema.optional(),
+  );
+}
+
 const distanceSchema = z.object({
   label: z.string().trim().min(1, "Informe o label"),
   distance_km: z.coerce.number().positive("Informe a distÃ¢ncia"),
@@ -25,16 +33,33 @@ const distanceSchema = z.object({
   max_slots: z.union([z.coerce.number().int().positive(), z.nan()]).optional(),
 });
 
-const eventFormSchema = z.object({
-  name: z.string().trim().min(3, "Nome deve ter ao menos 3 caracteres"),
-  city: z.string().trim().min(2, "Cidade obrigatÃ³ria"),
-  state: z.string().trim().length(2, "UF invÃ¡lida"),
-  event_date: z.string().min(1, "Data obrigatÃ³ria"),
-  registration_deadline: z.string().optional(),
-  description: z.string().optional(),
-  image_url: z.string().trim().optional(),
-  distances: z.array(distanceSchema).min(1, "Adicione ao menos uma distÃ¢ncia"),
-});
+const eventFormSchema = z
+  .object({
+    name: z.string().trim().min(3, "Nome deve ter ao menos 3 caracteres"),
+    city: z.string().trim().min(2, "Cidade obrigatÃ³ria"),
+    state: z.string().trim().length(2, "UF invÃ¡lida"),
+    address: z.string().trim().optional(),
+    latitude: optionalNumber(z.number().min(-90, "Latitude invalida").max(90, "Latitude invalida")),
+    longitude: optionalNumber(
+      z.number().min(-180, "Longitude invalida").max(180, "Longitude invalida"),
+    ),
+    check_in_radius_m: z.coerce.number().int().min(25).max(1000).default(100),
+    proximity_radius_m: z.coerce.number().int().min(50).max(2000).default(200),
+    event_date: z.string().min(1, "Data obrigatÃ³ria"),
+    registration_deadline: z.string().optional(),
+    description: z.string().optional(),
+    image_url: z.string().trim().optional(),
+    external_url: z.string().trim().optional(),
+    distances: z.array(distanceSchema).min(1, "Adicione ao menos uma distÃ¢ncia"),
+  })
+  .refine((value) => (value.latitude == null) === (value.longitude == null), {
+    message: "Informe latitude e longitude do ponto da prova",
+    path: ["latitude"],
+  })
+  .refine((value) => value.proximity_radius_m >= value.check_in_radius_m, {
+    message: "O raio de proximidade deve ser maior ou igual ao check-in",
+    path: ["proximity_radius_m"],
+  });
 
 type EventFormValues = z.infer<typeof eventFormSchema>;
 
@@ -83,10 +108,16 @@ export function EventForm({
       name: string;
       city: string;
       state: string;
+      address?: string;
+      latitude?: number | null;
+      longitude?: number | null;
+      check_in_radius_m?: number;
+      proximity_radius_m?: number;
       event_date: string;
       registration_deadline?: string;
       description?: string;
       image_url?: string;
+      external_url?: string;
       distances: Array<{
         label: string;
         distance_km: number;
@@ -108,12 +139,17 @@ export function EventForm({
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<EventFormValues>({
-    resolver: zodResolver(eventFormSchema),
+    resolver: zodResolver(eventFormSchema) as Resolver<EventFormValues>,
     mode: "onChange",
     defaultValues: {
       name: initialEvent?.name ?? "",
       city: initialEvent?.city ?? "",
       state: initialEvent?.state ?? "",
+      address: initialEvent?.address ?? "",
+      latitude: initialEvent?.latitude ?? undefined,
+      longitude: initialEvent?.longitude ?? undefined,
+      check_in_radius_m: initialEvent?.check_in_radius_m ?? 100,
+      proximity_radius_m: initialEvent?.proximity_radius_m ?? 200,
       event_date: initialEvent?.event_date
         ? format(new Date(initialEvent.event_date), "yyyy-MM-dd")
         : "",
@@ -122,6 +158,7 @@ export function EventForm({
         : "",
       description: initialEvent?.description ?? "",
       image_url: initialEvent?.image_url ?? "",
+      external_url: initialEvent?.external_url ?? "",
       distances: initialEvent?.distances?.map((distance) => ({
         label: distance.label,
         distance_km: distance.distance_km,
@@ -144,6 +181,11 @@ export function EventForm({
       name: values.name || "Nova prova",
       city: values.city || "Cidade",
       state: (values.state || "UF").toUpperCase(),
+      address: values.address || null,
+      latitude: Number.isFinite(values.latitude as number) ? Number(values.latitude) : null,
+      longitude: Number.isFinite(values.longitude as number) ? Number(values.longitude) : null,
+      check_in_radius_m: Number(values.check_in_radius_m) || 100,
+      proximity_radius_m: Number(values.proximity_radius_m) || 200,
       event_date: values.event_date
         ? new Date(`${values.event_date}T08:00:00.000Z`).toISOString()
         : new Date().toISOString(),
@@ -152,6 +194,7 @@ export function EventForm({
         : null,
       description: values.description,
       image_url: values.image_url || null,
+      external_url: values.external_url || null,
       status: submitMode === "PUBLISHED" ? "PUBLISHED" : (initialEvent?.status ?? "DRAFT"),
       registrations_count: initialEvent?.registrations_count ?? 0,
       distances: (values.distances ?? []).map((distance) => ({
@@ -168,6 +211,17 @@ export function EventForm({
 
   const submit = async (status: EventStatus, formValues: EventFormValues) => {
     setSubmitMode(status);
+    const latitude = Number.isFinite(formValues.latitude as number)
+      ? Number(formValues.latitude)
+      : null;
+    const longitude = Number.isFinite(formValues.longitude as number)
+      ? Number(formValues.longitude)
+      : null;
+
+    if (status === "PUBLISHED" && (latitude == null || longitude == null)) {
+      toast.error("Informe latitude e longitude do ponto exato antes de publicar.");
+      return;
+    }
 
     await onSubmit({
       status,
@@ -175,12 +229,18 @@ export function EventForm({
         name: formValues.name,
         city: formValues.city,
         state: formValues.state.toUpperCase(),
+        address: formValues.address?.trim() ? formValues.address.trim() : undefined,
+        latitude,
+        longitude,
+        check_in_radius_m: Number(formValues.check_in_radius_m) || 100,
+        proximity_radius_m: Number(formValues.proximity_radius_m) || 200,
         event_date: new Date(`${formValues.event_date}T08:00:00.000Z`).toISOString(),
         registration_deadline: formValues.registration_deadline
           ? new Date(`${formValues.registration_deadline}T23:59:59.000Z`).toISOString()
           : undefined,
         description: formValues.description,
         image_url: formValues.image_url?.trim() ? formValues.image_url.trim() : undefined,
+        external_url: formValues.external_url?.trim() ? formValues.external_url.trim() : undefined,
         distances: formValues.distances.map((distance) => ({
           label: distance.label,
           distance_km: Number(distance.distance_km),
@@ -228,6 +288,76 @@ export function EventForm({
               ) : null}
             </div>
 
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="address">Ponto de encontro / endereço</Label>
+              <Input
+                id="address"
+                className="border-white/15 bg-[#0F2743]"
+                placeholder="Trapiche da Beira-Mar Norte"
+                {...register("address")}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="latitude">Latitude do check-in</Label>
+              <Input
+                id="latitude"
+                type="number"
+                step="0.000001"
+                className="border-white/15 bg-[#0F2743]"
+                placeholder="-27.584000"
+                {...register("latitude", { valueAsNumber: true })}
+              />
+              {errors.latitude ? (
+                <p className="text-xs text-amber-300">{errors.latitude.message}</p>
+              ) : null}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="longitude">Longitude do check-in</Label>
+              <Input
+                id="longitude"
+                type="number"
+                step="0.000001"
+                className="border-white/15 bg-[#0F2743]"
+                placeholder="-48.545000"
+                {...register("longitude", { valueAsNumber: true })}
+              />
+              {errors.longitude ? (
+                <p className="text-xs text-amber-300">{errors.longitude.message}</p>
+              ) : null}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="check_in_radius_m">Raio de check-in (m)</Label>
+              <Input
+                id="check_in_radius_m"
+                type="number"
+                min={25}
+                max={1000}
+                className="border-white/15 bg-[#0F2743]"
+                {...register("check_in_radius_m", { valueAsNumber: true })}
+              />
+              {errors.check_in_radius_m ? (
+                <p className="text-xs text-amber-300">{errors.check_in_radius_m.message}</p>
+              ) : null}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="proximity_radius_m">Raio de proximidade (m)</Label>
+              <Input
+                id="proximity_radius_m"
+                type="number"
+                min={50}
+                max={2000}
+                className="border-white/15 bg-[#0F2743]"
+                {...register("proximity_radius_m", { valueAsNumber: true })}
+              />
+              {errors.proximity_radius_m ? (
+                <p className="text-xs text-amber-300">{errors.proximity_radius_m.message}</p>
+              ) : null}
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="event_date">Data da prova</Label>
               <Input
@@ -257,6 +387,16 @@ export function EventForm({
                 id="description"
                 className="min-h-24 w-full rounded-xl border border-white/15 bg-[#0F2743] px-3 py-2 text-sm"
                 {...register("description")}
+              />
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="external_url">Link oficial</Label>
+              <Input
+                id="external_url"
+                className="border-white/15 bg-[#0F2743]"
+                placeholder="https://..."
+                {...register("external_url")}
               />
             </div>
 

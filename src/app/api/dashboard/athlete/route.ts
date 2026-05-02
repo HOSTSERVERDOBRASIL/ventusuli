@@ -17,9 +17,9 @@ import {
   formatDistanceKm,
   monthlyDeltaLabel,
 } from "@/lib/dashboard/calculations";
+import { buildUserGamificationSnapshot } from "@/lib/gamification/snapshot";
 import { getAuthContext } from "@/lib/request-auth";
 import type { DashboardData } from "@/services/types";
-import { UserRole } from "@prisma/client";
 
 export const revalidate = 60;
 
@@ -150,7 +150,10 @@ async function getProximaCobranca(
   return rows[0] ?? null;
 }
 
-function buildEmptyExperience(athleteName: string): NonNullable<DashboardData["experience"]> {
+function buildEmptyExperience(
+  athleteName: string,
+  gamification: NonNullable<DashboardData["experience"]>["gamification"],
+): NonNullable<DashboardData["experience"]> {
   return {
     greeting: {
       headline: `Bora correr, ${athleteName.split(" ")[0]}!`,
@@ -181,6 +184,7 @@ function buildEmptyExperience(athleteName: string): NonNullable<DashboardData["e
       source: "EMPTY",
       message: "Sem dados da comunidade no momento.",
     },
+    gamification,
   };
 }
 
@@ -193,6 +197,7 @@ function buildActivityExperience(params: {
   distanceDistribution: Awaited<ReturnType<typeof getDistanceDistribution>>;
   personalRecords: Awaited<ReturnType<typeof getPersonalRecords>>;
   ranking: Awaited<ReturnType<typeof getGroupRanking>>;
+  gamification: NonNullable<DashboardData["experience"]>["gamification"];
 }): NonNullable<DashboardData["experience"]> {
   const {
     athleteName,
@@ -203,6 +208,7 @@ function buildActivityExperience(params: {
     distanceDistribution,
     personalRecords,
     ranking,
+    gamification,
   } = params;
 
   const totalFinanceiro = totalGastoAno + pendente;
@@ -307,13 +313,15 @@ function buildActivityExperience(params: {
       source: "EMPTY",
       message: "Comunidade sem publicacoes para sua organizacao no momento.",
     },
+    gamification,
   };
 }
 
 export async function GET(req: NextRequest) {
   const auth = getAuthContext(req);
   if (!auth) return apiError("UNAUTHORIZED", "Token de acesso ausente.", 401);
-  if (auth.role !== UserRole.ATHLETE) {
+  const authRole = String(auth.role);
+  if (authRole !== "ATHLETE" && authRole !== "PREMIUM_ATHLETE") {
     return apiError("FORBIDDEN", "Apenas atletas podem acessar o dashboard de evolucao.", 403);
   }
 
@@ -489,6 +497,7 @@ export async function GET(req: NextRequest) {
       }));
 
     const athleteName = athleteUser?.name ?? "Atleta";
+    const gamification = await buildUserGamificationSnapshot(prisma, auth.userId, auth.orgId, now);
 
     const [connectedToStrava, activitiesAvailable] = await Promise.all([
       hasStravaConnection(prisma, auth.userId, auth.orgId),
@@ -529,6 +538,7 @@ export async function GET(req: NextRequest) {
         distanceDistribution,
         personalRecords,
         ranking,
+        gamification,
       });
 
       metricsSnapshot = {
@@ -541,7 +551,7 @@ export async function GET(req: NextRequest) {
 
       experienceSource = "LIVE";
     } else {
-      experience = buildEmptyExperience(athleteName);
+      experience = buildEmptyExperience(athleteName, gamification);
     }
 
     const payload: DashboardAthleteResponse = {

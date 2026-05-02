@@ -16,11 +16,13 @@ const patchSchema = z.object({
 });
 
 function canViewAthletes(role: UserRole): boolean {
-  return role === UserRole.ADMIN || role === UserRole.COACH;
+  const value = String(role);
+  return value === "ADMIN" || value === "MANAGER" || value === "COACH" || value === "SUPPORT";
 }
 
 function canManageAthletes(role: UserRole): boolean {
-  return role === UserRole.ADMIN;
+  const value = String(role);
+  return value === "ADMIN" || value === "MANAGER";
 }
 
 function getInternalNote(value: unknown): string | null {
@@ -126,6 +128,22 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
       .sort(
         (a, b) => new Date(a.event.event_date).getTime() - new Date(b.event.event_date).getTime(),
       )[0] ?? null;
+  const confirmedRegistrations = athlete.registrations.filter(
+    (registration) => registration.status === "CONFIRMED",
+  );
+  const presentCount = confirmedRegistrations.filter(
+    (registration) => registration.attendance_status === "PRESENT",
+  ).length;
+  const absentCount = confirmedRegistrations.filter(
+    (registration) => registration.attendance_status === "ABSENT",
+  ).length;
+  const pendingAttendanceCount = confirmedRegistrations.filter(
+    (registration) => registration.attendance_status === "PENDING",
+  ).length;
+  const participationRate =
+    confirmedRegistrations.length > 0
+      ? Math.round((presentCount / confirmedRegistrations.length) * 100)
+      : 0;
 
   return NextResponse.json({
     data: {
@@ -151,12 +169,23 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
         registrationsCount: athlete.registrations.length,
         paidAmountCents: totalPaidCents,
         pendingAmountCents: totalPendingCents,
+        presentCount,
+        absentCount,
+        pendingAttendanceCount,
+        participationRate,
         nextEventName: nextRegistration?.event.name ?? null,
         nextEventDate: nextRegistration?.event.event_date ?? null,
       },
       registrations: athlete.registrations.map((registration) => ({
         id: registration.id,
         status: registration.status,
+        attendanceStatus: registration.attendance_status,
+        attendanceCheckedAt: registration.attendance_checked_at,
+        attendanceCheckedBy: registration.attendance_checked_by,
+        checkInAt: registration.check_in_at,
+        checkInDistanceM: registration.check_in_distance_m,
+        checkOutAt: registration.check_out_at,
+        checkOutDistanceM: registration.check_out_distance_m,
         registeredAt: registration.registered_at,
         event: {
           id: registration.event.id,

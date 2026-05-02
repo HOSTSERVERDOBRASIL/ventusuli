@@ -4,36 +4,31 @@ import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { useAuthToken } from "@/components/auth/AuthTokenProvider";
+import {
+  PAGE_ROUTE_POLICY_RULES,
+  canAccessPolicyAny,
+  getRoutePolicy,
+} from "@/lib/authorization";
 import { UserRole } from "@/types";
 
-const ADMIN_ROLES: UserRole[] = [UserRole.ADMIN];
-const FINANCE_ROLES: UserRole[] = [UserRole.ADMIN, UserRole.FINANCE];
-
-function canAccessAdmin(role: UserRole | null, pathname: string): boolean {
-  if (!role) return false;
-  if (pathname === "/admin/financeiro" || pathname.startsWith("/admin/financeiro/")) {
-    return FINANCE_ROLES.includes(role);
-  }
-  if (/^\/admin\/eventos\/[^/]+$/.test(pathname)) {
-    return FINANCE_ROLES.includes(role);
-  }
-  return ADMIN_ROLES.includes(role);
+function canAccessAdmin(roles: readonly UserRole[], pathname: string): boolean {
+  const policy = getRoutePolicy(pathname, PAGE_ROUTE_POLICY_RULES);
+  return policy ? canAccessPolicyAny(roles, policy) : false;
 }
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { hydrated, userRole } = useAuthToken();
+  const { hydrated, userRoles } = useAuthToken();
 
   useEffect(() => {
     if (!hydrated) return;
-    if (!canAccessAdmin(userRole, pathname)) {
-      // Athletes and unauthenticated users go to the main dashboard.
-      router.replace("/");
+    if (!canAccessAdmin(userRoles, pathname)) {
+      router.replace("/dashboard");
     }
-  }, [hydrated, pathname, router, userRole]);
+  }, [hydrated, pathname, router, userRoles]);
 
-  if (!hydrated || !canAccessAdmin(userRole, pathname)) {
+  if (!hydrated || !canAccessAdmin(userRoles, pathname)) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
         <p className="text-sm text-slate-300">Validando permissÃ£o...</p>

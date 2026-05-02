@@ -7,6 +7,7 @@ import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthToken } from "@/components/auth/AuthTokenProvider";
 import { isNavItemActive, splitNavBySection, type NavItem } from "@/components/layout/nav-items";
+import { ProfileSwitcher } from "@/components/layout/ProfileSwitcher";
 
 interface MobileNavProps {
   isOpen: boolean;
@@ -51,8 +52,9 @@ function MobileGroup({
 
 export function MobileNav({ isOpen, onClose }: MobileNavProps) {
   const pathname = usePathname();
-  const { userRoles, organization } = useAuthToken();
-  const groups = splitNavBySection(userRoles);
+  const { userRoles, activeRole, organization } = useAuthToken();
+  const navScope = activeRole ? [activeRole] : userRoles;
+  const groups = splitNavBySection(navScope);
   const navGroups = [
     { title: "Inicio", items: groups.home },
     { title: "Provas e agenda", items: groups.events },
@@ -128,6 +130,7 @@ export function MobileNav({ isOpen, onClose }: MobileNavProps) {
         </div>
 
         <nav className="space-y-3 overflow-y-auto pb-8">
+          <ProfileSwitcher className="mb-1" />
           {navGroups.map((group) => (
             <MobileGroup
               key={group.title}

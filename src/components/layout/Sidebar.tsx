@@ -4,9 +4,11 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { DoorOpen, UserCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getProfileConfig } from "@/lib/profile-config";
 import { rolesLabel } from "@/lib/role-labels";
 import { useAuthToken } from "@/components/auth/AuthTokenProvider";
 import { isNavItemActive, splitNavBySection, type NavItem } from "@/components/layout/nav-items";
+import { ProfileSwitcher } from "@/components/layout/ProfileSwitcher";
 import { UserRole } from "@/types";
 
 function initialsFromName(name?: string | null): string {
@@ -66,8 +68,9 @@ function NavGroup({
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { userRoles, clearAccessToken, currentUser, organization } = useAuthToken();
-  const groups = splitNavBySection(userRoles);
+  const { userRoles, activeRole, clearAccessToken, currentUser, organization } = useAuthToken();
+  const navScope = activeRole ? [activeRole] : userRoles;
+  const groups = splitNavBySection(navScope);
   const navGroups = [
     { title: "Inicio", items: groups.home },
     { title: "Provas e agenda", items: groups.events },
@@ -81,8 +84,12 @@ export function Sidebar() {
   ];
 
   const organizationLogo = resolveOrganizationLogo(organization?.logo_url);
-  const profileHref = userRoles.includes(UserRole.SUPER_ADMIN) && !userRoles.includes(UserRole.ATHLETE) ? "/super-admin" : "/perfil";
-  const profileLabel = userRoles.includes(UserRole.SUPER_ADMIN) && !userRoles.includes(UserRole.ATHLETE) ? "Plataforma" : "Perfil";
+  const hasAthleteProfile =
+    userRoles.includes(UserRole.ATHLETE) || userRoles.includes(UserRole.PREMIUM_ATHLETE);
+  const onlyPlatform = userRoles.includes(UserRole.SUPER_ADMIN) && !hasAthleteProfile;
+  const profileHref = onlyPlatform ? "/super-admin" : hasAthleteProfile ? "/perfil" : "/configuracoes/conta";
+  const profileLabel = onlyPlatform ? "Plataforma" : hasAthleteProfile ? "Perfil" : "Conta";
+  const activeProfile = getProfileConfig(activeRole ?? userRoles[0]);
 
   const handleLogout = async () => {
     clearAccessToken();
@@ -118,6 +125,7 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4">
+        <ProfileSwitcher className="mb-3" />
         {navGroups.map((group, index) =>
           group.items.length > 0 ? (
             <div key={group.title}>
@@ -141,7 +149,16 @@ export function Sidebar() {
             <p className="truncate text-[12px] font-semibold text-white">
               {currentUser?.name ?? "Usuário"}
             </p>
-            <p className="text-[10px] text-white/35">{rolesLabel(userRoles)}</p>
+            <div className="mt-1 flex min-w-0 items-center gap-1.5">
+              {activeProfile ? (
+                <span className="max-w-[86px] truncate rounded border border-[#ffc229]/25 bg-[#ffc229]/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-[#ffc229]">
+                  {activeProfile.shortLabel}
+                </span>
+              ) : null}
+              <span className="truncate text-[10px] text-white/35">
+                {activeProfile ? "Perfil ativo" : rolesLabel(userRoles)}
+              </span>
+            </div>
           </div>
         </div>
         <div className="mt-2 flex gap-2 px-1">

@@ -95,13 +95,19 @@ function parseRoles(primaryRole: string, roles?: unknown): UserRole[] {
 function fallbackPathByRoles(roles: readonly UserRole[]): string {
   if (roles.includes(UserRole.SUPER_ADMIN)) return "/super-admin";
   if (roles.includes(UserRole.ADMIN)) return "/admin";
+  if (roles.includes(UserRole.MANAGER)) return "/gestor";
   if (roles.includes(UserRole.FINANCE)) return "/admin/financeiro";
+  if (roles.includes(UserRole.ORGANIZER)) return "/organizador";
   if (roles.includes(UserRole.COACH)) return "/coach";
+  if (roles.includes(UserRole.SUPPORT)) return "/suporte";
+  if (roles.includes(UserRole.MODERATOR)) return "/moderador";
+  if (roles.includes(UserRole.PARTNER)) return "/parceiro";
+  if (roles.includes(UserRole.PREMIUM_ATHLETE)) return "/premium";
   return "/";
 }
 
 function resolveLegacyAthletesPath(roles: readonly UserRole[]): string {
-  if (roles.includes(UserRole.ADMIN)) return "/admin/atletas";
+  if (roles.includes(UserRole.ADMIN) || roles.includes(UserRole.MANAGER)) return "/admin/atletas";
   if (roles.includes(UserRole.COACH)) return "/coach/atletas";
   return fallbackPathByRoles(roles);
 }
@@ -261,6 +267,18 @@ export const config = {
     "/admin/:path*",
     "/coach",
     "/coach/:path*",
+    "/gestor",
+    "/gestor/:path*",
+    "/organizador",
+    "/organizador/:path*",
+    "/premium",
+    "/premium/:path*",
+    "/suporte",
+    "/suporte/:path*",
+    "/moderador",
+    "/moderador/:path*",
+    "/parceiro",
+    "/parceiro/:path*",
     "/provas",
     "/provas/:path*",
     "/minhas-inscricoes",
@@ -287,6 +305,7 @@ export const config = {
     "/patrocinadores/:path*",
     "/onboarding",
     "/onboarding/:path*",
+    "/selecionar-perfil",
     "/login",
     "/mfa",
     "/aguardando-aprovacao",

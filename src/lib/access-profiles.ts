@@ -3,8 +3,14 @@ import { UserRole } from "@/types";
 const ROLE_PRIORITY: UserRole[] = [
   UserRole.SUPER_ADMIN,
   UserRole.ADMIN,
+  UserRole.MANAGER,
   UserRole.FINANCE,
+  UserRole.ORGANIZER,
   UserRole.COACH,
+  UserRole.SUPPORT,
+  UserRole.MODERATOR,
+  UserRole.PARTNER,
+  UserRole.PREMIUM_ATHLETE,
   UserRole.ATHLETE,
 ];
 

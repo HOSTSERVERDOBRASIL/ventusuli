@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import { Bell, LogOut, Menu, Search } from "lucide-react";
 import { useAuthToken } from "@/components/auth/AuthTokenProvider";
 import { getQuickSearchLinks, getVisibleNavItems } from "@/components/layout/nav-items";
+import { ProfileSwitcher } from "@/components/layout/ProfileSwitcher";
+import { getProfileConfig } from "@/lib/profile-config";
 import { rolesLabel } from "@/lib/role-labels";
 import { UserRole } from "@/types";
 
@@ -31,31 +33,35 @@ function initialsFromName(name?: string | null): string {
 }
 
 export function Topbar({ user, onMobileMenuOpen }: TopbarProps) {
-  const { clearAccessToken, userRoles, organization, currentUser } = useAuthToken();
+  const { clearAccessToken, userRoles, activeRole, organization, currentUser } = useAuthToken();
   const router = useRouter();
   const pathname = usePathname();
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const navScope = useMemo(() => (activeRole ? [activeRole] : userRoles), [activeRole, userRoles]);
 
-  const quickLinks = useMemo(() => getQuickSearchLinks(userRoles), [userRoles]);
+  const quickLinks = useMemo(() => getQuickSearchLinks(navScope), [navScope]);
   const currentPageLabel = useMemo(() => {
-    const items = getVisibleNavItems(userRoles);
+    const items = getVisibleNavItems(navScope);
     const active = items
       .filter((item) => pathname === item.href || (item.href !== "/" && pathname.startsWith(`${item.href}/`)))
       .sort((a, b) => b.href.length - a.href.length)[0];
     return active?.label ?? "Dashboard";
-  }, [pathname, userRoles]);
+  }, [navScope, pathname]);
   const filteredLinks = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return quickLinks;
     return quickLinks.filter((item) => item.label.toLowerCase().includes(q));
   }, [quickLinks, query]);
-  const onlyPlatform = userRoles.includes(UserRole.SUPER_ADMIN) && !userRoles.includes(UserRole.ATHLETE);
-  const profileHref = onlyPlatform ? "/super-admin" : "/perfil";
-  const profileLabel = onlyPlatform ? "Plataforma" : "Meu perfil";
+  const hasAthleteProfile =
+    userRoles.includes(UserRole.ATHLETE) || userRoles.includes(UserRole.PREMIUM_ATHLETE);
+  const onlyPlatform = userRoles.includes(UserRole.SUPER_ADMIN) && !hasAthleteProfile;
+  const profileHref = onlyPlatform ? "/super-admin" : hasAthleteProfile ? "/perfil" : "/configuracoes/conta";
+  const profileLabel = onlyPlatform ? "Plataforma" : hasAthleteProfile ? "Meu perfil" : "Conta";
   const displayName = currentUser?.name ?? user?.name ?? "Usuário";
   const displayInitials = initialsFromName(displayName);
   const avatarUrl = currentUser?.avatar_url ?? user?.image ?? null;
+  const activeProfile = getProfileConfig(activeRole ?? userRoles[0]);
 
   const handleLogout = async () => {
     clearAccessToken();
@@ -156,6 +162,8 @@ export function Topbar({ user, onMobileMenuOpen }: TopbarProps) {
           <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-[#1E90FF]" />
         </button>
 
+        <ProfileSwitcher compact />
+
         {/* Avatar */}
         <Link
           href={profileHref}
@@ -176,7 +184,7 @@ export function Topbar({ user, onMobileMenuOpen }: TopbarProps) {
           <span className="hidden min-w-0 sm:block">
             <span className="block max-w-[140px] truncate font-medium leading-tight">{displayName}</span>
             <span className="block max-w-[140px] truncate text-[10px] leading-tight text-white/35">
-              {rolesLabel(userRoles)}
+              {activeProfile ? activeProfile.shortLabel : rolesLabel(userRoles)}
             </span>
           </span>
         </Link>

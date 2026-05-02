@@ -69,12 +69,30 @@ function resolvePostLoginPath(
 ): string {
   if (role === "COACH") return nextParam?.startsWith("/coach") ? nextParam : "/coach";
   if (role === "SUPER_ADMIN") return nextParam?.startsWith("/super-admin") ? nextParam : "/super-admin";
+  if (role === "MANAGER") {
+    if (nextParam && (nextParam.startsWith("/gestor") || nextParam.startsWith("/admin"))) {
+      return nextParam;
+    }
+    return "/gestor";
+  }
+  if (role === "ORGANIZER") {
+    return nextParam?.startsWith("/organizador") ? nextParam : "/organizador";
+  }
+  if (role === "SUPPORT") return nextParam?.startsWith("/suporte") ? nextParam : "/suporte";
+  if (role === "MODERATOR") return nextParam?.startsWith("/moderador") ? nextParam : "/moderador";
+  if (role === "PARTNER") return nextParam?.startsWith("/parceiro") ? nextParam : "/parceiro";
   if (role === "FINANCE") {
     return nextParam?.startsWith("/admin/financeiro") ? nextParam : "/admin/financeiro";
   }
   if (role === "ADMIN") {
     if (organizationStatus === "PENDING_SETUP" || !setupCompletedAt) return "/onboarding/assessoria";
     return nextParam?.startsWith("/admin") ? nextParam : "/admin";
+  }
+  if (role === "PREMIUM_ATHLETE") {
+    if (!hasCpf) return "/onboarding/atleta";
+    return nextParam && nextParam.startsWith("/") && !nextParam.startsWith("/admin")
+      ? nextParam
+      : "/premium";
   }
   if (!hasCpf) return "/onboarding/atleta";
   return nextParam && nextParam.startsWith("/") && !nextParam.startsWith("/admin") ? nextParam : "/";
@@ -199,6 +217,14 @@ export function MfaChallengeForm() {
 
       toast.success(setupRequired ? "MFA ativado com sucesso." : "Identidade confirmada.");
       const nextPath = searchParams.get("next");
+      const roles = payload.user.roles?.length ? payload.user.roles : [payload.user.role];
+      if (roles.length > 1 && searchParams.get("profile") !== "1") {
+        const profileUrl = new URL("/selecionar-perfil", window.location.origin);
+        if (nextPath) profileUrl.searchParams.set("next", nextPath);
+        router.push(profileUrl.pathname + profileUrl.search);
+        return;
+      }
+
       const hasCpf = payload.profile?.hasCpf ?? true;
       const destination = resolvePostLoginPath(
         payload.user.role,

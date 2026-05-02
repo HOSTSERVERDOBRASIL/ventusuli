@@ -18,6 +18,12 @@ enum UserRole {
   FINANCE
   COACH
   ATHLETE
+  ORGANIZER
+  MANAGER
+  PREMIUM_ATHLETE
+  SUPPORT
+  MODERATOR
+  PARTNER
 
   @@schema("public")
 }
@@ -803,6 +809,10 @@ model Event {
   city                  String?
   state                 String?      @db.Char(2)
   address               String?
+  latitude              Decimal?     @db.Decimal(9, 6)
+  longitude             Decimal?     @db.Decimal(9, 6)
+  check_in_radius_m     Int          @default(100)
+  proximity_radius_m    Int          @default(200)
   event_date            DateTime
   registration_deadline DateTime?
   description           String?
@@ -857,6 +867,14 @@ model Registration {
   attendance_status     AttendanceStatus   @default(PENDING)
   attendance_checked_at DateTime?
   attendance_checked_by String?
+  check_in_at           DateTime?
+  check_in_latitude     Decimal?           @db.Decimal(9, 6)
+  check_in_longitude    Decimal?           @db.Decimal(9, 6)
+  check_in_distance_m   Int?
+  check_out_at          DateTime?
+  check_out_latitude    Decimal?           @db.Decimal(9, 6)
+  check_out_longitude   Decimal?           @db.Decimal(9, 6)
+  check_out_distance_m  Int?
   notes                 String?
   registered_at         DateTime           @default(now())
 
@@ -866,6 +884,7 @@ model Registration {
   @@index([organization_id])
   @@index([user_id])
   @@index([organization_id, event_id, attendance_status])
+  @@index([organization_id, event_id, check_in_at])
   @@map("registrations")
   @@schema("public")
 }

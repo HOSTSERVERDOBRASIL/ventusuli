@@ -5,7 +5,13 @@ import { apiError } from "@/lib/api-error";
 import { getAuthContext } from "@/lib/request-auth";
 
 function isAdminRole(role: UserRole): boolean {
-  return role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN;
+  const value = String(role);
+  return (
+    value === "ADMIN" ||
+    value === "SUPER_ADMIN" ||
+    value === "MANAGER" ||
+    value === "ORGANIZER"
+  );
 }
 
 function prismaToApiError(error: unknown): NextResponse {
@@ -22,7 +28,8 @@ interface RouteParams {
 export async function POST(req: NextRequest, { params }: RouteParams) {
   const auth = getAuthContext(req);
   if (!auth) return apiError("UNAUTHORIZED", "Token de acesso ausente.", 401);
-  if (!isAdminRole(auth.role)) return apiError("FORBIDDEN", "Apenas administradores podem duplicar provas.", 403);
+  if (!isAdminRole(auth.role))
+    return apiError("FORBIDDEN", "Apenas administradores podem duplicar provas.", 403);
 
   try {
     const source = await prisma.event.findFirst({
@@ -50,6 +57,10 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
           city: source.city,
           state: source.state,
           address: source.address,
+          latitude: source.latitude,
+          longitude: source.longitude,
+          check_in_radius_m: source.check_in_radius_m,
+          proximity_radius_m: source.proximity_radius_m,
           event_date: source.event_date,
           registration_deadline: source.registration_deadline,
           description: source.description,
