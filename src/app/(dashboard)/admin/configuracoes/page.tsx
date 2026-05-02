@@ -10,7 +10,7 @@ import {
   Plus,
   Power,
   Trash2,
-  UserPlus,
+  Users,
   Copy,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -29,13 +29,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { VENTU_SULI_LOGO_SRC, resolveOrganizationLogo } from "@/lib/brand";
 import {
   FinanceProfileSettings,
+  AdminAccessUser,
   createInvite,
   deleteInvite,
   getOrganizationSettings,
+  listAdminAccessProfiles,
   listInvites,
   OrgInvite,
   OrganizationSettings,
   toggleInvite,
+  updateAdminAccessProfiles,
   updateOrganizationSettings,
 } from "@/services/organization-service";
 import {
@@ -44,12 +47,27 @@ import {
 } from "@/services/notification-service";
 import { AdminNotificationTemplate } from "@/services/types";
 import { uploadImageFile } from "@/services/upload-service";
+import { roleLabel } from "@/lib/role-labels";
 import { UserRole } from "@/types";
 
 const ADMIN_ROLES = new Set<UserRole>([UserRole.ADMIN, UserRole.MANAGER]);
 const DEFAULT_ORG_LOGO = VENTU_SULI_LOGO_SRC;
 const MAX_LOGO_FILE_SIZE = 2 * 1024 * 1024;
 type SettingsTab = "brand" | "access" | "finance" | "emails" | "invites" | "summary";
+
+const ACCESS_ROLE_DESCRIPTIONS: Record<UserRole, string> = {
+  [UserRole.SUPER_ADMIN]: "Plataforma inteira",
+  [UserRole.ADMIN]: "Configura a assessoria",
+  [UserRole.MANAGER]: "Gestao operacional",
+  [UserRole.FINANCE]: "Financeiro e pagamentos",
+  [UserRole.ORGANIZER]: "Eventos e check-in",
+  [UserRole.COACH]: "Treinos e atletas",
+  [UserRole.SUPPORT]: "Atendimento",
+  [UserRole.MODERATOR]: "Conteudo e comunidade",
+  [UserRole.PARTNER]: "Patrocinadores",
+  [UserRole.PREMIUM_ATHLETE]: "Atleta premium",
+  [UserRole.ATHLETE]: "Atleta comum",
+};
 
 function inviteLink(token: string): string {
   return `${window.location.origin}/register/atleta?inviteToken=${token}`;
@@ -125,6 +143,9 @@ export default function AdminConfiguracoesPage() {
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<OrganizationSettings | null>(null);
   const [invites, setInvites] = useState<OrgInvite[]>([]);
+  const [accessUsers, setAccessUsers] = useState<AdminAccessUser[]>([]);
+  const [assignableRoles, setAssignableRoles] = useState<UserRole[]>([]);
+  const [savingAccessUserId, setSavingAccessUserId] = useState<string | null>(null);
   const [creatingInvite, setCreatingInvite] = useState(false);
   const [newInviteLabel, setNewInviteLabel] = useState("");
   const [showInviteForm, setShowInviteForm] = useState(false);
@@ -186,10 +207,10 @@ export default function AdminConfiguracoesPage() {
         key: "access",
         label: "Acesso",
         audience: "Cadastro",
-        description: "Auto-cadastro, aprovação e entrada de atletas.",
-        icon: UserPlus,
-        metricLabel: "Aprovacao",
-        metricValue: form.requireAthleteApproval ? "Ativa" : "Livre",
+        description: "Auto-cadastro, aprovação e perfis de usuários.",
+        icon: Users,
+        metricLabel: "Usuarios",
+        metricValue: accessUsers.length,
         metricTone: form.requireAthleteApproval ? "warning" : "positive",
       },
       {
@@ -235,6 +256,7 @@ export default function AdminConfiguracoesPage() {
     ],
     [
       activeInvites,
+      accessUsers.length,
       canEdit,
       emailTemplates.length,
       form.financeRecurringChargeEnabled,
@@ -250,10 +272,11 @@ export default function AdminConfiguracoesPage() {
       setLoading(true);
       setError(null);
       try {
-        const [payload, inviteList, templateList] = await Promise.all([
+        const [payload, inviteList, templateList, accessProfiles] = await Promise.all([
           getOrganizationSettings(accessToken),
           listInvites(accessToken).catch(() => []),
           getAdminNotificationTemplates(accessToken, "EMAIL").catch(() => []),
+          listAdminAccessProfiles(accessToken).catch(() => ({ data: [], assignableRoles: [] })),
         ]);
 
         if (!cancelled) {
@@ -290,6 +313,8 @@ export default function AdminConfiguracoesPage() {
             financeQuickNotes: joinLines(payload.financeProfile.quickNotes),
           });
           setInvites(inviteList);
+          setAccessUsers(accessProfiles.data);
+          setAssignableRoles(accessProfiles.assignableRoles);
         }
       } catch (loadError) {
         if (!cancelled) {
@@ -386,6 +411,41 @@ export default function AdminConfiguracoesPage() {
       toast.error(uploadError instanceof Error ? uploadError.message : "Falha ao carregar logo.");
     } finally {
       setUploadingLogo(false);
+    }
+  };
+
+  const handleAccessRoleToggle = async (user: AdminAccessUser, role: UserRole) => {
+    if (!canEdit || savingAccessUserId) return;
+
+    const currentRoles = new Set(user.roles);
+    if (currentRoles.has(role)) {
+      currentRoles.delete(role);
+    } else {
+      currentRoles.add(role);
+      if (role === UserRole.ATHLETE) currentRoles.delete(UserRole.PREMIUM_ATHLETE);
+      if (role === UserRole.PREMIUM_ATHLETE) currentRoles.delete(UserRole.ATHLETE);
+    }
+
+    const nextRoles = Array.from(currentRoles);
+    setSavingAccessUserId(user.id);
+    try {
+      const updated = await updateAdminAccessProfiles(user.id, nextRoles, accessToken);
+      setAccessUsers((prev) =>
+        prev.map((current) =>
+          current.id === user.id
+            ? {
+                ...current,
+                primaryRole: updated.primaryRole,
+                roles: updated.roles,
+              }
+            : current,
+        ),
+      );
+      toast.success("Perfis do usuario atualizados.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao salvar perfis.");
+    } finally {
+      setSavingAccessUserId(null);
     }
   };
 
@@ -646,6 +706,94 @@ export default function AdminConfiguracoesPage() {
                 revisão no painel.
               </p>
             ) : null}
+
+            <div className="mt-6 space-y-3">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-white">Perfis e responsabilidades</p>
+                  <p className="text-xs text-[#8eb0dc]">
+                    Defina o que cada pessoa faz na assessoria. Atleta e atleta premium são
+                    exclusivos entre si.
+                  </p>
+                </div>
+                <StatusBadge
+                  label={`${accessUsers.length} usuario${accessUsers.length === 1 ? "" : "s"}`}
+                  tone={accessUsers.length > 0 ? "positive" : "neutral"}
+                />
+              </div>
+
+              {accessUsers.length === 0 ? (
+                <EmptyState
+                  title="Nenhum usuario operacional encontrado"
+                  description="Cadastre ou aprove usuarios para liberar a gestão de perfis."
+                />
+              ) : (
+                <div className="overflow-hidden rounded-xl border border-white/10">
+                  <div className="divide-y divide-white/10">
+                    {accessUsers.map((user) => (
+                      <div key={user.id} className="bg-[#0a1d36] p-3">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-white">{user.name}</p>
+                            <p className="truncate text-xs text-[#8eb0dc]">{user.email}</p>
+                            <p className="mt-1 text-[11px] text-slate-400">
+                              Principal: {roleLabel(user.primaryRole)}
+                            </p>
+                          </div>
+                          {savingAccessUserId === user.id ? (
+                            <StatusBadge label="Salvando" tone="warning" />
+                          ) : (
+                            <StatusBadge label={user.status} tone="neutral" />
+                          )}
+                        </div>
+
+                        <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                          {assignableRoles.map((role) => {
+                            const checked = user.roles.includes(role);
+                            const disabled =
+                              !canEdit ||
+                              savingAccessUserId !== null ||
+                              role === user.primaryRole ||
+                              (role === UserRole.ATHLETE &&
+                                user.roles.includes(UserRole.PREMIUM_ATHLETE)) ||
+                              (role === UserRole.PREMIUM_ATHLETE &&
+                                user.roles.includes(UserRole.ATHLETE));
+
+                            return (
+                              <label
+                                key={`${user.id}-${role}`}
+                                className={`flex min-h-[62px] items-start gap-2 rounded-lg border px-3 py-2 transition ${
+                                  checked
+                                    ? "border-[#F5A623]/55 bg-[#F5A623]/10"
+                                    : "border-white/10 bg-[#07192b] hover:border-sky-400/30"
+                                } ${disabled ? "opacity-65" : "cursor-pointer"}`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  disabled={disabled}
+                                  onChange={() => void handleAccessRoleToggle(user, role)}
+                                  className="mt-1 h-4 w-4 rounded border-white/20 bg-[#0f233d] accent-[#F5A623]"
+                                />
+                                <span className="min-w-0">
+                                  <span className="block text-xs font-semibold text-white">
+                                    {roleLabel(role)}
+                                  </span>
+                                  <span className="mt-0.5 block text-[11px] leading-4 text-slate-400">
+                                    {ACCESS_ROLE_DESCRIPTIONS[role]}
+                                    {role === user.primaryRole ? " · perfil principal" : ""}
+                                  </span>
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {canEdit ? (
               <div className="mt-4">

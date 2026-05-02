@@ -2,6 +2,8 @@
 
 export { ACCEPTED_IMAGE_FILE_INPUT_ACCEPT } from "@/services/upload-service";
 
+import { UserRole } from "@/types";
+
 export interface FinanceProfileSettings {
   businessModel: "ASSESSORIA" | "GRUPO_CORRIDA" | "ASSOCIACAO" | "CLUBE";
   revenueMode: "MENSALIDADES" | "EVENTOS" | "MISTO" | "PATROCINIOS";
@@ -232,4 +234,64 @@ export async function deleteInvite(inviteId: string, accessToken?: string | null
   if (!response.ok) {
     throw await parseApiError(response, "Nao foi possivel excluir convite.");
   }
+}
+
+export interface AdminAccessUser {
+  id: string;
+  name: string;
+  email: string;
+  status: string;
+  primaryRole: UserRole;
+  roles: UserRole[];
+}
+
+export interface AdminAccessProfilesPayload {
+  data: AdminAccessUser[];
+  assignableRoles: UserRole[];
+}
+
+export async function listAdminAccessProfiles(
+  accessToken?: string | null,
+): Promise<AdminAccessProfilesPayload> {
+  const response = await fetch("/api/admin/users/access-profiles", {
+    method: "GET",
+    cache: "no-store",
+    headers: buildAuthHeaders(accessToken),
+  });
+
+  if (!response.ok) {
+    throw await parseApiError(response, "Nao foi possivel carregar usuarios e perfis.");
+  }
+
+  const payload = await parseJsonResponse<AdminAccessProfilesPayload>(
+    response,
+    "Resposta invalida ao carregar usuarios e perfis.",
+  );
+  if (!Array.isArray(payload.data)) throw new Error("Resposta sem lista de usuarios.");
+  return payload;
+}
+
+export async function updateAdminAccessProfiles(
+  userId: string,
+  roles: UserRole[],
+  accessToken?: string | null,
+): Promise<{ userId: string; primaryRole: UserRole; roles: UserRole[] }> {
+  const response = await fetch(`/api/admin/users/${userId}/access-profiles`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      ...buildAuthHeaders(accessToken),
+    },
+    body: JSON.stringify({ roles }),
+  });
+
+  if (!response.ok) {
+    throw await parseApiError(response, "Nao foi possivel salvar os perfis do usuario.");
+  }
+
+  const payload = await parseJsonResponse<{
+    data: { userId: string; primaryRole: UserRole; roles: UserRole[] };
+  }>(response, "Resposta invalida ao salvar perfis.");
+  if (!payload.data) throw new Error("Resposta sem dados ao salvar perfis.");
+  return payload.data;
 }
