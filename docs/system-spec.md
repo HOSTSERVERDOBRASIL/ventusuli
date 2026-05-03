@@ -4,7 +4,7 @@ Data: 2026-05-03
 
 ## 0. Estado Atual da Implementacao
 
-Esta secao registra o estado real do sistema apos a entrega da agenda oficial de provas e a revisao de escopo para producao.
+Esta secao registra o estado real do sistema apos a entrega da agenda oficial de provas, a revisao de escopo para producao e o primeiro corte do cockpit da prova.
 
 ### Implementado
 
@@ -38,6 +38,8 @@ Esta secao registra o estado real do sistema apos a entrega da agenda oficial de
   - Tela `/admin/eventos/:id/cockpit`
   - Atalhos a partir da listagem e do detalhe administrativo da prova.
   - Agregacao de inscricoes, pagamentos, presenca, lista da assessoria, inscricao coletiva, patrocinadores, fotos e checklist calculada.
+  - Validado com `npm run type-check` e `npm run build`.
+  - Publicado na `main` no commit `6e2bfbf`.
 
 ### Parcialmente Implementado
 
@@ -367,6 +369,15 @@ Criterios de aceite:
 - Admin consegue ver rapidamente quem vai, quem esta pendente e quem ja se inscreveu fora.
 - Alteracoes de status relevantes disparam notificacoes quando configurado.
 - Historico da participacao da prova fica disponivel apos conclusao.
+
+Estado atual do cockpit:
+
+- Implementado como tela de leitura em `/admin/eventos/:id/cockpit`.
+- Implementado como API agregadora em `GET /api/admin/cockpit/events/:id`.
+- Usa dados existentes de `Event`, `Registration`, `Payment`, `OrganizationRacePlan`, `CollectiveSignup`, patrocinadores e fotos.
+- Nao cria novas tabelas nesta primeira versao.
+- Nao persiste checklist operacional ainda; a checklist atual e calculada a partir dos dados existentes.
+- Proximos passos: persistir checklist, criar fase operacional da prova, permitir exportacao, comunicados por prova e acoes em lote.
 
 ### 6.4.4 Modelo de Provas
 
@@ -1174,7 +1185,7 @@ Prioridade:
 
 ### 14.13 Ordem Recomendada de Execucao
 
-1. Cockpit completo da prova da assessoria.
+1. Evoluir o cockpit da prova da assessoria de leitura/agregacao para operacao completa.
 2. Segmentacao basica de audiencia.
 3. Notificacao ao abrir prova e lembretes por prazo.
 4. Formulario avancado do atleta para participacao.
@@ -1212,7 +1223,7 @@ Motivo:
 | --- | --- | --- |
 | Treinos | Ja existe com `TrainingPlan`, semanas, dias, sessoes, feedback, dashboard coach/atleta e IA de treino | Nao criar `TrainingCycle`/`TrainingSession`; evoluir o modulo atual |
 | CRM esportivo do atleta | Parcial via atleta, treino, pagamentos, inscricoes, pontos e perfil | Criar camada agregadora e adicionar notas/alertas/timeline se ainda nao existirem |
-| Cockpit da prova | Parcial via detalhe de evento, inscricoes, check-in e lista da assessoria | Criar cockpit como tela agregadora usando `Event` e `OrganizationRacePlan` |
+| Cockpit da prova | Primeiro corte implementado com API agregadora e tela admin | Evoluir para checklist persistente, fase operacional, exportacao, comunicados e acoes em lote |
 | Inscricao coletiva | Ja existe base com `CollectiveSignup` e `CollectiveMember` | Evoluir estes modelos em vez de criar `GroupRegistrationCampaign` duplicado |
 | TicketSports | Modelo de integracao esta na spec e ha arquivos locais nao versionados | Fechar implementacao, versionar e validar antes de marcar como pronto |
 | Financeiro por prova | Financeiro geral existe; por prova ainda precisa agregacao dedicada | Adicionar itens financeiros por evento ou vinculo claro com `FinancialEntry` |
@@ -1274,7 +1285,7 @@ Financeiro por prova:
 
 Fase 1 tecnica:
 
-1. Cockpit da prova usando dados existentes.
+1. Evoluir cockpit da prova usando dados existentes.
 2. Evolucao da inscricao coletiva em cima de `CollectiveSignup`.
 3. Financeiro por prova com menor mudanca possivel no modelo financeiro atual.
 4. CRM esportivo como agregador de dados ja existentes.
@@ -1298,7 +1309,7 @@ Fase 3 tecnica:
 
 Vale mudar agora:
 
-- Criar cockpit da prova como camada agregadora.
+- Evoluir cockpit da prova como centro operacional completo.
 - Melhorar a lista oficial da assessoria para virar centro operacional.
 - Adicionar status e dados faltantes na inscricao coletiva existente.
 - Criar segmentacao basica e conectar com abertura de provas.
