@@ -6,13 +6,13 @@ export default function SupportHomePage() {
   return (
     <RoleHome
       role={UserRole.SUPPORT}
-      title="Suporte"
-      subtitle="Contexto de atendimento para orientar usuarios sem misturar com perfis operacionais."
+      title="Coordenador"
+      subtitle="Contexto legado de atendimento tratado como coordenacao operacional."
       metrics={[
         {
           label: "Atendimento",
-          value: "Separado",
-          description: "Perfil proprio para suporte e acompanhamento assistido.",
+          value: "Coordenado",
+          description: "Atendimento e acompanhamento assistido ficam dentro da coordenacao.",
         },
         {
           label: "Acesso",
@@ -36,12 +36,12 @@ export default function SupportHomePage() {
       focusItems={[
         {
           title: "Atendimento com contexto",
-          description: "O suporte pode ser identificado como suporte no frontend e nas politicas.",
+          description: "Usuarios antigos com suporte aparecem como coordenadores no produto.",
           status: "Perfil",
         },
         {
           title: "Evolucao segura",
-          description: "Novos modulos de fila e tickets podem usar SUPPORT_AREA sem refazer o RBAC.",
+          description: "A compatibilidade tecnica continua sem criar um sexto perfil visivel.",
           status: "Base",
         },
         {

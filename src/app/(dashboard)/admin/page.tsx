@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { format, formatDistanceToNowStrict } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -442,10 +443,13 @@ export default function AdminOverviewPage() {
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-start gap-2">
                       {event.image_url ? (
-                        <div className="h-10 w-14 overflow-hidden rounded-md border border-white/10 bg-[#0c1d33]">
-                          <img
+                        <div className="relative h-10 w-14 overflow-hidden rounded-md border border-white/10 bg-[#0c1d33]">
+                          <Image
                             src={event.image_url}
                             alt={`Imagem da prova ${event.name}`}
+                            fill
+                            sizes="56px"
+                            unoptimized
                             className="h-full w-full object-cover"
                           />
                         </div>

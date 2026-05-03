@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { DoorOpen, UserCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -105,9 +106,12 @@ export function Sidebar() {
       <div className="border-b border-white/[0.06] p-3">
         <Link href="/" className="flex min-w-0 items-center gap-2.5 rounded-lg px-1 py-1.5">
           <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden">
-            <img
+            <Image
               src={organizationLogo}
               alt="Logo da assessoria"
+              fill
+              sizes="44px"
+              unoptimized
               referrerPolicy="no-referrer"
               className="h-full w-full object-contain drop-shadow-[0_8px_16px_rgba(3,10,22,0.5)]"
             />
@@ -137,11 +141,14 @@ export function Sidebar() {
 
       <div className="border-t border-white/[0.06] p-3">
         <div className="flex items-center gap-2.5 rounded-xl border border-white/[0.07] bg-white/[0.03] p-2.5">
-          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#1E90FF]/20 text-[11px] font-bold text-white">
+          <div className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#1E90FF]/20 text-[11px] font-bold text-white">
             {currentUser?.avatar_url ? (
-              <img
+              <Image
                 src={currentUser.avatar_url}
                 alt="Avatar do usuário"
+                fill
+                sizes="32px"
+                unoptimized
                 className="h-full w-full object-cover"
               />
             ) : (

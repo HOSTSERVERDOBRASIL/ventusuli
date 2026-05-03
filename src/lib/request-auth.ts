@@ -87,7 +87,7 @@ export function isAdminRole(role: UserRole): boolean {
 
 export function isFinanceRole(role: UserRole): boolean {
   const value = String(role);
-  return value === "ADMIN" || value === "FINANCE" || value === "MANAGER";
+  return value === "ADMIN" || value === "FINANCE";
 }
 
 export function isStaffRole(role: UserRole): boolean {

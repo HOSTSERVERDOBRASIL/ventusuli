@@ -1,4 +1,4 @@
-import { BarChart3, Coins, ShieldCheck } from "lucide-react";
+import { BellRing, Coins, Trophy, Users } from "lucide-react";
 import { RoleHome } from "@/components/profile/role-home";
 import { UserRole } from "@/types";
 
@@ -6,18 +6,18 @@ export default function ManagerHomePage() {
   return (
     <RoleHome
       role={UserRole.MANAGER}
-      title="Gestao geral"
-      subtitle="Visao executiva da assessoria, conectando operacao, financeiro e pontuacao."
+      title="Coordenador"
+      subtitle="Operacao da assessoria com foco em atletas, provas, comunicacao e pontuacao."
       metrics={[
         {
           label: "Escopo",
-          value: "360",
-          description: "Acesso amplo para coordenar a operacao sem sair do mesmo login.",
+          value: "Operacao",
+          description: "Acesso para coordenar rotinas sem liberar configuracoes sensiveis.",
         },
         {
           label: "RBAC",
           value: "Ativo",
-          description: "Perfil separado de admin, coach, financeiro e atleta.",
+          description: "Perfil separado de administrador, financeiro, treinador e atleta.",
         },
         {
           label: "Auditoria",
@@ -27,16 +27,16 @@ export default function ManagerHomePage() {
       ]}
       actions={[
         {
-          href: "/admin",
-          label: "Painel administrativo",
-          description: "Indicadores, alertas e atalhos da operacao.",
-          icon: ShieldCheck,
+          href: "/admin/atletas",
+          label: "Atletas",
+          description: "Acompanhe cadastro, status e necessidades operacionais.",
+          icon: Users,
         },
         {
-          href: "/admin/financeiro",
-          label: "Financeiro",
-          description: "Recebimentos, pendencias e conciliacao.",
-          icon: BarChart3,
+          href: "/admin/eventos",
+          label: "Provas",
+          description: "Coordene calendario, inscricoes e check-in.",
+          icon: Trophy,
         },
         {
           href: "/admin/pontos",
@@ -44,11 +44,17 @@ export default function ManagerHomePage() {
           description: "Conferencia de creditos, estornos e recompensas.",
           icon: Coins,
         },
+        {
+          href: "/admin/avisos",
+          label: "Avisos",
+          description: "Comunique atletas e equipe com governanca.",
+          icon: BellRing,
+        },
       ]}
       focusItems={[
         {
-          title: "Separar decisao de execucao",
-          description: "O gestor acompanha tudo, mas o menu se adapta ao perfil ativo escolhido.",
+          title: "Operacao sem configuracao sensivel",
+          description: "O coordenador acompanha a rotina sem alterar acesso, organizacao ou financeiro.",
           status: "RBAC",
         },
         {
@@ -57,8 +63,8 @@ export default function ManagerHomePage() {
           status: "Pontos",
         },
         {
-          title: "Governanca por papel",
-          description: "Novos perfis podem amadurecer sem virar permissoes soltas no frontend.",
+          title: "Governanca por perfil",
+          description: "Administrador, financeiro, coordenador, treinador e atleta ficam separados.",
           status: "Base",
         },
       ]}

@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -287,11 +288,14 @@ export default function OrganizationSetupOnboardingPage() {
                 Logo da assessoria
               </Label>
               <div className="grid gap-3 rounded-xl border border-white/10 bg-[#0F2743] p-3 md:grid-cols-[104px_1fr]">
-                <div className="flex h-[88px] w-[88px] items-center justify-center overflow-hidden rounded-xl border border-white/20 bg-[#0a1d36]">
+                <div className="relative flex h-[88px] w-[88px] items-center justify-center overflow-hidden rounded-xl border border-white/20 bg-[#0a1d36]">
                   {form.logoUrl ? (
-                    <img
+                    <Image
                       src={form.logoUrl}
                       alt="Preview da logo da assessoria"
+                      fill
+                      sizes="88px"
+                      unoptimized
                       className="h-full w-full object-contain"
                     />
                   ) : (

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import { format, formatDistanceToNowStrict } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -189,9 +190,12 @@ export function AthletePerformanceDashboard({
       <div className="mx-auto max-w-[1440px] space-y-3">
         <section className={`${CARD_CLASS} relative min-h-[228px]`}>
           {heroImage ? (
-            <img
+            <Image
               src={heroImage}
               alt=""
+              fill
+              sizes="100vw"
+              unoptimized
               className="absolute inset-0 h-full w-full object-cover"
               referrerPolicy="no-referrer"
             />
@@ -302,9 +306,12 @@ export function AthletePerformanceDashboard({
                   >
                     <div className="relative h-[68px] overflow-hidden rounded-md border border-white/10 bg-[#0d2a49]">
                       {event.image_url ? (
-                        <img
+                        <Image
                           src={event.image_url}
                           alt={`Imagem da prova ${event.name}`}
+                          fill
+                          sizes="(min-width: 1024px) 280px, 100vw"
+                          unoptimized
                           className="h-full w-full object-cover"
                           referrerPolicy="no-referrer"
                         />

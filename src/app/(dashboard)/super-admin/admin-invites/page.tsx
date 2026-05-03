@@ -326,7 +326,7 @@ export default function SuperAdminAdminInvitesPage() {
             }
             className="rounded-lg border border-white/15 bg-[#0F2743] px-3 py-2 text-sm text-white outline-none"
           >
-            <option value="ADMIN">Gestor da assessoria</option>
+            <option value="ADMIN">Administrador</option>
             <option value="FINANCE">Financeiro</option>
             <option value="COACH">Treinador</option>
           </select>

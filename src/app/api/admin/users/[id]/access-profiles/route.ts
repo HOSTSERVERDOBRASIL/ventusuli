@@ -3,6 +3,7 @@ import { UserRole as PrismaUserRole } from "@prisma/client";
 import { z } from "zod";
 import { apiError } from "@/lib/api-error";
 import { normalizeRoles } from "@/lib/access-profiles";
+import { CANONICAL_ASSIGNABLE_ROLES } from "@/lib/product-profiles";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/request-auth";
 import { UserRole } from "@/types";
@@ -11,19 +12,6 @@ const assignProfilesSchema = z.object({
   roles: z.array(z.nativeEnum(PrismaUserRole)).max(10).default([]),
 });
 
-const ALL_ASSIGNABLE_ROLES = [
-  UserRole.ADMIN,
-  UserRole.MANAGER,
-  UserRole.FINANCE,
-  UserRole.ORGANIZER,
-  UserRole.COACH,
-  UserRole.SUPPORT,
-  UserRole.MODERATOR,
-  UserRole.PARTNER,
-  UserRole.PREMIUM_ATHLETE,
-  UserRole.ATHLETE,
-] as const;
-
 type RoleLike = UserRole | PrismaUserRole | string;
 
 interface RouteParams {
@@ -31,7 +19,7 @@ interface RouteParams {
 }
 
 function canManageAccessProfiles(roles: readonly RoleLike[]): boolean {
-  return roles.some((role) => role === UserRole.ADMIN || role === UserRole.MANAGER);
+  return roles.some((role) => role === UserRole.ADMIN);
 }
 
 function canAssignRole(authRoles: readonly RoleLike[], role: UserRole): boolean {
@@ -41,8 +29,8 @@ function canAssignRole(authRoles: readonly RoleLike[], role: UserRole): boolean 
 
 function getAssignableRoles(authRoles: readonly RoleLike[]): UserRole[] {
   return authRoles.some((role) => role === UserRole.SUPER_ADMIN)
-    ? [UserRole.SUPER_ADMIN, ...ALL_ASSIGNABLE_ROLES]
-    : [...ALL_ASSIGNABLE_ROLES];
+    ? [UserRole.SUPER_ADMIN, ...CANONICAL_ASSIGNABLE_ROLES]
+    : [...CANONICAL_ASSIGNABLE_ROLES];
 }
 
 function hasConflictingAthleteRoles(roles: readonly UserRole[]): boolean {

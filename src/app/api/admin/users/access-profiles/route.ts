@@ -4,29 +4,17 @@ import { apiError } from "@/lib/api-error";
 import { normalizeRoles } from "@/lib/access-profiles";
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/request-auth";
+import { CANONICAL_ASSIGNABLE_ROLES } from "@/lib/product-profiles";
 import { UserRole } from "@/types";
 
-const ALL_ASSIGNABLE_ROLES = [
-  UserRole.ADMIN,
-  UserRole.MANAGER,
-  UserRole.FINANCE,
-  UserRole.ORGANIZER,
-  UserRole.COACH,
-  UserRole.SUPPORT,
-  UserRole.MODERATOR,
-  UserRole.PARTNER,
-  UserRole.PREMIUM_ATHLETE,
-  UserRole.ATHLETE,
-] as const;
-
 function canManageAccessProfiles(roles: readonly string[]): boolean {
-  return roles.includes(UserRole.ADMIN) || roles.includes(UserRole.MANAGER);
+  return roles.includes(UserRole.ADMIN);
 }
 
 function getAssignableRoles(authRoles: readonly string[]): UserRole[] {
   return authRoles.includes(UserRole.SUPER_ADMIN)
-    ? [UserRole.SUPER_ADMIN, ...ALL_ASSIGNABLE_ROLES]
-    : [...ALL_ASSIGNABLE_ROLES];
+    ? [UserRole.SUPER_ADMIN, ...CANONICAL_ASSIGNABLE_ROLES]
+    : [...CANONICAL_ASSIGNABLE_ROLES];
 }
 
 export async function GET(req: NextRequest) {

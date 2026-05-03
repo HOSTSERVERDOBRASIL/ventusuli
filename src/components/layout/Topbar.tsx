@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -295,11 +296,14 @@ export function Topbar({ user, onMobileMenuOpen }: TopbarProps) {
           aria-label={profileLabel}
           className="flex h-9 items-center gap-2 rounded-lg border border-white/[0.07] bg-white/[0.03] px-2.5 text-[13px] text-white/70 transition hover:bg-white/[0.07] hover:text-white"
         >
-          <div className="flex h-5 w-5 items-center justify-center overflow-hidden rounded-full bg-[#1E90FF]/20 text-[10px] font-bold text-white">
+          <div className="relative flex h-5 w-5 items-center justify-center overflow-hidden rounded-full bg-[#1E90FF]/20 text-[10px] font-bold text-white">
             {avatarUrl ? (
-              <img
+              <Image
                 src={avatarUrl}
                 alt="Avatar do usuário"
+                fill
+                sizes="20px"
+                unoptimized
                 className="h-full w-full object-cover"
               />
             ) : (

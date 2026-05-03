@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useMemo, useState } from "react";
+import Image from "next/image";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type Resolver, useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
@@ -447,10 +448,13 @@ export function EventForm({
                 </Button>
               </div>
               {values.image_url ? (
-                <div className="mt-2 h-36 w-full overflow-hidden rounded-xl border border-white/10 bg-[#0F2743]">
-                  <img
+                <div className="relative mt-2 h-36 w-full overflow-hidden rounded-xl border border-white/10 bg-[#0F2743]">
+                  <Image
                     src={values.image_url}
                     alt="Preview da imagem da prova"
+                    fill
+                    sizes="(min-width: 1024px) 50vw, 100vw"
+                    unoptimized
                     className="h-full w-full object-cover"
                   />
                 </div>

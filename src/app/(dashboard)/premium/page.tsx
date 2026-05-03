@@ -6,12 +6,12 @@ export default function PremiumAthleteHomePage() {
   return (
     <RoleHome
       role={UserRole.PREMIUM_ATHLETE}
-      title="Atleta premium"
+      title="Atleta"
       subtitle="Experiencia de atleta com foco em treino, provas, evolucao e beneficios."
       metrics={[
         {
           label: "Perfil",
-          value: "Premium",
+          value: "Atleta",
           description: "Atalho para uma experiencia mais acompanhada e completa.",
         },
         {

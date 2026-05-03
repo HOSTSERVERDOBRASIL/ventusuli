@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   Building2,
@@ -51,7 +52,7 @@ import { uploadImageFile } from "@/services/upload-service";
 import { roleLabel } from "@/lib/role-labels";
 import { UserRole } from "@/types";
 
-const ADMIN_ROLES = new Set<UserRole>([UserRole.ADMIN, UserRole.MANAGER]);
+const ADMIN_ROLES = new Set<UserRole>([UserRole.ADMIN]);
 const DEFAULT_ORG_LOGO = VENTU_SULI_LOGO_SRC;
 const MAX_LOGO_FILE_SIZE = 2 * 1024 * 1024;
 type SettingsTab = "brand" | "access" | "finance" | "emails" | "invites" | "summary";
@@ -67,16 +68,16 @@ const SETTINGS_TAB_PATHS: Record<SettingsTab, string> = {
 
 const ACCESS_ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   [UserRole.SUPER_ADMIN]: "Plataforma inteira",
-  [UserRole.ADMIN]: "Configura a assessoria",
-  [UserRole.MANAGER]: "Gestao operacional",
+  [UserRole.ADMIN]: "Acesso completo da assessoria",
+  [UserRole.MANAGER]: "Coordena operacao, atletas, provas e comunicacao",
   [UserRole.FINANCE]: "Financeiro e pagamentos",
-  [UserRole.ORGANIZER]: "Eventos e check-in",
+  [UserRole.ORGANIZER]: "Coordenacao de eventos e check-in",
   [UserRole.COACH]: "Treinos e atletas",
-  [UserRole.SUPPORT]: "Atendimento",
-  [UserRole.MODERATOR]: "Conteudo e comunidade",
-  [UserRole.PARTNER]: "Patrocinadores",
-  [UserRole.PREMIUM_ATHLETE]: "Atleta premium",
-  [UserRole.ATHLETE]: "Atleta comum",
+  [UserRole.SUPPORT]: "Coordenacao de atendimento",
+  [UserRole.MODERATOR]: "Coordenacao de conteudo e comunidade",
+  [UserRole.PARTNER]: "Coordenacao de patrocinadores",
+  [UserRole.PREMIUM_ATHLETE]: "Atleta",
+  [UserRole.ATHLETE]: "Atleta",
 };
 
 function inviteLink(token: string): string {
@@ -599,10 +600,13 @@ export function AdminConfiguracoesPageContent({ activeTab }: { activeTab: Settin
               />
 
               <div className="grid gap-3 rounded-xl border border-white/10 bg-[#0F2743] p-3 md:col-span-2 md:grid-cols-[104px_1fr]">
-                <div className="flex h-[88px] w-[88px] items-center justify-center overflow-hidden rounded-xl border border-white/20 bg-[#0a1d36]">
-                  <img
+                <div className="relative flex h-[88px] w-[88px] items-center justify-center overflow-hidden rounded-xl border border-white/20 bg-[#0a1d36]">
+                  <Image
                     src={logoPreviewUrl}
                     alt="Logo da assessoria"
+                    fill
+                    sizes="88px"
+                    unoptimized
                     referrerPolicy="no-referrer"
                     className="h-full w-full object-contain"
                   />

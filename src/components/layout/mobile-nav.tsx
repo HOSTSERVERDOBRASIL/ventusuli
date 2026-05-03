@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
@@ -106,9 +107,12 @@ export function MobileNav({ isOpen, onClose }: MobileNavProps) {
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="relative flex h-12 w-12 items-center justify-center overflow-hidden">
-              <img
+              <Image
                 src={organizationLogo}
                 alt="Logo da assessoria"
+                fill
+                sizes="48px"
+                unoptimized
                 referrerPolicy="no-referrer"
                 className="h-full w-full object-contain drop-shadow-[0_8px_16px_rgba(3,10,22,0.45)]"
               />

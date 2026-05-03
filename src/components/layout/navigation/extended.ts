@@ -15,7 +15,7 @@ import { UserRole } from "@/types";
 export const extendedNavItems: NavItem[] = [
   {
     href: "/gestor",
-    label: "Gestão Geral",
+    label: "Coordenacao",
     icon: SlidersHorizontal,
     roles: [UserRole.MANAGER],
     policy: "MANAGER_AREA",
@@ -24,7 +24,7 @@ export const extendedNavItems: NavItem[] = [
   },
   {
     href: "/organizador",
-    label: "Operação de Eventos",
+    label: "Coordenacao de Eventos",
     icon: Megaphone,
     roles: [UserRole.ORGANIZER],
     policy: "ORGANIZER_AREA",
@@ -42,7 +42,7 @@ export const extendedNavItems: NavItem[] = [
   },
   {
     href: "/premium",
-    label: "Premium",
+    label: "Atleta",
     icon: Crown,
     roles: [UserRole.PREMIUM_ATHLETE],
     policy: "PREMIUM_ATHLETE_AREA",
@@ -51,7 +51,7 @@ export const extendedNavItems: NavItem[] = [
   },
   {
     href: "/suporte",
-    label: "Suporte",
+    label: "Coordenacao de Atendimento",
     icon: Headphones,
     roles: [UserRole.SUPPORT],
     policy: "SUPPORT_AREA",
@@ -60,7 +60,7 @@ export const extendedNavItems: NavItem[] = [
   },
   {
     href: "/moderador",
-    label: "Moderação",
+    label: "Coordenacao de Conteudo",
     icon: BadgeCheck,
     roles: [UserRole.MODERATOR],
     policy: "MODERATOR_AREA",
@@ -87,7 +87,7 @@ export const extendedNavItems: NavItem[] = [
   },
   {
     href: "/parceiro",
-    label: "Parceiro",
+    label: "Coordenacao de Parceiros",
     icon: Handshake,
     roles: [UserRole.PARTNER],
     policy: "PARTNER_AREA",

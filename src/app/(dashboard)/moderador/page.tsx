@@ -6,8 +6,8 @@ export default function ModeratorHomePage() {
   return (
     <RoleHome
       role={UserRole.MODERATOR}
-      title="Moderacao"
-      subtitle="Controle de comunicacao, avisos e conteudos da comunidade."
+      title="Coordenador"
+      subtitle="Coordenacao de comunicacao, avisos e conteudos da comunidade."
       metrics={[
         {
           label: "Comunicacao",
@@ -48,7 +48,7 @@ export default function ModeratorHomePage() {
       focusItems={[
         {
           title: "Avisos com governanca",
-          description: "Moderador entra pelo mesmo login, mas com politica propria.",
+          description: "Usuarios antigos de moderacao aparecem como coordenadores no produto.",
           status: "Avisos",
         },
         {

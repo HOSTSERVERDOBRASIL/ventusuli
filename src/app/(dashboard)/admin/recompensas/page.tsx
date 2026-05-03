@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { BarChart3, ClipboardList, Gift } from "lucide-react";
 import { toast } from "sonner";
 import { ActionButton } from "@/components/system/action-button";
@@ -204,10 +205,13 @@ export default function AdminRecompensasPage() {
       cell: (row) => (
         <div className="flex items-center gap-2">
           {row.imageUrl ? (
-            <div className="h-10 w-10 overflow-hidden rounded-lg border border-white/10 bg-[#0f233d]">
-              <img
+            <div className="relative h-10 w-10 overflow-hidden rounded-lg border border-white/10 bg-[#0f233d]">
+              <Image
                 src={row.imageUrl}
                 alt={`Imagem de ${row.name}`}
+                fill
+                sizes="40px"
+                unoptimized
                 className="h-full w-full object-cover"
               />
             </div>
@@ -414,10 +418,13 @@ export default function AdminRecompensasPage() {
               </button>
             </div>
             {form.imageUrl ? (
-              <div className="h-28 w-full overflow-hidden rounded-lg border border-white/[0.1] bg-[#0f233d]">
-                <img
+              <div className="relative h-28 w-full overflow-hidden rounded-lg border border-white/[0.1] bg-[#0f233d]">
+                <Image
                   src={form.imageUrl}
                   alt="Preview da recompensa"
+                  fill
+                  sizes="(min-width: 1024px) 36vw, 100vw"
+                  unoptimized
                   className="h-full w-full object-cover"
                 />
               </div>

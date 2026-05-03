@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { ArrowRight, BadgeCheck, BarChart3, CheckCircle2, Sparkles, Target } from "lucide-react";
@@ -292,9 +293,12 @@ export function ProfileCockpit({
       <div className="mx-auto max-w-[1440px] space-y-3">
         <section className={cn(CARD_CLASS, "relative min-h-[236px]")}>
           {heroImage ? (
-            <img
+            <Image
               src={heroImage}
               alt=""
+              fill
+              sizes="100vw"
+              unoptimized
               className="absolute inset-0 h-full w-full object-cover"
               referrerPolicy="no-referrer"
             />

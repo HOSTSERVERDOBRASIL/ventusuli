@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { toast } from "sonner";
 import { ActionButton } from "@/components/system/action-button";
@@ -570,10 +571,13 @@ export default function RecompensasPage() {
                   className="rounded-2xl border border-white/10 bg-[#102640] p-4"
                 >
                   {item.imageUrl ? (
-                    <div className="mb-3 h-36 w-full overflow-hidden rounded-xl border border-white/10 bg-[#0c1d33]">
-                      <img
+                    <div className="relative mb-3 h-36 w-full overflow-hidden rounded-xl border border-white/10 bg-[#0c1d33]">
+                      <Image
                         src={item.imageUrl}
                         alt={`Imagem de ${item.name}`}
+                        fill
+                        sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
+                        unoptimized
                         className="h-full w-full object-cover"
                       />
                     </div>

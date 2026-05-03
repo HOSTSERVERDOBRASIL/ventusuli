@@ -6,8 +6,8 @@ export default function PartnerHomePage() {
   return (
     <RoleHome
       role={UserRole.PARTNER}
-      title="Parceiro"
-      subtitle="Area para patrocinadores, beneficios e relacionamento com a comunidade."
+      title="Coordenador"
+      subtitle="Coordenacao de patrocinadores, beneficios e relacionamento com a comunidade."
       metrics={[
         {
           label: "Patrocinio",
@@ -47,8 +47,8 @@ export default function PartnerHomePage() {
       ]}
       focusItems={[
         {
-          title: "Parceiro sem acesso indevido",
-          description: "O perfil existe separado de admin, financeiro e atleta.",
+          title: "Coordenacao sem acesso indevido",
+          description: "Patrocinadores e beneficios ficam no escopo operacional, separados do financeiro.",
           status: "RBAC",
         },
         {
