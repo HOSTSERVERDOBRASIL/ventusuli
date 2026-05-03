@@ -1,12 +1,76 @@
+import type { ReactNode } from "react";
+import Image from "next/image";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CalendarDays, MapPin, Users } from "lucide-react";
-import { EventStatusBadge } from "@/components/events/event-status-badge";
-import { type EventView } from "@/components/events/types";
+import { type EventStatus, type EventView } from "@/components/events/types";
 import { StatusBadge } from "@/components/system/status-badge";
 import type { RaceRecommendationTone } from "@/lib/race-recommendations";
+import type { RegistrationStatus } from "@/services/types";
 
 const currency = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+
+type Tone = "positive" | "warning" | "info" | "danger" | "neutral";
+
+function statusTone(status: EventStatus): Tone {
+  if (status === "PUBLISHED") return "positive";
+  if (status === "DRAFT") return "warning";
+  if (status === "CANCELLED") return "danger";
+  return "neutral";
+}
+
+function statusLabel(status: EventStatus): string {
+  if (status === "PUBLISHED") return "Publicado";
+  if (status === "DRAFT") return "Rascunho";
+  if (status === "CANCELLED") return "Cancelado";
+  return "Finalizado";
+}
+
+function registrationTone(status: RegistrationStatus): Tone {
+  if (status === "CONFIRMED") return "positive";
+  if (status === "PENDING_PAYMENT") return "warning";
+  if (status === "CANCELLED") return "danger";
+  return "info";
+}
+
+function registrationLabel(status: RegistrationStatus): string {
+  if (status === "CONFIRMED") return "Confirmado";
+  if (status === "PENDING_PAYMENT") return "Em aberto";
+  if (status === "CANCELLED") return "Cancelado";
+  return "Interesse";
+}
+
+function buildDistanceLabel(event: EventView): string {
+  const labels = event.distances.map((distance) => distance.label).filter(Boolean);
+  if (labels.length === 0) return "Distancia a definir";
+  if (labels.length <= 3) return labels.join(" / ");
+  return `${labels.slice(0, 3).join(" / ")} +${labels.length - 3}`;
+}
+
+function minPriceLabel(event: EventView): string {
+  const minPrice = event.distances.reduce(
+    (acc, distance) => Math.min(acc, distance.price_cents),
+    Number.POSITIVE_INFINITY,
+  );
+  return Number.isFinite(minPrice) ? currency.format(minPrice / 100) : "Sob consulta";
+}
+
+function defaultCtaLabel(
+  mode: "admin" | "athlete",
+  event: EventView,
+  registration?: { status: RegistrationStatus } | null,
+): string {
+  if (mode === "admin") {
+    if (event.status === "DRAFT") return "Editar rascunho";
+    if (event.status === "PUBLISHED") return "Gerenciar prova";
+    return "Ver prova";
+  }
+
+  if (registration?.status === "CONFIRMED") return "Ver detalhes";
+  if (registration?.status === "PENDING_PAYMENT") return "Concluir inscricao";
+  if (registration?.status === "INTERESTED") return "Tenho interesse";
+  return "Quero participar";
+}
 
 export function EventCard({
   event,
@@ -14,6 +78,8 @@ export function EventCard({
   ctaLabel,
   ctaDisabled,
   recommendation,
+  registration,
+  actions,
 }: {
   event: EventView;
   mode?: "admin" | "athlete";
@@ -23,117 +89,114 @@ export function EventCard({
     label: string;
     tone: RaceRecommendationTone;
   } | null;
+  registration?: {
+    status: RegistrationStatus;
+    distanceLabel?: string | null;
+  } | null;
+  actions?: ReactNode;
 }) {
-  const defaultLabel = mode === "admin" ? "Gerenciar" : "Ver detalhes";
-  const minPrice = event.distances.reduce(
-    (acc, d) => Math.min(acc, d.price_cents),
-    Number.POSITIVE_INFINITY,
-  );
-  const displayPrice = Number.isFinite(minPrice) ? currency.format(minPrice / 100) : "—";
-  const totalSlots = event.distances.reduce((acc, d) => acc + (d.max_slots ?? 0), 0);
-  const totalRegistered = event.distances.reduce((acc, d) => acc + (d.registered_count ?? 0), 0);
-  const hasLimitedSlots = event.distances.some((d) => Boolean(d.max_slots));
-  const occupancy =
-    hasLimitedSlots && totalSlots > 0 ? Math.round((totalRegistered / totalSlots) * 100) : null;
+  const distanceLabel = buildDistanceLabel(event);
+  const heroLabel = format(new Date(event.event_date), "dd MMM yyyy", { locale: ptBR })
+    .replace(".", "")
+    .toUpperCase();
+  const primaryBadge = registration
+    ? { label: registrationLabel(registration.status), tone: registrationTone(registration.status) }
+    : { label: statusLabel(event.status), tone: statusTone(event.status) };
+  const selectedDistance = registration?.distanceLabel ?? null;
+  const registrationsCount = event.registrations_count ?? 0;
+  const buttonLabel = ctaLabel ?? defaultCtaLabel(mode, event, registration);
 
   return (
-    <div className="group flex h-full flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[#112240] shadow-[0_4px_24px_rgba(0,0,0,0.3)] transition-all duration-200 hover:-translate-y-0.5 hover:border-white/20 hover:shadow-[0_12px_40px_rgba(0,0,0,0.4)]">
-      {/* Header image area — fixed height */}
-      <div className="relative h-[168px] w-full flex-shrink-0 overflow-hidden">
+    <article className="group flex h-full min-h-[248px] flex-col overflow-hidden rounded-lg border border-[#15395d] bg-[#071b31] shadow-[0_16px_34px_rgba(0,0,0,0.28)] transition hover:-translate-y-0.5 hover:border-sky-400/45 hover:shadow-[0_18px_46px_rgba(0,0,0,0.36)]">
+      <div className="relative h-[104px] overflow-hidden bg-[#0a2743]">
         {event.image_url ? (
-          <img
+          <Image
             src={event.image_url}
             alt={`Imagem da prova ${event.name}`}
-            className="absolute inset-0 h-full w-full object-cover"
+            fill
+            sizes="(min-width: 1280px) 33vw, (min-width: 768px) 50vw, 100vw"
+            unoptimized
+            className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+            referrerPolicy="no-referrer"
           />
         ) : (
-          <div className="absolute inset-0 bg-[linear-gradient(135deg,#0c2d5c_0%,#1a4b8a_50%,#0d2d4d_100%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(135deg,#113f67,#0b2540_52%,#061527)]" />
         )}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(30,144,255,0.18),transparent_55%)]" />
-        <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#112240] to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#03101f]/15 via-transparent to-[#071b31]" />
 
-        {/* Status badge */}
-        <div className="absolute left-3 top-3">
-          <EventStatusBadge status={event.status} />
+        <div className="absolute left-2 top-2">
+          <StatusBadge label={primaryBadge.label} tone={primaryBadge.tone} />
         </div>
+        <div className="absolute right-2 top-2 max-w-[56%] truncate rounded border border-white/15 bg-[#061426]/75 px-2 py-1 text-[10px] font-bold text-slate-100 backdrop-blur">
+          {distanceLabel}
+        </div>
+        <div className="absolute bottom-2 left-2 rounded bg-black/45 px-2 py-1 text-[10px] font-bold text-amber-200">
+          {heroLabel}
+        </div>
+      </div>
+
+      <div className="flex flex-1 flex-col p-3">
+        <h3 className="line-clamp-2 min-h-[38px] text-sm font-bold leading-[1.35] text-white">
+          {event.name}
+        </h3>
+        <p className="mt-1 flex min-w-0 items-center gap-1 text-[11px] text-slate-300">
+          <MapPin className="h-3 w-3 shrink-0 text-sky-300" />
+          <span className="truncate">
+            {event.city}/{event.state}
+          </span>
+        </p>
+
+        <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
+          <div className="rounded border border-white/10 bg-white/[0.035] px-2 py-1.5">
+            <p className="text-[9px] font-semibold uppercase text-slate-500">A partir de</p>
+            <p className="mt-0.5 truncate font-bold text-slate-100">{minPriceLabel(event)}</p>
+          </div>
+          <div className="rounded border border-white/10 bg-white/[0.035] px-2 py-1.5">
+            <p className="text-[9px] font-semibold uppercase text-slate-500">
+              {mode === "admin" ? "Inscritos" : "Sua prova"}
+            </p>
+            <p className="mt-0.5 truncate font-bold text-slate-100">
+              {mode === "admin"
+                ? registrationsCount
+                : selectedDistance ?? (registration ? "A definir" : "Escolher")}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-3 flex items-center justify-between gap-2 text-[11px] text-slate-400">
+          <span className="inline-flex items-center gap-1">
+            <CalendarDays className="h-3 w-3 text-sky-300" />
+            {event.registration_deadline
+              ? `Inscricoes ate ${format(new Date(event.registration_deadline), "dd/MM", {
+                  locale: ptBR,
+                })}`
+              : "Inscricoes abertas"}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <Users className="h-3 w-3 text-sky-300" />
+            {registrationsCount}
+          </span>
+        </div>
+
         {recommendation ? (
-          <div className="absolute right-3 top-3">
+          <div className="mt-2">
             <StatusBadge label={recommendation.label} tone={recommendation.tone} />
           </div>
         ) : null}
 
-        {/* Title + city pinned to bottom of image */}
-        <div className="absolute bottom-0 left-0 right-0 p-3">
-          <h3 className="line-clamp-2 text-[15px] font-bold leading-snug text-white">
-            {event.name}
-          </h3>
-          <p className="mt-1 flex items-center gap-1 text-[11px] text-white/50">
-            <MapPin className="h-3 w-3 flex-shrink-0" />
-            {event.city}/{event.state}
-          </p>
-        </div>
-      </div>
-
-      {/* Body — grows to fill remaining space */}
-      <div className="flex flex-1 flex-col gap-3 p-4">
-        {/* Date */}
-        <p className="flex items-center gap-1.5 text-[12px] text-white/55">
-          <CalendarDays className="h-3.5 w-3.5 flex-shrink-0 text-[#1E90FF]" />
-          {format(new Date(event.event_date), "dd 'de' MMMM yyyy", { locale: ptBR })}
-        </p>
-
-        {/* KPI row — fixed height, always 3 cols */}
-        <div className="grid grid-cols-3 gap-2">
-          {(
-            [
-              { label: "A partir de", value: displayPrice },
-              { label: "Distâncias", value: String(event.distances.length) },
-              { label: "Ocupação", value: occupancy !== null ? `${occupancy}%` : "—" },
-            ] as const
-          ).map(({ label, value }) => (
-            <div
-              key={label}
-              className="rounded-lg border border-white/[0.07] bg-white/[0.03] px-2 py-2 text-center"
+        <div className="mt-auto pt-3">
+          {actions ? (
+            actions
+          ) : (
+            <span
+              aria-disabled={ctaDisabled}
+              className="inline-flex h-8 w-full items-center justify-center rounded-md bg-[#0868bd] px-3 text-xs font-bold text-white transition group-hover:bg-[#0a78d6] aria-disabled:pointer-events-none aria-disabled:opacity-45"
             >
-              <p className="text-[9px] font-semibold uppercase tracking-[0.08em] text-white/35">
-                {label}
-              </p>
-              <p className="mt-1 text-[13px] font-bold text-white">{value}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* Distances list — scrollable, max 4 visible */}
-        <ul className="max-h-[88px] space-y-1.5 overflow-y-auto pr-0.5">
-          {event.distances.map((d) => (
-            <li key={d.id ?? d.label} className="flex items-center justify-between text-[12px]">
-              <span className="rounded-full border border-white/[0.08] bg-white/[0.04] px-2.5 py-0.5 text-white/70">
-                {d.label}
-              </span>
-              <span className="font-semibold text-white">
-                {currency.format(d.price_cents / 100)}
-              </span>
-            </li>
-          ))}
-        </ul>
-
-        {/* Inscriptions count */}
-        <p className="flex items-center gap-1.5 text-[11px] text-white/35">
-          <Users className="h-3 w-3" />
-          Inscrições: {event.registrations_count ?? 0}
-        </p>
-
-        {/* CTA — always at the bottom */}
-        <div className="mt-auto pt-1">
-          <button
-            type="button"
-            disabled={ctaDisabled}
-            className="h-9 w-full rounded-lg bg-[#1E90FF] text-[13px] font-semibold text-white transition hover:brightness-110 hover:-translate-y-px disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {ctaLabel ?? defaultLabel}
-          </button>
+              {buttonLabel}
+            </span>
+          )}
         </div>
       </div>
-    </div>
+    </article>
   );
 }
