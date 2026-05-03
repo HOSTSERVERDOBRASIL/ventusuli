@@ -2,6 +2,56 @@
 
 Data: 2026-05-03
 
+## 0. Estado Atual da Implementacao
+
+Esta secao registra o estado real do sistema apos a entrega da agenda oficial de provas e a revisao de escopo para producao.
+
+### Implementado
+
+- Modelo de agenda oficial da assessoria no Prisma:
+  - `OrganizationRacePlan`
+  - `AthleteRaceParticipation`
+  - `OrganizationRacePlanStatus`
+  - `RacePlanAthleteAction`
+  - `AthleteRaceParticipationStatus`
+- Modelo base de integracoes externas no Prisma:
+  - `ExternalPlatform`
+  - `PlatformCredential`
+  - `ExternalEvent`
+  - `ExternalRegistration`
+  - `ExternalOrder`
+  - `SyncLog`
+- API administrativa para agenda oficial:
+  - `GET /api/admin/race-plans`
+  - `POST /api/admin/race-plans`
+  - `GET /api/admin/race-plans/by-event/:eventId`
+- API do atleta para agenda oficial:
+  - `GET /api/race-plans`
+  - `POST /api/race-plans/:id/participations`
+- Tela admin de provas com acao para abrir uma prova existente na lista oficial da assessoria.
+- Tela admin de detalhe da prova com bloco "Lista da assessoria", mostrando atletas que registraram participacao pela agenda oficial.
+- Tela do atleta em `/provas` com bloco "Provas da assessoria" e acao "Quero participar".
+- Padronizacao visual do logo no fluxo de MFA para usar a mesma escala hero do login.
+- Policies de API adicionadas para `/api/admin/race-plans` e `/api/race-plans`.
+
+### Parcialmente Implementado
+
+- A estrutura de dados para integracoes externas existe, mas o fluxo completo de sincronizacao, normalizacao, deduplicacao e curadoria por UI ainda deve ser finalizado antes de ser considerado pronto para operacao.
+- A agenda oficial ja registra interesse/participacao do atleta, mas ainda nao cobre toda a operacao esperada de fechamento, conclusao, comunicados especificos, exportacao, presenca por race plan e automacoes pos-prova.
+- O campo `audience` existe no modelo de agenda oficial, mas a API atual do atleta ainda lista provas abertas por organizacao sem aplicar segmentacao avancada por grupos, nivel, cidade, premium ou selecao manual.
+- A participacao pode guardar distancia, link/codigo externo e observacao, mas a UI atual usa o caminho simples de "Quero participar" sem formulario avancado para esses campos.
+
+### Pendente para Fechar o Fluxo Forte
+
+- Tela administrativa da central de provas importadas.
+- Jobs de sync com TicketSports e outras APIs externas.
+- Normalizador/deduplicador de provas externas.
+- Conversao assistida de `ExternalEvent` para `Event` e `OrganizationRacePlan`.
+- Envio real aos atletas por notificacao/aviso ao abrir uma prova.
+- Segmentacao de audiencia na API e na UI.
+- Acoes administrativas para fechar, cancelar, confirmar equipe, concluir prova e exportar lista.
+- Vinculo automatico com pagamento interno, inscricao coletiva, pontos, fotos e comunicados pos-prova.
+
 ## 1. Visao
 
 O VentuSuli e uma plataforma SaaS multi-tenant para assessorias esportivas, organizadores e comunidades de atletas. O sistema centraliza operacao de eventos, atletas, inscricoes, pagamentos, financeiro, treinos, pontuacao, recompensas, fotos, patrocinadores, comunicados, comunidade, auditoria e integracoes externas.
@@ -210,6 +260,21 @@ Responsabilidades:
 - Permitir comunicados especificos por prova para os atletas participantes ou interessados.
 - Permitir estados operacionais da participacao da assessoria: planejada, aberta para atletas, encerrada, cancelada e concluida.
 
+Implementacao atual:
+
+- O admin consegue abrir uma prova ja cadastrada na lista oficial da assessoria pela tela `/admin/eventos`.
+- A abertura cria ou atualiza um `OrganizationRacePlan` com status `OPEN_TO_ATHLETES` e acao padrao `INTEREST`.
+- A tela `/admin/eventos/:id` mostra a lista de atletas que entraram pela agenda oficial.
+- A tela `/provas` mostra ao atleta as provas abertas na agenda oficial da assessoria.
+- O atleta consegue clicar em "Quero participar", gerando um `AthleteRaceParticipation`.
+- A API bloqueia participacao em prova fechada, fora da janela `opensAt/closesAt` ou de outra organizacao.
+
+Limitacoes atuais:
+
+- Ainda nao ha tela completa para editar status, audiencia, logistica, prazo e acao principal da agenda.
+- Ainda nao ha filtro avancado de audiencia aplicado na listagem do atleta.
+- Ainda nao ha exportacao da lista, envio de comunicado especifico, fechamento/conclusao por UI ou integracao automatica com pontos e pagamentos.
+
 Estados da participacao da assessoria:
 
 - `PLANNED`: prova escolhida pelo admin, mas ainda nao aberta aos atletas.
@@ -297,15 +362,16 @@ Criterios de aceite:
 - Alteracoes de status relevantes disparam notificacoes quando configurado.
 - Historico da participacao da prova fica disponivel apos conclusao.
 
-### 6.4.4 Modelo Conceitual de Provas
+### 6.4.4 Modelo de Provas
 
-Para evitar confusao entre prova encontrada, prova cadastrada e prova assumida pela assessoria, o dominio deve separar quatro conceitos:
+Para evitar confusao entre prova encontrada, prova cadastrada e prova assumida pela assessoria, o dominio separa estes conceitos:
 
 `ExternalEvent`
 
 - Representa uma prova encontrada em API externa.
 - Guarda origem, ID externo, payload bruto, dados normalizados e status de sync/curadoria.
 - Nao e exibida ao atleta por padrao.
+- Estado atual: modelo de dados criado; fluxo completo de sync e curadoria ainda pendente.
 
 `Event`
 
@@ -319,12 +385,14 @@ Para evitar confusao entre prova encontrada, prova cadastrada e prova assumida p
 - Define se a prova entra na lista oficial da equipe.
 - Controla status operacional, audiencia, orientacoes, logistica e acao principal do atleta.
 - Pode apontar para um `Event` interno e preservar origem externa quando houver.
+- Estado atual: modelo, APIs e primeira UI operacional implementados.
 
 `AthleteRaceParticipation`
 
 - Representa a relacao do atleta com uma prova da assessoria.
 - Guarda status, distancia escolhida, pagamento, inscricao externa, presenca, observacoes e timestamps.
 - Permite acompanhar interesse e confirmacao mesmo quando a inscricao final acontece fora da plataforma.
+- Estado atual: modelo e acao simples "Quero participar" implementados.
 
 Relacionamento esperado:
 
@@ -631,8 +699,14 @@ Grupos principais:
 - Plataforma: `/api/super-admin/*`
 - Admin: `/api/admin/*`
 - Eventos: `/api/events/*`
-- Agenda oficial da assessoria: `/api/admin/race-plans/*`, `/api/race-plans/*`
-- Participacao do atleta em provas da assessoria: `/api/race-plans/:id/participations/*`, `/api/me/race-participations/*`
+- Agenda oficial da assessoria:
+  - Implementado: `GET /api/admin/race-plans`
+  - Implementado: `POST /api/admin/race-plans`
+  - Implementado: `GET /api/admin/race-plans/by-event/:eventId`
+  - Implementado: `GET /api/race-plans`
+- Participacao do atleta em provas da assessoria:
+  - Implementado: `POST /api/race-plans/:id/participations`
+  - Planejado: `/api/me/race-participations/*`
 - Inscricoes: `/api/registrations/*`
 - Pagamentos: `/api/payments/*`
 - Financeiro: `/api/finance/*`, `/api/reports/*`
@@ -644,7 +718,9 @@ Grupos principais:
 - Fotos: `/api/photos/*`, `/api/admin/photos/*`
 - Patrocinadores: `/api/sponsors/*`, `/api/admin/sponsors/*`
 - Integracoes: `/api/integrations/*`
-- Central de provas importadas: `/api/integrations/platforms/*`, `/api/integrations/*/sync/events`, `/api/admin/eventos/importados/*`
+- Central de provas importadas:
+  - Modelo de dados implementado no Prisma.
+  - Planejado: `/api/integrations/platforms/*`, `/api/integrations/*/sync/events`, `/api/admin/eventos/importados/*`
 
 ## 11. Fluxos Criticos de Aceite
 
@@ -817,14 +893,17 @@ Smoke pos-deploy:
 
 O primeiro corte de produto deve provar o fluxo principal sem depender de todos os modulos comerciais:
 
-1. Importar/listar provas externas em uma central administrativa.
-2. Permitir curadoria: revisar, ignorar ou adicionar a prova a lista oficial da assessoria.
-3. Criar a lista oficial de provas da assessoria com status planejada/aberta/encerrada/concluida.
-4. Mostrar para o atleta apenas as provas abertas para sua audiencia.
-5. Permitir ao atleta clicar em "Tenho interesse" ou "Quero participar".
-6. Permitir ao admin acompanhar participantes por prova.
-7. Permitir comunicados simples para participantes da prova.
-8. Registrar historico basico de conclusao da prova.
+1. Criar base de dados para integracoes externas. Status: implementado.
+2. Criar base de dados para lista oficial de provas da assessoria. Status: implementado.
+3. Permitir que o admin abra uma prova existente para os atletas. Status: implementado.
+4. Mostrar para o atleta provas abertas na agenda oficial da assessoria. Status: implementado.
+5. Permitir ao atleta clicar em "Quero participar". Status: implementado.
+6. Permitir ao admin acompanhar participantes por prova. Status: implementado em primeira versao.
+7. Importar/listar provas externas em uma central administrativa. Status: pendente.
+8. Permitir curadoria: revisar, ignorar ou adicionar prova importada a lista oficial. Status: pendente.
+9. Mostrar para o atleta apenas provas abertas para sua audiencia segmentada. Status: pendente.
+10. Permitir comunicados simples para participantes da prova. Status: pendente.
+11. Registrar historico basico de conclusao da prova. Status: pendente.
 
 Fora do MVP inicial:
 
