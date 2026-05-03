@@ -3,6 +3,7 @@ import { z } from "zod";
 import crypto from "crypto";
 import { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { buildPublicInviteUrl } from "@/lib/public-url";
 import { apiError, handleApiException } from "@/lib/api-error";
 import { getAuthContext } from "@/lib/request-auth";
 
@@ -66,7 +67,7 @@ function toInviteOutput(invite: InviteRow) {
     accepted_user_id: invite.accepted_user_id,
     accepted_at: invite.accepted_at,
     created_at: invite.created_at,
-    signupUrl: `/register/atleta?inviteToken=${invite.token}`,
+    signupUrl: buildPublicInviteUrl(invite.token),
   };
 }
 

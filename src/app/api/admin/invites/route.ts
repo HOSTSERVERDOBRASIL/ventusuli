@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { apiError } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
+import { buildPublicInviteUrl } from "@/lib/public-url";
 import { getAuthContext, isStaffRole } from "@/lib/request-auth";
 
 const createInviteSchema = z
@@ -52,7 +53,6 @@ function toInviteOutput(
     accepted_at: Date | null;
     created_at: Date;
   },
-  origin: string,
   actors?: {
     createdByName?: string | null;
     createdByEmail?: string | null;
@@ -98,7 +98,7 @@ function toInviteOutput(
       : null,
     acceptedAt: invite.accepted_at,
     createdAt: invite.created_at,
-    signupUrl: `${origin}/register/atleta?inviteToken=${invite.token}`,
+    signupUrl: buildPublicInviteUrl(invite.token),
   };
 }
 
@@ -161,7 +161,7 @@ export async function GET(req: NextRequest) {
   const inviteOutputs = invites.map((invite) => {
     const createdBy = invite.created_by ? userById.get(invite.created_by) : null;
     const acceptedUser = invite.accepted_user_id ? userById.get(invite.accepted_user_id) : null;
-    return toInviteOutput(invite, req.nextUrl.origin, {
+    return toInviteOutput(invite, {
       createdByName: createdBy?.name ?? null,
       createdByEmail: createdBy?.email ?? null,
       acceptedUserName: acceptedUser?.name ?? null,
@@ -234,5 +234,5 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  return NextResponse.json({ data: toInviteOutput(invite, req.nextUrl.origin) }, { status: 201 });
+  return NextResponse.json({ data: toInviteOutput(invite) }, { status: 201 });
 }

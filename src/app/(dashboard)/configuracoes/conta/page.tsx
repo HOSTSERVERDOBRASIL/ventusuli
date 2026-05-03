@@ -10,6 +10,7 @@ import { LoadingState } from "@/components/system/loading-state";
 import { PageHeader } from "@/components/system/page-header";
 import { SectionCard } from "@/components/system/section-card";
 import { StatusBadge } from "@/components/system/status-badge";
+import { buildPublicInviteUrl } from "@/lib/public-url";
 import { createInvite, OrgInvite } from "@/services/organization-service";
 import {
   disconnectStrava,
@@ -144,9 +145,7 @@ export default function ConfiguracoesContaPage() {
     }
   };
 
-  const inviteUrl = lastInvite
-    ? `${typeof window !== "undefined" ? window.location.origin : ""}/register/atleta?inviteToken=${lastInvite.token}`
-    : "";
+  const inviteUrl = lastInvite?.signupUrl ?? (lastInvite ? buildPublicInviteUrl(lastInvite.token) : "");
 
   const handleCreateInvite = async () => {
     if (!isAthlete) return;

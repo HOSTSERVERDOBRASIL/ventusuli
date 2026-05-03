@@ -80,7 +80,7 @@ const ACCESS_ROLE_DESCRIPTIONS: Record<UserRole, string> = {
 };
 
 function inviteLink(token: string): string {
-  return `${window.location.origin}/register/atleta?inviteToken=${token}`;
+  return `https://sistema.ventusuli.com.br/register/atleta?inviteToken=${encodeURIComponent(token)}`;
 }
 
 function formatExpiry(expiresAt: string | null): string {
@@ -1262,8 +1262,7 @@ export function AdminConfiguracoesPageContent({ activeTab }: { activeTab: Settin
                 <p>
                   O link de convite tem formato:{" "}
                   <span className="font-mono text-white">
-                    {typeof window !== "undefined" ? window.location.origin : ""}
-                    /register/atleta?inviteToken=TOKEN
+                    https://sistema.ventusuli.com.br/register/atleta?inviteToken=TOKEN
                   </span>
                 </p>
               </div>

@@ -3,8 +3,8 @@ import { Suspense } from "react";
 import { RegisterAtletaForm } from "@/components/auth/RegisterAtletaForm";
 
 export const metadata: Metadata = {
-  title: "Cadastro de Atleta",
-  description: "Cadastre-se como atleta em uma assessoria Ventu Suli",
+  title: "Cadastro Ventu Suli Floripa",
+  description: "Cadastre-se como atleta no grupo Ventu Suli Floripa",
 };
 
 export default function RegisterAtletaPage() {

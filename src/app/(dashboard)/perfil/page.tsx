@@ -14,6 +14,7 @@ import { getAthleteIdentity, updateAthleteProfile } from "@/services/registratio
 import { AthleteIdentity } from "@/services/types";
 import { createInvite, listInvites, OrgInvite } from "@/services/organization-service";
 import { formatCpf, isValidCpf, normalizeCpf } from "@/lib/cpf";
+import { buildPublicInviteUrl } from "@/lib/public-url";
 import { uploadImageFile } from "@/services/upload-service";
 import { roleLabel as formatRoleLabel } from "@/lib/role-labels";
 
@@ -311,9 +312,8 @@ export default function PerfilPage() {
   }
 
   function buildInviteUrl(invite: OrgInvite): string {
-    const path = invite.signupUrl ?? `/register/atleta?inviteToken=${invite.token}`;
-    if (typeof window === "undefined") return path;
-    return path.startsWith("http") ? path : `${window.location.origin}${path}`;
+    const path = invite.signupUrl ?? buildPublicInviteUrl(invite.token);
+    return path.startsWith("http") ? path : buildPublicInviteUrl(invite.token);
   }
 
   async function handleCreateFriendInvite() {

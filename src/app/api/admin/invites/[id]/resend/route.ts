@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiError } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
+import { buildPublicInviteUrl } from "@/lib/public-url";
 import { getAuthContext, isStaffRole } from "@/lib/request-auth";
 
 interface RouteParams {
@@ -71,7 +72,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       usedCount: resent.used_count,
       reusable: resent.max_uses === null,
       createdAt: resent.created_at,
-      signupUrl: `${req.nextUrl.origin}/register/atleta?inviteToken=${resent.token}`,
+      signupUrl: buildPublicInviteUrl(resent.token),
     },
   });
 }
