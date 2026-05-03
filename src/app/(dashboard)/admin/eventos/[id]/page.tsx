@@ -9,6 +9,7 @@ import {
   ArrowRight,
   CheckCircle2,
   CopyPlus,
+  Gauge,
   MapPin,
   Pencil,
   Rocket,
@@ -298,6 +299,11 @@ export default function AdminEventoDetalhesPage() {
         subtitle="Detalhes operacionais, performance de inscrições e situação financeira da prova."
         actions={
           <>
+            <ActionButton asChild intent="secondary">
+              <Link href={`/admin/eventos/${event.id}/cockpit`}>
+                <Gauge className="mr-2 h-4 w-4" /> Cockpit
+              </Link>
+            </ActionButton>
             <ActionButton asChild intent="secondary">
               <Link href={`/admin/eventos/${event.id}/editar`}>
                 <Pencil className="mr-2 h-4 w-4" /> Editar

@@ -250,6 +250,128 @@ export interface ServiceRacePlan {
   participationCounts?: Record<string, number>;
 }
 
+export interface EventCockpitData {
+  event: {
+    id: string;
+    name: string;
+    city: string | null;
+    state: string | null;
+    address: string | null;
+    eventDate: string;
+    registrationDeadline: string | null;
+    status: string;
+    externalUrl: string | null;
+    latitude: number | null;
+    longitude: number | null;
+    checkInRadiusM: number;
+    proximityRadiusM: number;
+    distances: Array<{
+      id: string;
+      label: string;
+      distanceKm: number;
+      priceCents: number;
+      maxSlots: number | null;
+      registeredCount: number;
+    }>;
+  };
+  metrics: {
+    registrations: {
+      total: number;
+      confirmed: number;
+      pendingPayment: number;
+      conversionRate: number;
+    };
+    financial: {
+      grossRevenueCents: number;
+      paidRevenueCents: number;
+      pendingRevenueCents: number;
+    };
+    attendance: {
+      present: number;
+      absent: number;
+      pending: number;
+      checkedIn: number;
+      presenceRate: number;
+    };
+    racePlan: {
+      hasPlan: boolean;
+      total: number;
+      interested: number;
+    };
+    collective: {
+      campaigns: number;
+      members: number;
+    };
+    media: {
+      galleries: number;
+      photos: number;
+    };
+    sponsors: {
+      campaigns: number;
+    };
+  };
+  registrations: Array<{
+    id: string;
+    athleteName: string;
+    athleteEmail: string;
+    distanceLabel: string;
+    status: string;
+    paymentStatus: string | null;
+    attendanceStatus: string;
+    amountCents: number;
+    registeredAt: string;
+    tone: "done" | "warning" | "danger" | "neutral";
+  }>;
+  racePlan: {
+    id: string;
+    status: OrganizationRacePlanStatus;
+    athleteAction: RacePlanAthleteAction;
+    instructions: string | null;
+    opensAt: string | null;
+    closesAt: string | null;
+    participations: Array<{
+      id: string;
+      athleteName: string;
+      athleteEmail: string;
+      status: AthleteRaceParticipationStatus;
+      distanceLabel: string | null;
+      registrationStatus: string | null;
+      paymentStatus: string | null;
+      createdAt: string;
+      tone: "done" | "warning" | "danger" | "neutral";
+    }>;
+  } | null;
+  collectiveSignups: Array<{
+    id: string;
+    name: string;
+    status: string;
+    deadline: string | null;
+    maxMembers: number | null;
+    membersCount: number;
+    paidMembersCount: number;
+  }>;
+  sponsors: Array<{
+    id: string;
+    campaignId: string;
+    campaignTitle: string;
+    campaignStatus: string;
+    sponsorName: string;
+    budgetCents: number;
+  }>;
+  photoGalleries: Array<{
+    id: string;
+    title: string;
+    status: string;
+    photosCount: number;
+    publishedAt: string | null;
+  }>;
+  checklist: Array<{
+    key: string;
+    title: string;
+    status: "done" | "pending" | "attention";
+  }>;
+}
+
 export interface EventUpsertPayload {
   name: string;
   city: string;

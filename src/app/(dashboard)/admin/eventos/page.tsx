@@ -10,6 +10,7 @@ import {
   CircleDollarSign,
   CopyPlus,
   Eye,
+  Gauge,
   LayoutGrid,
   List,
   Megaphone,
@@ -368,6 +369,11 @@ export default function AdminEventosPage() {
   const renderEventActions = (event: EventView) => (
     <div className="flex flex-wrap items-center gap-1.5">
       <EventIconBtn href={`/admin/eventos/${event.id}`} icon={Eye} title="Ver prova" />
+      <EventIconBtn
+        href={`/admin/eventos/${event.id}/cockpit`}
+        icon={Gauge}
+        title="Abrir cockpit"
+      />
       <EventIconBtn
         href={`/admin/eventos/${event.id}#inscritos`}
         icon={Users}

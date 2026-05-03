@@ -33,6 +33,11 @@ Esta secao registra o estado real do sistema apos a entrega da agenda oficial de
 - Tela do atleta em `/provas` com bloco "Provas da assessoria" e acao "Quero participar".
 - Padronizacao visual do logo no fluxo de MFA para usar a mesma escala hero do login.
 - Policies de API adicionadas para `/api/admin/race-plans` e `/api/race-plans`.
+- Primeiro corte do cockpit da prova:
+  - `GET /api/admin/cockpit/events/:id`
+  - Tela `/admin/eventos/:id/cockpit`
+  - Atalhos a partir da listagem e do detalhe administrativo da prova.
+  - Agregacao de inscricoes, pagamentos, presenca, lista da assessoria, inscricao coletiva, patrocinadores, fotos e checklist calculada.
 
 ### Parcialmente Implementado
 
@@ -40,6 +45,7 @@ Esta secao registra o estado real do sistema apos a entrega da agenda oficial de
 - A agenda oficial ja registra interesse/participacao do atleta, mas ainda nao cobre toda a operacao esperada de fechamento, conclusao, comunicados especificos, exportacao, presenca por race plan e automacoes pos-prova.
 - O campo `audience` existe no modelo de agenda oficial, mas a API atual do atleta ainda lista provas abertas por organizacao sem aplicar segmentacao avancada por grupos, nivel, cidade, premium ou selecao manual.
 - A participacao pode guardar distancia, link/codigo externo e observacao, mas a UI atual usa o caminho simples de "Quero participar" sem formulario avancado para esses campos.
+- O cockpit da prova existe como primeira versao de leitura/agregacao, mas ainda nao tem checklist persistente, acoes em lote, comunicados por prova, exportacao, edicao de fase operacional ou financeiro proprio por prova.
 
 ### Pendente para Fechar o Fluxo Forte
 
@@ -49,7 +55,7 @@ Esta secao registra o estado real do sistema apos a entrega da agenda oficial de
 - Conversao assistida de `ExternalEvent` para `Event` e `OrganizationRacePlan`.
 - Envio real aos atletas por notificacao/aviso ao abrir uma prova.
 - Segmentacao de audiencia na API e na UI.
-- Acoes administrativas para fechar, cancelar, confirmar equipe, concluir prova e exportar lista.
+- Acoes administrativas para fechar, cancelar, confirmar equipe, concluir prova, exportar lista e persistir checklist operacional.
 - Vinculo automatico com pagamento interno, inscricao coletiva, pontos, fotos e comunicados pos-prova.
 
 ## 1. Visao
@@ -699,6 +705,9 @@ Grupos principais:
 - Plataforma: `/api/super-admin/*`
 - Admin: `/api/admin/*`
 - Eventos: `/api/events/*`
+- Cockpit administrativo da prova:
+  - Implementado: `GET /api/admin/cockpit/events/:id`
+  - Planejado: acoes de checklist, fase operacional, exportacao e comunicados por prova
 - Agenda oficial da assessoria:
   - Implementado: `GET /api/admin/race-plans`
   - Implementado: `POST /api/admin/race-plans`
