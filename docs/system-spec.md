@@ -6,6 +6,13 @@ Data: 2026-05-03
 
 Esta secao registra o estado real do sistema apos a entrega da agenda oficial de provas, a revisao de escopo para producao e o primeiro corte do cockpit da prova.
 
+### Terminologia do Tenant Ventu Suli
+
+- O sistema suporta tipos/modelos como `GRUPO_CORRIDA`, `ASSESSORIA`, `ASSOCIACAO`, `CLUBE` e perfis tecnicos como treinador.
+- Para o tenant/produto Ventu Suli, a nomenclatura principal exibida ao usuario deve ser **Grupo**.
+- Evitar "assessoria" nas telas centrais do Ventu Suli quando o contexto for a organizacao do usuario.
+- Exemplos: "Gestor do grupo", "Grupo", "Codigo de membro", "Atleta do grupo".
+
 ### Implementado
 
 - Modelo de agenda oficial da assessoria no Prisma:

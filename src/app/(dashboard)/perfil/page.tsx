@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { AlertTriangle, Check, CircleUserRound, Copy, Mail, Pencil, ShieldCheck, UserPlus, X } from "lucide-react";
 import { toast } from "sonner";
@@ -176,7 +177,7 @@ export default function PerfilPage() {
   const isAthleteRole = userRole === "ATHLETE" || !userRole;
   const roleLabel = formatRoleLabel(userRole);
   const organizationName =
-    organization?.name ?? currentUser?.organization?.name ?? "Assessoria nao identificada";
+    organization?.name ?? currentUser?.organization?.name ?? "Grupo nao identificado";
 
   const hasCpf = Boolean(identity?.cpf);
 
@@ -401,11 +402,14 @@ export default function PerfilPage() {
           {/* Account info */}
           <SectionCard title="Informações da conta" description="Dados de autenticação e acesso">
             <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-[#24486f] bg-[#0a1d36] p-4">
-              <div className="h-16 w-16 overflow-hidden rounded-full border border-[#2f5d8f] bg-[#0f233d]">
+              <div className="relative h-16 w-16 overflow-hidden rounded-full border border-[#2f5d8f] bg-[#0f233d]">
                 {identity.avatarUrl ? (
-                  <img
+                  <Image
                     src={identity.avatarUrl}
                     alt="Foto de perfil"
+                    fill
+                    sizes="64px"
+                    unoptimized
                     className="h-full w-full object-cover"
                   />
                 ) : (
@@ -442,7 +446,7 @@ export default function PerfilPage() {
             </div>
 
             <div className="mb-4">
-              <label className={labelClass()}>Codigo de associado</label>
+              <label className={labelClass()}>Codigo de membro</label>
               <input
                 className={inputClass(
                   "cursor-not-allowed border-[#34587d] bg-[#091a30] font-semibold text-[#dce9ff] opacity-100",
@@ -452,7 +456,7 @@ export default function PerfilPage() {
                 disabled
               />
               <p className="mt-1 text-xs text-[#6a9ac8]">
-                Identificacao oficial do associado, gerada pela assessoria e bloqueada para edicao.
+                Identificacao oficial do membro, gerada pelo grupo e bloqueada para edicao.
               </p>
             </div>
 
@@ -460,9 +464,9 @@ export default function PerfilPage() {
               {[
                 { label: "Nome", value: identity.name },
                 { label: "Email", value: identity.email },
-                { label: "Associado", value: identity.memberNumber ?? "Aguardando aprovação" },
+                { label: "Membro", value: identity.memberNumber ?? "Aguardando aprovação" },
                 { label: "Perfil", value: roleLabel },
-                { label: "Assessoria", value: organizationName },
+                { label: "Grupo", value: organizationName },
               ].map(({ label, value }) => (
                 <div key={label} className="rounded-xl border border-[#24486f] bg-[#0f233d] p-4">
                   <p className="text-xs uppercase tracking-wide text-[#8eb0dc]">{label}</p>
@@ -475,7 +479,7 @@ export default function PerfilPage() {
           {userRole === "ATHLETE" ? (
             <SectionCard
               title="Convidar amigo"
-              description="Gere um convite individual para um amigo entrar na sua assessoria"
+              description="Gere um convite individual para um amigo entrar no seu grupo"
             >
               <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
                 <div>
