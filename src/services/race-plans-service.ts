@@ -1,4 +1,4 @@
-﻿import { buildAuthHeaders } from "@/services/runtime";
+import { buildAuthHeaders } from "@/services/runtime";
 import type {
   AthleteRaceParticipationStatus,
   RacePlanAthleteAction,
@@ -99,7 +99,7 @@ export async function getAdminRacePlanByEvent(
     const errorPayload = (await response.json().catch(() => null)) as {
       error?: { message?: string };
     } | null;
-    throw new Error(errorPayload?.error?.message ?? "Nao foi possivel carregar a lista da produtora.");
+    throw new Error(errorPayload?.error?.message ?? "Nao foi possivel carregar a lista da assessoria.");
   }
 
   const payload = (await response.json()) as AdminRacePlanByEventResponse;

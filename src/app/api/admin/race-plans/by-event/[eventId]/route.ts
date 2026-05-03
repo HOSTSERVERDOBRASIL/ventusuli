@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { UserRole } from "@prisma/client";
 import { apiError } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
@@ -12,7 +12,7 @@ export async function GET(req: NextRequest, { params }: { params: { eventId: str
   const auth = getAuthContext(req);
   if (!auth) return apiError("UNAUTHORIZED", "Token de acesso ausente.", 401);
   if (!canManageRacePlans(auth.role)) {
-    return apiError("FORBIDDEN", "Apenas administradores podem acompanhar a agenda da produtora.", 403);
+    return apiError("FORBIDDEN", "Apenas administradores podem acompanhar a agenda da assessoria.", 403);
   }
 
   const plan = await prisma.organizationRacePlan.findFirst({

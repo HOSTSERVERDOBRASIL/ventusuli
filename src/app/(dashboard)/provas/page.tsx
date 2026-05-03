@@ -234,12 +234,12 @@ export default function ProvasPage() {
       </SectionCard>
 
       <SectionCard
-        title="Provas da produtora"
+        title="Provas da assessoria"
         description="Agenda oficial que a equipe abriu para participacao dos atletas"
       >
         {racePlans.length === 0 ? (
           <EmptyState
-            title="Nenhuma prova aberta pela produtora"
+            title="Nenhuma prova aberta pela assessoria"
             description="Quando o admin abrir uma prova para o grupo, ela aparece aqui com a acao de participacao."
           />
         ) : (
@@ -286,7 +286,7 @@ export default function ProvasPage() {
                               : item,
                           ),
                         );
-                        toast.success("Participacao registrada para a produtora.");
+                        toast.success("Participacao registrada para a assessoria.");
                       } catch (error) {
                         toast.error(
                           error instanceof Error
