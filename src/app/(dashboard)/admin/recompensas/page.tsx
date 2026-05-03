@@ -248,7 +248,7 @@ export default function AdminRecompensasPage() {
     },
     {
       key: "actions",
-      header: "AÃ§Ãµes",
+      header: "Ações",
       className: "min-w-[160px]",
       cell: (row) => (
         <div className="flex flex-nowrap gap-1.5">

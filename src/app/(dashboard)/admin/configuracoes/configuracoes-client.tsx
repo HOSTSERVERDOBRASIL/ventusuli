@@ -1,0 +1,1288 @@
+﻿"use client";
+
+import { ChangeEvent, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Building2,
+  CreditCard,
+  FileText,
+  Link2,
+  Mail,
+  Plus,
+  Power,
+  Trash2,
+  Users,
+  Copy,
+} from "lucide-react";
+import { toast } from "sonner";
+import { useAuthToken } from "@/components/auth/AuthTokenProvider";
+import { ActionButton } from "@/components/system/action-button";
+import { EmptyState } from "@/components/system/empty-state";
+import { LoadingState } from "@/components/system/loading-state";
+import { MetricStrip } from "@/components/system/metric-strip";
+import { ModuleTabs, type ModuleTabItem } from "@/components/system/module-tabs";
+import { PageHeader } from "@/components/system/page-header";
+import { SectionCard } from "@/components/system/section-card";
+import { StatusBadge } from "@/components/system/status-badge";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { VENTU_SULI_LOGO_SRC, resolveOrganizationLogo } from "@/lib/brand";
+import {
+  FinanceProfileSettings,
+  AdminAccessUser,
+  createInvite,
+  deleteInvite,
+  getOrganizationSettings,
+  listAdminAccessProfiles,
+  listInvites,
+  OrgInvite,
+  OrganizationSettings,
+  toggleInvite,
+  updateAdminAccessProfiles,
+  updateOrganizationSettings,
+} from "@/services/organization-service";
+import {
+  getAdminNotificationTemplates,
+  updateAdminNotificationTemplate,
+} from "@/services/notification-service";
+import { AdminNotificationTemplate } from "@/services/types";
+import { uploadImageFile } from "@/services/upload-service";
+import { roleLabel } from "@/lib/role-labels";
+import { UserRole } from "@/types";
+
+const ADMIN_ROLES = new Set<UserRole>([UserRole.ADMIN, UserRole.MANAGER]);
+const DEFAULT_ORG_LOGO = VENTU_SULI_LOGO_SRC;
+const MAX_LOGO_FILE_SIZE = 2 * 1024 * 1024;
+type SettingsTab = "brand" | "access" | "finance" | "emails" | "invites" | "summary";
+
+const SETTINGS_TAB_PATHS: Record<SettingsTab, string> = {
+  brand: "/admin/configuracoes",
+  access: "/admin/configuracoes/acesso",
+  finance: "/admin/configuracoes/financeiro",
+  emails: "/admin/configuracoes/emails",
+  invites: "/admin/configuracoes/convites",
+  summary: "/admin/configuracoes/resumo",
+};
+
+const ACCESS_ROLE_DESCRIPTIONS: Record<UserRole, string> = {
+  [UserRole.SUPER_ADMIN]: "Plataforma inteira",
+  [UserRole.ADMIN]: "Configura a assessoria",
+  [UserRole.MANAGER]: "Gestao operacional",
+  [UserRole.FINANCE]: "Financeiro e pagamentos",
+  [UserRole.ORGANIZER]: "Eventos e check-in",
+  [UserRole.COACH]: "Treinos e atletas",
+  [UserRole.SUPPORT]: "Atendimento",
+  [UserRole.MODERATOR]: "Conteudo e comunidade",
+  [UserRole.PARTNER]: "Patrocinadores",
+  [UserRole.PREMIUM_ATHLETE]: "Atleta premium",
+  [UserRole.ATHLETE]: "Atleta comum",
+};
+
+function inviteLink(token: string): string {
+  return `${window.location.origin}/register/atleta?inviteToken=${token}`;
+}
+
+function formatExpiry(expiresAt: string | null): string {
+  if (!expiresAt) return "Sem expiracao";
+  return new Date(expiresAt).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+function joinLines(values: string[]): string {
+  return values.join("\n");
+}
+
+function splitLines(value: string): string[] {
+  return Array.from(
+    new Set(
+      value
+        .split(/\r?\n|,/)
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
+function Toggle({
+  label,
+  checked,
+  onChange,
+  disabled,
+  description,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (value: boolean) => void;
+  disabled?: boolean;
+  description?: string;
+}) {
+  return (
+    <label className="flex cursor-pointer items-start justify-between gap-4">
+      <div>
+        <p className="text-sm font-medium text-white">{label}</p>
+        {description ? <p className="mt-0.5 text-xs text-[#8eb0dc]">{description}</p> : null}
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        disabled={disabled}
+        onClick={() => onChange(!checked)}
+        className={`relative mt-0.5 h-6 w-11 shrink-0 rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-[#3a8fd4] disabled:opacity-50 ${
+          checked ? "border-[#F5A623] bg-[#F5A623]" : "border-[#24486f] bg-[#0f233d]"
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+            checked ? "translate-x-5" : "translate-x-0.5"
+          }`}
+        />
+      </button>
+    </label>
+  );
+}
+
+export function AdminConfiguracoesPageContent({ activeTab }: { activeTab: SettingsTab }) {
+  const router = useRouter();
+  const { accessToken, userRole, refreshSession } = useAuthToken();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [settings, setSettings] = useState<OrganizationSettings | null>(null);
+  const [invites, setInvites] = useState<OrgInvite[]>([]);
+  const [accessUsers, setAccessUsers] = useState<AdminAccessUser[]>([]);
+  const [assignableRoles, setAssignableRoles] = useState<UserRole[]>([]);
+  const [savingAccessUserId, setSavingAccessUserId] = useState<string | null>(null);
+  const [creatingInvite, setCreatingInvite] = useState(false);
+  const [newInviteLabel, setNewInviteLabel] = useState("");
+  const [showInviteForm, setShowInviteForm] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [emailTemplates, setEmailTemplates] = useState<AdminNotificationTemplate[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [savingTemplateId, setSavingTemplateId] = useState<string | null>(null);
+
+  const [form, setForm] = useState({
+    name: "",
+    slug: "",
+    supportEmail: "",
+    primaryColor: "#F5A623",
+    logoUrl: "",
+    allowAthleteSelfSignup: true,
+    requireAthleteApproval: false,
+    financeBusinessModel: "ASSESSORIA" as FinanceProfileSettings["businessModel"],
+    financeRevenueMode: "MISTO" as FinanceProfileSettings["revenueMode"],
+    financeBillingDay: "5",
+    financeRecurringMonthlyFee: "0",
+    financeRecurringChargeEnabled: false,
+    financeRecurringGraceDays: "3",
+    financeRecurringDescription: "Mensalidade recorrente do associado",
+    financeDefaultEntryKind: "RECEIVABLE" as FinanceProfileSettings["defaultEntryKind"],
+    financeDefaultAccountCode: "MENSALIDADE",
+    financeDefaultCostCenter: "Operacao",
+    financeDefaultPaymentMethod: "PIX",
+    financeRequireDueDateForOpenEntries: true,
+    financeAllowManualCashbook: true,
+    financeCategories: "",
+    financeCostCenters: "",
+    financePaymentMethods: "",
+    financeQuickNotes: "",
+  });
+
+  const canEdit = userRole ? ADMIN_ROLES.has(userRole) : false;
+  const logoPreviewUrl = resolveOrganizationLogo(
+    form.logoUrl.trim() || settings?.logoUrl || DEFAULT_ORG_LOGO,
+  );
+  const activeInvites = useMemo(() => invites.filter((invite) => invite.active).length, [invites]);
+  const selectedTemplate = useMemo(
+    () => emailTemplates.find((template) => template.id === selectedTemplateId) ?? emailTemplates[0],
+    [emailTemplates, selectedTemplateId],
+  );
+  const tabs = useMemo<ModuleTabItem<SettingsTab>[]>(
+    () => [
+      {
+        key: "brand",
+        label: "Marca",
+        audience: "Gestão",
+        description: "Nome, slug, logo, cor e canal de suporte.",
+        icon: Building2,
+        metricLabel: "Plano",
+        metricValue: settings?.plan ?? "-",
+        metricTone: "info",
+      },
+      {
+        key: "access",
+        label: "Acesso",
+        audience: "Cadastro",
+        description: "Auto-cadastro, aprovação e perfis de usuários.",
+        icon: Users,
+        metricLabel: "Usuarios",
+        metricValue: accessUsers.length,
+        metricTone: form.requireAthleteApproval ? "warning" : "positive",
+      },
+      {
+        key: "finance",
+        label: "Financeiro",
+        audience: "Tesouraria",
+        description: "Mensalidade, contas, centros e formas de pagamento.",
+        icon: CreditCard,
+        metricLabel: "Recorrencia",
+        metricValue: form.financeRecurringChargeEnabled ? "Ativa" : "Inativa",
+        metricTone: form.financeRecurringChargeEnabled ? "positive" : "neutral",
+      },
+      {
+        key: "emails",
+        label: "E-mails",
+        audience: "Comunicacao",
+        description: "Assuntos, mensagens e status dos modelos enviados por SMTP.",
+        icon: Mail,
+        metricLabel: "Modelos",
+        metricValue: emailTemplates.length,
+        metricTone: emailTemplates.length > 0 ? "positive" : "neutral",
+      },
+      {
+        key: "invites",
+        label: "Convites",
+        audience: "Operacao",
+        description: "Links únicos para trazer atletas para a assessoria.",
+        icon: Link2,
+        metricLabel: "Ativos",
+        metricValue: activeInvites,
+        metricTone: activeInvites > 0 ? "positive" : "neutral",
+      },
+      {
+        key: "summary",
+        label: "Resumo",
+        audience: "Diretoria",
+        description: "Informações comerciais essenciais do tenant.",
+        icon: FileText,
+        metricLabel: "Edicao",
+        metricValue: canEdit ? "Liberada" : "Leitura",
+        metricTone: canEdit ? "positive" : "neutral",
+      },
+    ],
+    [
+      activeInvites,
+      accessUsers.length,
+      canEdit,
+      emailTemplates.length,
+      form.financeRecurringChargeEnabled,
+      form.requireAthleteApproval,
+      settings?.plan,
+    ],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [payload, inviteList, templateList, accessProfiles] = await Promise.all([
+          getOrganizationSettings(accessToken),
+          listInvites(accessToken).catch(() => []),
+          getAdminNotificationTemplates(accessToken, "EMAIL").catch(() => []),
+          listAdminAccessProfiles(accessToken).catch(() => ({ data: [], assignableRoles: [] })),
+        ]);
+
+        if (!cancelled) {
+          setSettings(payload);
+          setEmailTemplates(templateList);
+          setSelectedTemplateId((current) => current ?? templateList[0]?.id ?? null);
+          setForm({
+            name: payload.name,
+            slug: payload.slug,
+            supportEmail: payload.supportEmail,
+            primaryColor: payload.primaryColor,
+            logoUrl: payload.logoUrl ?? "",
+            allowAthleteSelfSignup: payload.allowAthleteSelfSignup,
+            requireAthleteApproval: payload.requireAthleteApproval,
+            financeBusinessModel: payload.financeProfile.businessModel,
+            financeRevenueMode: payload.financeProfile.revenueMode,
+            financeBillingDay: payload.financeProfile.billingDay?.toString() ?? "",
+            financeRecurringMonthlyFee: String(
+              payload.financeProfile.recurringMonthlyFeeCents ?? 0,
+            ),
+            financeRecurringChargeEnabled: payload.financeProfile.recurringChargeEnabled,
+            financeRecurringGraceDays: String(payload.financeProfile.recurringGraceDays ?? 3),
+            financeRecurringDescription: payload.financeProfile.recurringDescription,
+            financeDefaultEntryKind: payload.financeProfile.defaultEntryKind,
+            financeDefaultAccountCode: payload.financeProfile.defaultAccountCode,
+            financeDefaultCostCenter: payload.financeProfile.defaultCostCenter,
+            financeDefaultPaymentMethod: payload.financeProfile.defaultPaymentMethod,
+            financeRequireDueDateForOpenEntries:
+              payload.financeProfile.requireDueDateForOpenEntries,
+            financeAllowManualCashbook: payload.financeProfile.allowManualCashbook,
+            financeCategories: joinLines(payload.financeProfile.categories),
+            financeCostCenters: joinLines(payload.financeProfile.costCenters),
+            financePaymentMethods: joinLines(payload.financeProfile.paymentMethods),
+            financeQuickNotes: joinLines(payload.financeProfile.quickNotes),
+          });
+          setInvites(inviteList);
+          setAccessUsers(accessProfiles.data);
+          setAssignableRoles(accessProfiles.assignableRoles);
+        }
+      } catch (loadError) {
+        if (!cancelled) {
+          setError(
+            loadError instanceof Error
+              ? loadError.message
+              : "Não foi possível carregar configurações da assessoria.",
+          );
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken]);
+
+  const onSave = async () => {
+    if (!canEdit) return;
+
+    setSaving(true);
+    try {
+      const payload = await updateOrganizationSettings(
+        {
+          name: form.name,
+          slug: form.slug,
+          supportEmail: form.supportEmail,
+          primaryColor: form.primaryColor,
+          logoUrl: form.logoUrl.trim() ? form.logoUrl.trim() : null,
+          allowAthleteSelfSignup: form.allowAthleteSelfSignup,
+          requireAthleteApproval: form.requireAthleteApproval,
+          financeProfile: {
+            businessModel: form.financeBusinessModel,
+            revenueMode: form.financeRevenueMode,
+            billingDay: form.financeBillingDay.trim() ? Number(form.financeBillingDay) : null,
+            recurringMonthlyFeeCents: form.financeRecurringMonthlyFee.trim()
+              ? Number(form.financeRecurringMonthlyFee)
+              : 0,
+            recurringChargeEnabled: form.financeRecurringChargeEnabled,
+            recurringGraceDays: form.financeRecurringGraceDays.trim()
+              ? Number(form.financeRecurringGraceDays)
+              : 3,
+            recurringDescription: form.financeRecurringDescription,
+            defaultEntryKind: form.financeDefaultEntryKind,
+            defaultAccountCode: form.financeDefaultAccountCode,
+            defaultCostCenter: form.financeDefaultCostCenter,
+            defaultPaymentMethod: form.financeDefaultPaymentMethod,
+            requireDueDateForOpenEntries: form.financeRequireDueDateForOpenEntries,
+            allowManualCashbook: form.financeAllowManualCashbook,
+            categories: splitLines(form.financeCategories),
+            costCenters: splitLines(form.financeCostCenters),
+            paymentMethods: splitLines(form.financePaymentMethods),
+            quickNotes: splitLines(form.financeQuickNotes),
+          },
+        },
+        accessToken,
+      );
+      setSettings(payload);
+      await refreshSession();
+      toast.success("Configurações salvas com sucesso.");
+    } catch (saveError) {
+      toast.error(
+        saveError instanceof Error ? saveError.message : "Falha ao salvar configurações.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const onLogoFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = event.target.files?.[0];
+    event.target.value = "";
+    if (!selectedFile) return;
+
+    if (!selectedFile.type.startsWith("image/")) {
+      toast.error("Selecione um arquivo de imagem valido.");
+      return;
+    }
+
+    if (selectedFile.size > MAX_LOGO_FILE_SIZE) {
+      toast.error("A logo deve ter no maximo 2MB.");
+      return;
+    }
+
+    setUploadingLogo(true);
+    try {
+      const uploaded = await uploadImageFile(selectedFile, "branding", accessToken);
+      setForm((prev) => ({ ...prev, logoUrl: uploaded.url }));
+      toast.success("Logo carregada. Clique em salvar configurações para aplicar.");
+    } catch (uploadError) {
+      toast.error(uploadError instanceof Error ? uploadError.message : "Falha ao carregar logo.");
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleAccessRoleToggle = async (user: AdminAccessUser, role: UserRole) => {
+    if (!canEdit || savingAccessUserId) return;
+
+    const currentRoles = new Set(user.roles);
+    if (currentRoles.has(role)) {
+      currentRoles.delete(role);
+    } else {
+      currentRoles.add(role);
+      if (role === UserRole.ATHLETE) currentRoles.delete(UserRole.PREMIUM_ATHLETE);
+      if (role === UserRole.PREMIUM_ATHLETE) currentRoles.delete(UserRole.ATHLETE);
+    }
+
+    const nextRoles = Array.from(currentRoles);
+    setSavingAccessUserId(user.id);
+    try {
+      const updated = await updateAdminAccessProfiles(user.id, nextRoles, accessToken);
+      setAccessUsers((prev) =>
+        prev.map((current) =>
+          current.id === user.id
+            ? {
+                ...current,
+                primaryRole: updated.primaryRole,
+                roles: updated.roles,
+              }
+            : current,
+        ),
+      );
+      toast.success("Perfis do usuario atualizados.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao salvar perfis.");
+    } finally {
+      setSavingAccessUserId(null);
+    }
+  };
+
+  const handleCreateInvite = async () => {
+    setCreatingInvite(true);
+    try {
+      const invite = await createInvite({ label: newInviteLabel.trim() || undefined }, accessToken);
+      setInvites((prev) => [invite, ...prev]);
+      setNewInviteLabel("");
+      setShowInviteForm(false);
+      toast.success("Convite criado com sucesso.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao criar convite.");
+    } finally {
+      setCreatingInvite(false);
+    }
+  };
+
+  const handleToggleInvite = async (invite: OrgInvite) => {
+    try {
+      const updated = await toggleInvite(invite.id, !invite.active, accessToken);
+      setInvites((prev) => prev.map((current) => (current.id === invite.id ? updated : current)));
+      toast.success(updated.active ? "Convite reativado." : "Convite desativado.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao atualizar convite.");
+    }
+  };
+
+  const handleDeleteInvite = async (invite: OrgInvite) => {
+    if (
+      !confirm(
+        `Excluir o convite "${invite.label ?? invite.token.slice(0, 8) + "..."}"? Esta ação não pode ser desfeita.`,
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await deleteInvite(invite.id, accessToken);
+      setInvites((prev) => prev.filter((current) => current.id !== invite.id));
+      toast.success("Convite excluido.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao excluir convite.");
+    }
+  };
+
+  const copyLink = (token: string) => {
+    const link = inviteLink(token);
+    void navigator.clipboard.writeText(link).then(() => {
+      toast.success("Link de convite copiado!");
+    });
+  };
+
+  const updateTemplateDraft = (
+    id: string,
+    patch: Partial<Pick<AdminNotificationTemplate, "subject" | "body" | "is_active">>,
+  ) => {
+    setEmailTemplates((current) =>
+      current.map((template) => (template.id === id ? { ...template, ...patch } : template)),
+    );
+  };
+
+  const saveTemplate = async (template: AdminNotificationTemplate) => {
+    if (!canEdit) return;
+
+    setSavingTemplateId(template.id);
+    try {
+      const updated = await updateAdminNotificationTemplate(
+        template.id,
+        {
+          subject: template.subject,
+          body: template.body,
+          isActive: template.is_active,
+        },
+        accessToken,
+      );
+      setEmailTemplates((current) =>
+        current.map((item) => (item.id === updated.id ? updated : item)),
+      );
+      toast.success("Modelo de e-mail salvo.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao salvar modelo de e-mail.");
+    } finally {
+      setSavingTemplateId(null);
+    }
+  };
+
+  return (
+    <div className="space-y-6 text-white">
+      <PageHeader
+        title="Configurações da assessoria"
+        subtitle="Branding, regras de onboarding e convites do tenant."
+      />
+
+      {loading ? (
+        <LoadingState lines={4} />
+      ) : error || !settings ? (
+        <EmptyState
+          title="Configurações indisponíveis"
+          description={error ?? "Falha ao carregar configurações da assessoria."}
+        />
+      ) : (
+        <>
+          <ModuleTabs
+            tabs={tabs}
+            activeTab={activeTab}
+            onChange={(tab) => router.push(SETTINGS_TAB_PATHS[tab])}
+            columnsClassName="md:grid-cols-6"
+          />
+
+          <SectionCard
+            className={activeTab === "brand" ? undefined : "hidden"}
+            title="Identidade da marca"
+            description="Nome, slug, logo e cor principal da assessoria."
+            action={
+              <StatusBadge
+                label={canEdit ? "EDITAVEL" : "SOMENTE LEITURA"}
+                tone={canEdit ? "positive" : "neutral"}
+              />
+            }
+          >
+            <div className="grid gap-3 md:grid-cols-2">
+              <Input
+                value={form.name}
+                onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
+                placeholder="Nome da assessoria"
+                className="border-white/15 bg-[#0F2743] text-white"
+                disabled={!canEdit}
+              />
+              <Input
+                value={form.slug}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    slug: event.target.value.toLowerCase().replace(/\s+/g, "-"),
+                  }))
+                }
+                placeholder="slug-comercial"
+                className="border-white/15 bg-[#0F2743] text-white"
+                disabled={!canEdit}
+              />
+
+              <div className="grid gap-3 rounded-xl border border-white/10 bg-[#0F2743] p-3 md:col-span-2 md:grid-cols-[104px_1fr]">
+                <div className="flex h-[88px] w-[88px] items-center justify-center overflow-hidden rounded-xl border border-white/20 bg-[#0a1d36]">
+                  <img
+                    src={logoPreviewUrl}
+                    alt="Logo da assessoria"
+                    referrerPolicy="no-referrer"
+                    className="h-full w-full object-contain"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Input
+                    value={form.logoUrl}
+                    onChange={(event) =>
+                      setForm((prev) => ({ ...prev, logoUrl: event.target.value }))
+                    }
+                    placeholder="https://cdn.seudominio.com/logo.png"
+                    className="border-white/15 bg-[#0a1d36] text-white"
+                    disabled={!canEdit}
+                  />
+
+                  {canEdit ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <label className="inline-flex cursor-pointer items-center rounded-lg border border-[#2f5d8f] bg-[#0a1d36] px-3 py-2 text-xs font-medium text-[#c8dbf8] transition hover:border-[#4f7fb4]">
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/jpg,image/webp,image/gif,image/svg+xml"
+                          className="hidden"
+                          onChange={(event) => void onLogoFileChange(event)}
+                          disabled={!canEdit || uploadingLogo}
+                        />
+                        {uploadingLogo ? "Carregando..." : "Fazer upload da logo"}
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setForm((prev) => ({ ...prev, logoUrl: "" }))}
+                        className="rounded-lg border border-white/15 bg-[#0a1d36] px-3 py-2 text-xs font-medium text-slate-300 transition hover:text-white"
+                        disabled={uploadingLogo}
+                      >
+                        Remover logo
+                      </button>
+                    </div>
+                  ) : null}
+
+                  <p className="text-[11px] text-slate-400">
+                    PNG, JPG, WEBP, GIF ou SVG com até 2MB.
+                  </p>
+                </div>
+              </div>
+
+              <Input
+                value={form.supportEmail}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, supportEmail: event.target.value }))
+                }
+                placeholder="suporte@suaassessoria.com"
+                className="border-white/15 bg-[#0F2743] text-white"
+                disabled={!canEdit}
+              />
+              <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-[#0F2743] px-3 py-2">
+                <input
+                  type="color"
+                  value={form.primaryColor}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, primaryColor: event.target.value }))
+                  }
+                  className="h-8 w-10 cursor-pointer rounded border border-white/15 bg-transparent"
+                  disabled={!canEdit}
+                />
+                <span className="text-sm text-slate-200">{form.primaryColor}</span>
+              </div>
+            </div>
+
+            {canEdit ? (
+              <div className="mt-4">
+                <ActionButton onClick={() => void onSave()} disabled={saving}>
+                  {saving ? "Salvando..." : "Salvar configurações"}
+                </ActionButton>
+              </div>
+            ) : (
+              <p className="mt-4 text-xs text-slate-300">
+                Apenas administradores podem alterar estas configurações.
+              </p>
+            )}
+          </SectionCard>
+
+          <SectionCard
+            className={activeTab === "access" ? undefined : "hidden"}
+            title="Regras de entrada de atletas"
+            description="Controle como novos atletas acessam sua assessoria."
+          >
+            <div className="space-y-4">
+              <Toggle
+                label="Permitir auto-cadastro por slug"
+                description="Quando ativo, qualquer pessoa com o slug da assessoria pode criar uma conta de atleta."
+                checked={form.allowAthleteSelfSignup}
+                onChange={(value) =>
+                  setForm((prev) => ({ ...prev, allowAthleteSelfSignup: value }))
+                }
+                disabled={!canEdit}
+              />
+              <div className="h-px bg-white/10" />
+              <Toggle
+                label="Exigir aprovação antes de liberar acesso"
+                description="Quando ativo, novos atletas ficam pendentes até serem aprovados manualmente no painel."
+                checked={form.requireAthleteApproval}
+                onChange={(value) =>
+                  setForm((prev) => ({ ...prev, requireAthleteApproval: value }))
+                }
+                disabled={!canEdit}
+              />
+            </div>
+
+            {form.requireAthleteApproval ? (
+              <p className="mt-3 rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-200">
+                Atletas cadastrados ficarão com status <strong>Pendente de aprovação</strong> até
+                revisão no painel.
+              </p>
+            ) : null}
+
+            <div className="mt-6 space-y-3">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-white">Perfis e responsabilidades</p>
+                  <p className="text-xs text-[#8eb0dc]">
+                    Defina o que cada pessoa faz na assessoria. Atleta e atleta premium são
+                    exclusivos entre si.
+                  </p>
+                </div>
+                <StatusBadge
+                  label={`${accessUsers.length} usuario${accessUsers.length === 1 ? "" : "s"}`}
+                  tone={accessUsers.length > 0 ? "positive" : "neutral"}
+                />
+              </div>
+
+              {accessUsers.length === 0 ? (
+                <EmptyState
+                  title="Nenhum usuario operacional encontrado"
+                  description="Cadastre ou aprove usuarios para liberar a gestão de perfis."
+                />
+              ) : (
+                <div className="overflow-hidden rounded-xl border border-white/10">
+                  <div className="divide-y divide-white/10">
+                    {accessUsers.map((user) => (
+                      <div key={user.id} className="bg-[#0a1d36] p-3">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-white">{user.name}</p>
+                            <p className="truncate text-xs text-[#8eb0dc]">{user.email}</p>
+                            <p className="mt-1 text-[11px] text-slate-400">
+                              Principal: {roleLabel(user.primaryRole)}
+                            </p>
+                          </div>
+                          {savingAccessUserId === user.id ? (
+                            <StatusBadge label="Salvando" tone="warning" />
+                          ) : (
+                            <StatusBadge label={user.status} tone="neutral" />
+                          )}
+                        </div>
+
+                        <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                          {assignableRoles.map((role) => {
+                            const checked = user.roles.includes(role);
+                            const disabled =
+                              !canEdit ||
+                              savingAccessUserId !== null ||
+                              role === user.primaryRole ||
+                              (role === UserRole.ATHLETE &&
+                                user.roles.includes(UserRole.PREMIUM_ATHLETE)) ||
+                              (role === UserRole.PREMIUM_ATHLETE &&
+                                user.roles.includes(UserRole.ATHLETE));
+
+                            return (
+                              <label
+                                key={`${user.id}-${role}`}
+                                className={`flex min-h-[62px] items-start gap-2 rounded-lg border px-3 py-2 transition ${
+                                  checked
+                                    ? "border-[#F5A623]/55 bg-[#F5A623]/10"
+                                    : "border-white/10 bg-[#07192b] hover:border-sky-400/30"
+                                } ${disabled ? "opacity-65" : "cursor-pointer"}`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  disabled={disabled}
+                                  onChange={() => void handleAccessRoleToggle(user, role)}
+                                  className="mt-1 h-4 w-4 rounded border-white/20 bg-[#0f233d] accent-[#F5A623]"
+                                />
+                                <span className="min-w-0">
+                                  <span className="block text-xs font-semibold text-white">
+                                    {roleLabel(role)}
+                                  </span>
+                                  <span className="mt-0.5 block text-[11px] leading-4 text-slate-400">
+                                    {ACCESS_ROLE_DESCRIPTIONS[role]}
+                                    {role === user.primaryRole ? " · perfil principal" : ""}
+                                  </span>
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {canEdit ? (
+              <div className="mt-4">
+                <ActionButton onClick={() => void onSave()} disabled={saving}>
+                  {saving ? "Salvando..." : "Salvar regras de acesso"}
+                </ActionButton>
+              </div>
+            ) : null}
+          </SectionCard>
+
+          <SectionCard
+            className={activeTab === "finance" ? undefined : "hidden"}
+            title="Modelo financeiro da operação"
+            description="Defina como a assessoria cobra, classifica e controla receitas e despesas."
+          >
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <Select
+                value={form.financeBusinessModel}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    financeBusinessModel: event.target
+                      .value as FinanceProfileSettings["businessModel"],
+                  }))
+                }
+                className="border-white/15 bg-[#0F2743] text-white"
+                disabled={!canEdit}
+              >
+                <option value="ASSESSORIA">Assessoria esportiva</option>
+                <option value="GRUPO_CORRIDA">Grupo de corrida</option>
+                <option value="ASSOCIACAO">Associacao</option>
+                <option value="CLUBE">Clube</option>
+              </Select>
+
+              <Select
+                value={form.financeRevenueMode}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    financeRevenueMode: event.target.value as FinanceProfileSettings["revenueMode"],
+                  }))
+                }
+                className="border-white/15 bg-[#0F2743] text-white"
+                disabled={!canEdit}
+              >
+                <option value="MENSALIDADES">Receita por mensalidades</option>
+                <option value="EVENTOS">Receita por eventos</option>
+                <option value="MISTO">Receita mista</option>
+                <option value="PATROCINIOS">Receita por patrocinios</option>
+              </Select>
+
+              <Input
+                type="number"
+                min={1}
+                max={31}
+                value={form.financeBillingDay}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, financeBillingDay: event.target.value }))
+                }
+                placeholder="Dia padrão da cobrança"
+                className="border-white/15 bg-[#0F2743] text-white"
+                disabled={!canEdit}
+              />
+
+              <Input
+                type="number"
+                min={0}
+                value={form.financeRecurringMonthlyFee}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, financeRecurringMonthlyFee: event.target.value }))
+                }
+                placeholder="Mensalidade em centavos"
+                className="border-white/15 bg-[#0F2743] text-white"
+                disabled={!canEdit}
+              />
+
+              <Input
+                type="number"
+                min={0}
+                max={31}
+                value={form.financeRecurringGraceDays}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, financeRecurringGraceDays: event.target.value }))
+                }
+                placeholder="Dias extras apos vencimento"
+                className="border-white/15 bg-[#0F2743] text-white"
+                disabled={!canEdit}
+              />
+
+              <Select
+                value={form.financeDefaultEntryKind}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    financeDefaultEntryKind: event.target
+                      .value as FinanceProfileSettings["defaultEntryKind"],
+                  }))
+                }
+                className="border-white/15 bg-[#0F2743] text-white"
+                disabled={!canEdit}
+              >
+                <option value="RECEIVABLE">Conta a receber padrão</option>
+                <option value="PAYABLE">Conta a pagar padrão</option>
+                <option value="CASH">Livro-caixa padrão</option>
+              </Select>
+
+              <Input
+                value={form.financeRecurringDescription}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, financeRecurringDescription: event.target.value }))
+                }
+                placeholder="Descricao da mensalidade"
+                className="border-white/15 bg-[#0F2743] text-white"
+                disabled={!canEdit}
+              />
+
+              <Input
+                value={form.financeDefaultAccountCode}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, financeDefaultAccountCode: event.target.value }))
+                }
+                placeholder="Plano de contas padrão"
+                className="border-white/15 bg-[#0F2743] text-white"
+                disabled={!canEdit}
+              />
+
+              <Input
+                value={form.financeDefaultCostCenter}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, financeDefaultCostCenter: event.target.value }))
+                }
+                placeholder="Centro de custo padrão"
+                className="border-white/15 bg-[#0F2743] text-white"
+                disabled={!canEdit}
+              />
+
+              <Input
+                value={form.financeDefaultPaymentMethod}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, financeDefaultPaymentMethod: event.target.value }))
+                }
+                placeholder="Forma de pagamento padrão"
+                className="border-white/15 bg-[#0F2743] text-white"
+                disabled={!canEdit}
+              />
+            </div>
+
+            <div className="mt-4 space-y-4">
+              <Toggle
+                label="Exigir vencimento para titulos em aberto"
+                description="Padroniza a cobrança e facilita o controle de inadimplência."
+                checked={form.financeRequireDueDateForOpenEntries}
+                onChange={(value) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    financeRequireDueDateForOpenEntries: value,
+                  }))
+                }
+                disabled={!canEdit}
+              />
+              <div className="h-px bg-white/10" />
+              <Toggle
+                label="Ativar mensalidade recorrente"
+                description="Permite gerar automaticamente a carteira mensal dos associados ativos."
+                checked={form.financeRecurringChargeEnabled}
+                onChange={(value) =>
+                  setForm((prev) => ({ ...prev, financeRecurringChargeEnabled: value }))
+                }
+                disabled={!canEdit}
+              />
+              <div className="h-px bg-white/10" />
+              <Toggle
+                label="Permitir livro-caixa manual"
+                description="Desative para forcar o time a operar em contas a pagar/receber com baixa."
+                checked={form.financeAllowManualCashbook}
+                onChange={(value) =>
+                  setForm((prev) => ({ ...prev, financeAllowManualCashbook: value }))
+                }
+                disabled={!canEdit}
+              />
+            </div>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <Textarea
+                value={form.financeCategories}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, financeCategories: event.target.value }))
+                }
+                placeholder={"Categorias sugeridas\nMensalidades\nInscricoes\nPatrocinios"}
+                className="min-h-[140px] border-white/15 bg-[#0F2743] text-white"
+                disabled={!canEdit}
+              />
+              <Textarea
+                value={form.financeCostCenters}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, financeCostCenters: event.target.value }))
+                }
+                placeholder={"Centros de custo\nOperacao\nEventos\nEquipe"}
+                className="min-h-[140px] border-white/15 bg-[#0F2743] text-white"
+                disabled={!canEdit}
+              />
+              <Textarea
+                value={form.financePaymentMethods}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, financePaymentMethods: event.target.value }))
+                }
+                placeholder={"Formas de pagamento\nPIX\nCartao\nBoleto"}
+                className="min-h-[140px] border-white/15 bg-[#0F2743] text-white"
+                disabled={!canEdit}
+              />
+              <Textarea
+                value={form.financeQuickNotes}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, financeQuickNotes: event.target.value }))
+                }
+                placeholder={
+                  "Anotações operacionais\nMensalidade recorrente do associado\nRateio da equipe"
+                }
+                className="min-h-[140px] border-white/15 bg-[#0F2743] text-white"
+                disabled={!canEdit}
+              />
+            </div>
+
+            <p className="mt-3 text-xs text-slate-300">
+              Cada linha vira uma sugestao pratica dentro do financeiro administrativo.
+            </p>
+
+            {canEdit ? (
+              <div className="mt-4">
+                <ActionButton onClick={() => void onSave()} disabled={saving}>
+                  {saving ? "Salvando..." : "Salvar modelo financeiro"}
+                </ActionButton>
+              </div>
+            ) : null}
+          </SectionCard>
+
+          <SectionCard
+            className={activeTab === "emails" ? undefined : "hidden"}
+            title="Modelos de e-mail"
+            description="Edite os assuntos e mensagens usadas nos envios SMTP da assessoria."
+            action={
+              <StatusBadge
+                label={canEdit ? "SMTP" : "LEITURA"}
+                tone={canEdit ? "positive" : "neutral"}
+              />
+            }
+          >
+            {emailTemplates.length === 0 ? (
+              <p className="text-sm text-[#8eb0dc]">
+                Nenhum modelo de e-mail foi carregado para esta assessoria.
+              </p>
+            ) : (
+              <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
+                <div className="max-h-[560px] overflow-y-auto rounded-xl border border-white/10 bg-[#0a1d36] p-2">
+                  {emailTemplates.map((template) => (
+                    <button
+                      key={template.id}
+                      type="button"
+                      onClick={() => setSelectedTemplateId(template.id)}
+                      className={`mb-1 flex w-full items-start justify-between gap-3 rounded-lg px-3 py-2 text-left transition last:mb-0 ${
+                        selectedTemplate?.id === template.id
+                          ? "bg-[#18436f] text-white"
+                          : "text-[#8eb0dc] hover:bg-white/[0.05] hover:text-white"
+                      }`}
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold">
+                          {template.name}
+                        </span>
+                        <span className="mt-0.5 block truncate font-mono text-[10px] opacity-70">
+                          {template.code}
+                        </span>
+                      </span>
+                      <span
+                        className={`mt-1 h-2 w-2 shrink-0 rounded-full ${
+                          template.is_active ? "bg-emerald-400" : "bg-slate-500"
+                        }`}
+                      />
+                    </button>
+                  ))}
+                </div>
+
+                {selectedTemplate ? (
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-[#0a1d36] px-3 py-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-white">
+                          {selectedTemplate.name}
+                        </p>
+                        <p className="mt-0.5 font-mono text-[11px] text-[#8eb0dc]">
+                          {selectedTemplate.code} · {selectedTemplate.audience}
+                        </p>
+                      </div>
+                      <Toggle
+                        label="Ativo"
+                        checked={selectedTemplate.is_active}
+                        onChange={(value) =>
+                          updateTemplateDraft(selectedTemplate.id, { is_active: value })
+                        }
+                        disabled={!canEdit}
+                      />
+                    </div>
+
+                    <Input
+                      value={selectedTemplate.subject ?? ""}
+                      onChange={(event) =>
+                        updateTemplateDraft(selectedTemplate.id, {
+                          subject: event.target.value,
+                        })
+                      }
+                      placeholder="Assunto do e-mail"
+                      className="border-white/15 bg-[#0F2743] text-white"
+                      disabled={!canEdit}
+                    />
+
+                    <Textarea
+                      value={selectedTemplate.body}
+                      onChange={(event) =>
+                        updateTemplateDraft(selectedTemplate.id, {
+                          body: event.target.value,
+                        })
+                      }
+                      placeholder="Corpo do e-mail"
+                      className="min-h-[300px] border-white/15 bg-[#0F2743] font-mono text-sm text-white"
+                      disabled={!canEdit}
+                    />
+
+                    <div className="rounded-xl border border-[#24486f] bg-[#0a1d36] px-3 py-2 text-xs text-[#8eb0dc]">
+                      Variáveis disponíveis no texto usam o formato{" "}
+                      <span className="font-mono text-white">{"{{nome}}"}</span>,{" "}
+                      <span className="font-mono text-white">{"{{event_name}}"}</span>,{" "}
+                      <span className="font-mono text-white">{"{{amount}}"}</span> e outras
+                      variáveis do evento.
+                    </div>
+
+                    {canEdit ? (
+                      <ActionButton
+                        onClick={() => void saveTemplate(selectedTemplate)}
+                        disabled={savingTemplateId === selectedTemplate.id}
+                      >
+                        {savingTemplateId === selectedTemplate.id
+                          ? "Salvando..."
+                          : "Salvar modelo de e-mail"}
+                      </ActionButton>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </SectionCard>
+
+          {canEdit ? (
+            <SectionCard
+              className={activeTab === "invites" ? undefined : "hidden"}
+              title="Convites de entrada"
+              description="Gere links únicos para convidar atletas diretamente para sua assessoria."
+              action={
+                <ActionButton size="sm" onClick={() => setShowInviteForm((value) => !value)}>
+                  <Plus className="mr-1.5 h-3.5 w-3.5" />
+                  Novo convite
+                </ActionButton>
+              }
+            >
+              {showInviteForm ? (
+                <div className="mb-4 flex items-center gap-3 rounded-xl border border-[#24486f] bg-[#0a1d36] p-3">
+                  <Input
+                    value={newInviteLabel}
+                    onChange={(event) => setNewInviteLabel(event.target.value)}
+                    placeholder="Rotulo do convite (ex: Turma Maio 2026)"
+                    className="border-white/15 bg-[#0F2743] text-white"
+                  />
+                  <ActionButton
+                    size="sm"
+                    disabled={creatingInvite}
+                    onClick={() => void handleCreateInvite()}
+                  >
+                    {creatingInvite ? "Criando..." : "Criar"}
+                  </ActionButton>
+                  <button
+                    type="button"
+                    onClick={() => setShowInviteForm(false)}
+                    className="text-xs text-[#8eb0dc] hover:text-white"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              ) : null}
+
+              {invites.length === 0 ? (
+                <p className="text-sm text-[#8eb0dc]">
+                  Nenhum convite criado ainda. Crie um para compartilhar com seus atletas.
+                </p>
+              ) : (
+                <div className="divide-y divide-white/10">
+                  {invites.map((invite) => (
+                    <div
+                      key={invite.id}
+                      className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-white">
+                          {invite.label ?? <span className="text-[#8eb0dc]">Sem rótulo</span>}
+                        </p>
+                        <p className="mt-0.5 font-mono text-xs text-[#4a7fa8]">
+                          {invite.token.slice(0, 16)}...
+                        </p>
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[#8eb0dc]">
+                          <span>
+                            {invite.used_count} uso{invite.used_count !== 1 ? "s" : ""}
+                          </span>
+                          {invite.max_uses ? <span>/ max {invite.max_uses}</span> : null}
+                          <span>· {formatExpiry(invite.expires_at)}</span>
+                          <StatusBadge
+                            label={invite.active ? "ATIVO" : "INATIVO"}
+                            tone={invite.active ? "positive" : "neutral"}
+                            className="text-[10px]"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        <button
+                          type="button"
+                          title="Copiar link de convite"
+                          onClick={() => copyLink(invite.token)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#2f5d8f] bg-[#0f233d] text-[#8eb0dc] transition hover:bg-[#18436f] hover:text-white"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          title={invite.active ? "Desativar convite" : "Reativar convite"}
+                          onClick={() => void handleToggleInvite(invite)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#2f5d8f] bg-[#0f233d] text-[#8eb0dc] transition hover:bg-[#18436f] hover:text-white"
+                        >
+                          <Power
+                            className={`h-3.5 w-3.5 ${invite.active ? "text-emerald-400" : "text-slate-500"}`}
+                          />
+                        </button>
+                        <button
+                          type="button"
+                          title="Excluir convite"
+                          onClick={() => void handleDeleteInvite(invite)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-500/30 bg-[#0f233d] text-red-400/60 transition hover:bg-red-500/10 hover:text-red-300"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="mt-4 flex items-center gap-2 rounded-xl border border-[#24486f] bg-[#0a1d36] px-3 py-2 text-xs text-[#8eb0dc]">
+                <Link2 className="h-4 w-4 shrink-0 text-[#38bdf8]" />
+                <p>
+                  O link de convite tem formato:{" "}
+                  <span className="font-mono text-white">
+                    {typeof window !== "undefined" ? window.location.origin : ""}
+                    /register/atleta?inviteToken=TOKEN
+                  </span>
+                </p>
+              </div>
+            </SectionCard>
+          ) : null}
+
+          <MetricStrip
+            className={activeTab === "summary" ? undefined : "hidden"}
+            title="Resumo comercial"
+            description="Informações essenciais da plataforma"
+            columnsClassName="md:grid-cols-3"
+            items={[
+              { label: "Assessoria", value: settings.name },
+              { label: "Plano", value: settings.plan, tone: "highlight" },
+              { label: "Suporte", value: settings.supportEmail || "Não definido" },
+            ]}
+          />
+        </>
+      )}
+    </div>
+  );
+}

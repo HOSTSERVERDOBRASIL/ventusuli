@@ -40,7 +40,7 @@ export function AuthShell({
     <div
       className={cn(
         "relative min-h-svh overflow-x-hidden bg-[#020a1b] text-white",
-        fitViewport && "lg:min-h-dvh",
+        fitViewport && "lg:h-dvh lg:min-h-dvh lg:overflow-hidden",
       )}
     >
       <header
@@ -78,15 +78,15 @@ export function AuthShell({
 
       <main
         className={cn(
-          "relative z-10 grid min-h-svh items-center gap-6 px-5 pb-6 pt-28 sm:px-6 md:px-10 lg:grid-cols-[minmax(0,1fr)_450px] lg:gap-10 lg:px-12 xl:px-16",
-          fitViewport ? "lg:min-h-dvh lg:py-5" : "lg:py-12",
+          "relative z-10 grid min-h-svh items-center gap-5 px-5 pb-6 pt-28 sm:px-6 md:px-10 lg:grid-cols-[minmax(0,1fr)_430px] lg:gap-8 lg:px-10 xl:grid-cols-[minmax(0,1fr)_450px] xl:px-14",
+          fitViewport ? "lg:h-dvh lg:min-h-dvh lg:py-4" : "lg:py-12",
           isHeroLogo && "pt-48 sm:pt-60 lg:pt-5",
         )}
       >
         <section
           className={cn(
             "hidden w-full max-w-[510px] text-left lg:block",
-            fitViewport && "lg:max-h-[calc(100dvh-40px)] lg:overflow-hidden",
+            fitViewport && "lg:max-h-[calc(100dvh-32px)] lg:overflow-hidden",
           )}
         >
           {isHeroLogo ? (
@@ -96,31 +96,31 @@ export function AuthShell({
               width={1080}
               height={1350}
               priority
-              className="-ml-8 mb-1 h-64 w-64 object-contain drop-shadow-[0_28px_60px_rgba(0,0,0,0.5)] xl:h-72 xl:w-72 2xl:h-[340px] 2xl:w-[340px]"
+              className="-ml-5 mb-1 h-44 w-44 object-contain drop-shadow-[0_24px_48px_rgba(0,0,0,0.48)] xl:h-52 xl:w-52 2xl:h-60 2xl:w-60"
             />
           ) : null}
 
-          <h1 className="text-[42px] font-extrabold leading-[1.04] text-white xl:text-[48px]">
+          <h1 className="text-[34px] font-extrabold leading-[1.04] text-white xl:text-[42px]">
             Transforme treinos em <span className="text-[#ffc229]">evolução real.</span>
           </h1>
 
-          <p className="mt-3 max-w-[440px] text-base leading-6 text-[#dce6f3]">
+          <p className="mt-2.5 max-w-[430px] text-sm leading-6 text-[#dce6f3] xl:text-base">
             Disciplina, dados e comunidade para você treinar melhor, competir com mais confiança e
             perceber o próprio progresso.
           </p>
 
-          <div className="mt-5 grid max-w-[470px] gap-2.5">
+          <div className="mt-4 grid max-w-[455px] gap-2">
             {featureHighlights.map(({ icon: Icon, title: featureTitle, description: text }) => (
               <div
                 key={featureTitle}
-                className="grid grid-cols-[38px_minmax(0,1fr)] gap-3 rounded-lg border border-white/10 bg-white/[0.045] p-3 text-left"
+                className="grid grid-cols-[34px_minmax(0,1fr)] gap-2.5 rounded-lg border border-white/10 bg-white/[0.045] p-2.5 text-left"
               >
-                <div className="grid h-[38px] w-[38px] place-items-center rounded-md bg-[#ffc229]/12 text-[#ffc229]">
-                  <Icon className="h-[18px] w-[18px]" />
+                <div className="grid h-[34px] w-[34px] place-items-center rounded-md bg-[#ffc229]/12 text-[#ffc229]">
+                  <Icon className="h-4 w-4" />
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-bold leading-5 text-white">{featureTitle}</p>
-                  <p className="text-xs leading-5 text-slate-300">{text}</p>
+                  <p className="text-xs leading-4 text-slate-300">{text}</p>
                 </div>
               </div>
             ))}
@@ -130,15 +130,15 @@ export function AuthShell({
         <section className="mx-auto flex w-full max-w-[450px] items-center justify-center lg:mx-0">
           <div
             className={cn(
-              "w-full rounded-lg border border-white/15 bg-[linear-gradient(180deg,rgba(4,12,31,0.95),rgba(5,13,29,0.9))] p-5 shadow-[0_24px_70px_rgba(0,0,0,0.42)] backdrop-blur-[18px] sm:p-7 lg:p-7",
-              fitViewport && "lg:max-h-[calc(100dvh-40px)] lg:overflow-y-auto lg:p-6 xl:p-7",
+              "w-full rounded-lg border border-white/15 bg-[linear-gradient(180deg,rgba(4,12,31,0.95),rgba(5,13,29,0.9))] p-5 shadow-[0_24px_70px_rgba(0,0,0,0.42)] backdrop-blur-[18px] sm:p-6 lg:p-6",
+              fitViewport && "lg:max-h-[calc(100dvh-32px)] lg:overflow-hidden xl:p-6",
             )}
           >
-            <div className="mb-5">
-              <h2 className="text-[25px] font-extrabold leading-tight text-white sm:text-[28px]">
+            <div className="mb-4">
+              <h2 className="text-[24px] font-extrabold leading-tight text-white sm:text-[27px]">
                 {title}
               </h2>
-              <p className="mt-1.5 text-sm leading-6 text-slate-300">{description}</p>
+              <p className="mt-1 text-sm leading-5 text-slate-300">{description}</p>
             </div>
             {children}
           </div>

@@ -31,7 +31,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (!hydrated || !canAccessAdmin(userRoles, pathname)) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
-        <p className="text-sm text-slate-300">Validando permissÃ£o...</p>
+        <p className="text-sm text-slate-300">Validando permissão...</p>
       </div>
     );
   }

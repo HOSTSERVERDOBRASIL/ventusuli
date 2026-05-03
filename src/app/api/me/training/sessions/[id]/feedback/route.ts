@@ -38,6 +38,75 @@ function mergeAthleteNotes(
   return `${current}\n${entry}`;
 }
 
+function buildFeedbackSuggestion(input: z.infer<typeof feedbackSchema>) {
+  const painLevel = input.painLevel ?? 0;
+  const effort = input.perceivedEffort ?? 0;
+  const duration = input.actualDurationMinutes ?? 0;
+  const distance = input.actualDistanceM ?? 0;
+  const painArea = input.painArea?.trim();
+
+  if (painLevel >= 8) {
+    return {
+      type: "RECOVERY_ALERT",
+      summary: "Dor alta registrada. Recomenda-se pausar intensidade e revisar a próxima sessão.",
+      rationale: `Dor ${painLevel}/10${painArea ? ` em ${painArea}` : ""} exige revisão humana antes de nova carga.`,
+      action: "Reduzir volume por 48-72h, priorizar mobilidade leve e orientar avaliação caso a dor persista.",
+    };
+  }
+
+  if (painLevel >= 5) {
+    return {
+      type: "PAIN_MONITORING",
+      summary: "Desconforto moderado. Próxima sessão deve ser conservadora.",
+      rationale: `Dor ${painLevel}/10 indica risco de piora se houver progressão automática.`,
+      action: "Manter treino leve, evitar estímulos intensos e pedir novo feedback pós-sessão.",
+    };
+  }
+
+  if (input.completedFlag === "MISSED") {
+    return {
+      type: "ADHERENCE_CHECK",
+      summary: "Sessão não realizada. Vale ajustar agenda ou remover carga acumulada.",
+      rationale: "Treinos perdidos não devem ser compensados automaticamente sem revisão do coach.",
+      action: "Reagendar sessão-chave ou manter semana atual sem compensação agressiva.",
+    };
+  }
+
+  if (input.completedFlag === "PARTIAL") {
+    return {
+      type: "LOAD_ADJUSTMENT",
+      summary: "Sessão parcial. IA sugere manter carga ou reduzir progressão da semana.",
+      rationale: "Conclusão parcial sinaliza que a prescrição pode estar acima da disponibilidade atual.",
+      action: "Revisar duração prevista e remover um bloco de intensidade se necessário.",
+    };
+  }
+
+  if (effort >= 5) {
+    return {
+      type: "LOAD_REDUCTION",
+      summary: "Esforço máximo registrado. Considere descanso adicional ou redução de intensidade.",
+      rationale: "RPE 5/5 reduz margem de recuperação e aumenta risco de sobrecarga.",
+      action: "Inserir sessão regenerativa antes do próximo treino de qualidade.",
+    };
+  }
+
+  if (input.completedFlag === "COMPLETED" && effort <= 2 && (duration >= 30 || distance >= 3000)) {
+    return {
+      type: "PROGRESSION",
+      summary: "Sessão bem tolerada. Progressão gradual pode ser considerada.",
+      rationale: "Boa tolerância subjetiva com volume suficiente permite avanço moderado.",
+      action: "Aumentar volume em até 5-10% ou manter volume e melhorar técnica.",
+    };
+  }
+
+  return {
+    type: "MONITORING",
+    summary: "Sessão registrada. Manter monitoramento e comparar próximas respostas.",
+    rationale: "Sem sinal crítico; o histórico deve orientar a revisão humana.",
+    action: "Manter plano atual e acompanhar tendência de esforço, dor e adesão.",
+  };
+}
+
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = getAuthContext(req);
   if (!auth) return apiError("UNAUTHORIZED", "Token de acesso ausente.", 401);
@@ -128,33 +197,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       },
     });
 
-    const suggestion =
-      painLevel >= 7
-        ? {
-            type: "RECOVERY_ALERT",
-            summary: "Dor elevada registrada. Considere reduzir carga e revisar a sessao seguinte.",
-            rationale: "Dor >= 7 aciona alerta de seguranca para o coach.",
-          }
-        : (perceivedEffort ?? 0) >= 5
-          ? {
-              type: "LOAD_REDUCTION",
-              summary:
-                "Esforco muito alto. Sugestao: reduzir intensidade ou inserir descanso adicional.",
-              rationale: "RPE 5/5 sem margem de recuperacao aumenta risco de sobrecarga.",
-            }
-          : parsed.data.completedFlag === "COMPLETED" && (perceivedEffort ?? 0) <= 2
-            ? {
-                type: "PROGRESSION",
-                summary: "Sessao bem tolerada. IA sugere progressao gradual na proxima semana.",
-                rationale: "Boa resposta subjetiva permite ajuste moderado de carga.",
-              }
-            : {
-                type: "MONITORING",
-                summary:
-                  "Sessao registrada com sucesso. Manter monitoramento e comparar proximas respostas.",
-                rationale:
-                  "Nao houve sinal critico, mas o historico deve orientar a revisao humana.",
-              };
+    const suggestion = buildFeedbackSuggestion(parsed.data);
 
     await tx.aIRecommendation.create({
       data: {

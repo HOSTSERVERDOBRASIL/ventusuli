@@ -286,6 +286,7 @@ export function MfaChallengeForm() {
 
   return (
     <AuthShell
+      fitViewport
       title={setupRequired ? "Confirme sua identidade" : "Confirme sua identidade"}
       description={
         setupRequired
@@ -294,46 +295,46 @@ export function MfaChallengeForm() {
       }
     >
       {error ? (
-        <div className="mb-5 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+        <div className="mb-3 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-100">
           {error}
         </div>
       ) : null}
 
       {setupRequired ? (
-        <section className="mb-6 rounded-[1.6rem] border border-white/12 bg-white/5 p-5">
+        <section className="mb-3 rounded-xl border border-white/12 bg-white/5 p-3">
           {loadingSetup ? (
-            <div className="flex min-h-40 items-center justify-center text-slate-300">
+            <div className="flex min-h-28 items-center justify-center text-slate-300">
               <Loader2 className="mr-2 h-5 w-5 animate-spin" />
               Preparando autenticador...
             </div>
           ) : setupData ? (
-            <div className="space-y-5">
-              <div className="grid gap-5 lg:grid-cols-[1fr_0.9fr]">
-                <div className="rounded-2xl border border-white/10 bg-[#08101e] p-4">
+            <div className="space-y-3">
+              <div className="grid gap-3 lg:grid-cols-[0.9fr_1fr]">
+                <div className="rounded-xl border border-white/10 bg-[#08101e] p-3">
                   <p className="text-sm font-semibold text-white">1. Escaneie o QR Code</p>
-                  <p className="mt-1 text-sm leading-6 text-slate-300">
+                  <p className="mt-1 text-xs leading-5 text-slate-300">
                     Use Google Authenticator, Authy ou Microsoft Authenticator.
                   </p>
-                  <div className="mt-4 flex justify-center rounded-2xl bg-white p-4">
-                    <QRCodeSVG value={setupData.qr_code_data} size={188} />
+                  <div className="mt-3 flex justify-center rounded-xl bg-white p-3">
+                    <QRCodeSVG value={setupData.qr_code_data} size={142} />
                   </div>
                 </div>
-                <div className="rounded-2xl border border-white/10 bg-[#08101e] p-4">
+                <div className="rounded-xl border border-white/10 bg-[#08101e] p-3">
                   <p className="text-sm font-semibold text-white">2. Chave manual</p>
-                  <p className="mt-1 text-sm leading-6 text-slate-300">
+                  <p className="mt-1 text-xs leading-5 text-slate-300">
                     Caso prefira, copie a chave abaixo no seu app autenticador.
                   </p>
-                  <div className="mt-4 rounded-2xl border border-dashed border-[#f7b529]/35 bg-[#f7b529]/8 px-4 py-3">
-                    <p className="break-all font-mono text-sm tracking-[0.16em] text-[#ffd27a]">
+                  <div className="mt-3 rounded-xl border border-dashed border-[#f7b529]/35 bg-[#f7b529]/8 px-3 py-2">
+                    <p className="break-all font-mono text-xs tracking-[0.12em] text-[#ffd27a]">
                       {setupData.manual_entry_key}
                     </p>
                   </div>
-                  <p className="mt-4 text-sm text-slate-400">
+                  <p className="mt-3 text-xs text-slate-400">
                     Conta protegida para <span className="text-white">{setupData.masked_email}</span>
                   </p>
                 </div>
               </div>
-              <div className="rounded-2xl border border-[#f7b529]/20 bg-[#f7b529]/8 p-4 text-sm leading-6 text-slate-200">
+              <div className="rounded-xl border border-[#f7b529]/20 bg-[#f7b529]/8 p-3 text-xs leading-5 text-slate-200">
                 <p className="font-semibold text-white">Último passo</p>
                 <p>Digite o código de 6 dígitos gerado pelo autenticador para concluir a ativação.</p>
               </div>
@@ -342,9 +343,9 @@ export function MfaChallengeForm() {
         </section>
       ) : null}
 
-      <div className="space-y-5">
+      <div className="space-y-3">
         {!setupRequired ? (
-          <div className="rounded-[1.4rem] border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
+          <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-slate-300">
             <p className="font-semibold text-white">Acesso em verificação</p>
             <p className="mt-1">
               {method === "EMAIL_OTP"
@@ -355,14 +356,14 @@ export function MfaChallengeForm() {
         ) : null}
 
         {!setupRequired ? (
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => {
                 setMethod("TOTP");
                 setCode("");
               }}
-              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+              className={`rounded-full px-3 py-1.5 text-sm font-semibold transition ${
                 method === "TOTP" ? "bg-[#f7b529] text-[#091223]" : "border border-white/12 bg-white/5 text-slate-300"
               }`}
             >
@@ -375,7 +376,7 @@ export function MfaChallengeForm() {
                   setMethod("EMAIL_OTP");
                   setCode("");
                 }}
-                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                className={`rounded-full px-3 py-1.5 text-sm font-semibold transition ${
                   method === "EMAIL_OTP"
                     ? "bg-[#f7b529] text-[#091223]"
                     : "border border-white/12 bg-white/5 text-slate-300"
@@ -391,7 +392,7 @@ export function MfaChallengeForm() {
                   setMethod("RECOVERY_CODE");
                   setCode("");
                 }}
-                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                className={`rounded-full px-3 py-1.5 text-sm font-semibold transition ${
                   method === "RECOVERY_CODE"
                     ? "bg-[#f7b529] text-[#091223]"
                     : "border border-white/12 bg-white/5 text-slate-300"
@@ -403,7 +404,7 @@ export function MfaChallengeForm() {
           </div>
         ) : null}
 
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <label className="text-sm font-medium text-slate-100">
             {method === "RECOVERY_CODE" ? "Recovery code" : "Código de verificação"}
           </label>
@@ -425,24 +426,24 @@ export function MfaChallengeForm() {
             inputMode={method === "RECOVERY_CODE" ? "text" : "numeric"}
             maxLength={method === "RECOVERY_CODE" ? 16 : 6}
             placeholder={method === "RECOVERY_CODE" ? "ABCD-1234" : "000000"}
-            className="h-16 rounded-2xl border-white/12 bg-[#08101e] text-center font-mono text-3xl font-bold text-white caret-[#f7b529] placeholder:text-slate-500 focus-visible:ring-[#f7b529]"
+            className="h-[52px] rounded-xl border-white/12 bg-[#08101e] text-center font-mono text-2xl font-bold text-white caret-[#f7b529] placeholder:text-slate-500 focus-visible:ring-[#f7b529] sm:h-14 sm:text-3xl"
           />
         </div>
 
         {debugEmailCode ? (
-          <div className="rounded-2xl border border-[#f7b529]/20 bg-[#f7b529]/8 px-4 py-3 text-sm text-slate-200">
+          <div className="rounded-xl border border-[#f7b529]/20 bg-[#f7b529]/8 px-3 py-2 text-sm text-slate-200">
             Ambiente de desenvolvimento. Código enviado:{" "}
             <span className="font-mono font-semibold text-white">{debugEmailCode}</span>
           </div>
         ) : null}
 
         {recoveryCodes ? (
-          <div className="rounded-[1.6rem] border border-emerald-500/25 bg-emerald-500/10 p-5">
+          <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-3">
             <p className="text-base font-semibold text-white">Recovery codes gerados</p>
-            <p className="mt-2 text-sm leading-6 text-emerald-50/90">
+            <p className="mt-1 text-sm leading-5 text-emerald-50/90">
               Estes códigos aparecem uma única vez. Guarde-os em local seguro.
             </p>
-            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
               {recoveryCodes.map((recoveryCode) => (
                 <div
                   key={recoveryCode}
@@ -460,7 +461,7 @@ export function MfaChallengeForm() {
             type="button"
             disabled={submitting || (!code.trim() && method !== "RECOVERY_CODE")}
             onClick={() => void handleVerify()}
-            className="h-14 rounded-xl bg-[#f7b529] text-base font-semibold text-[#091223] hover:bg-[#ffbf3e]"
+            className="h-12 rounded-xl bg-[#f7b529] text-base font-semibold text-[#091223] hover:bg-[#ffbf3e]"
           >
             {submitting ? (
               <span className="flex items-center gap-2">
@@ -480,7 +481,7 @@ export function MfaChallengeForm() {
               type="button"
               variant="outline"
               onClick={() => void handleResend()}
-              className="h-14 rounded-2xl border-white/12 bg-white/5 text-base text-white hover:bg-white/10"
+              className="h-12 rounded-xl border-white/12 bg-white/5 text-base text-white hover:bg-white/10"
             >
               <Mail className="mr-2 h-4 w-4" />
               Reenviar por e-mail
@@ -489,7 +490,7 @@ export function MfaChallengeForm() {
             <Button
               asChild
               variant="outline"
-              className="h-14 rounded-2xl border-white/12 bg-white/5 text-base text-white hover:bg-white/10"
+              className="h-12 rounded-xl border-white/12 bg-white/5 text-base text-white hover:bg-white/10"
             >
               <Link href="/login">
                 <ArrowLeft className="mr-2 h-4 w-4" />
@@ -499,7 +500,7 @@ export function MfaChallengeForm() {
           )}
         </div>
 
-        <div className="flex items-center justify-between text-sm text-slate-400">
+        <div className="flex items-center justify-between text-sm leading-5 text-slate-400">
           <Link href="/login" className="inline-flex items-center gap-2 hover:text-white">
             <ArrowLeft className="h-4 w-4" />
             Voltar

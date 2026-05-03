@@ -199,7 +199,7 @@ export async function POST(req: NextRequest) {
       // Give a clear message: each user belongs to exactly one org and cannot join another.
       return apiError(
         "EMAIL_ALREADY_EXISTS",
-        "Este e-mail jÃ¡ estÃ¡ cadastrado em uma assessoria. Cada atleta sÃ³ pode pertencer a uma assessoria por vez. Caso precise trocar, entre em contato com o suporte.",
+        "Este e-mail já está cadastrado em uma assessoria. Cada atleta só pode pertencer a uma assessoria por vez. Caso precise trocar, entre em contato com o suporte.",
         409,
       );
     }
@@ -414,7 +414,7 @@ export async function POST(req: NextRequest) {
       logWarn("auth_register_athlete_unique_conflict", withRequestContext(req, { email }));
       return apiError(
         "EMAIL_ALREADY_EXISTS",
-        "Este e-mail jÃ¡ estÃ¡ cadastrado. Cada atleta sÃ³ pode pertencer a uma assessoria por vez.",
+        "Este e-mail já está cadastrado. Cada atleta só pode pertencer a uma assessoria por vez.",
         409,
       );
     }

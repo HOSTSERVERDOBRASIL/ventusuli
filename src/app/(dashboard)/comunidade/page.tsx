@@ -105,13 +105,13 @@ export default function ComunidadePage() {
     <div className="space-y-6">
       <PageHeader
         title="Comunidade"
-        subtitle="Feed da assessoria com publica��es, coment�rios e intera��es de atletas."
+        subtitle="Feed da assessoria com publicações, comentários e interações de atletas."
       />
 
       {canPublish ? (
         <SectionCard
-          title="Nova publica��o"
-          description="Atletas e administra��o podem compartilhar atualiza��es com o grupo."
+          title="Nova publicação"
+          description="Atletas e administração podem compartilhar atualizações com o grupo."
         >
           <div className="space-y-3">
             <div className="flex flex-wrap gap-2">
@@ -149,7 +149,7 @@ export default function ComunidadePage() {
                     setPostText("");
                     setPostTab("Feed");
                     await loadFeed({ page: 1 });
-                    toast.success("Publica��o enviada para a comunidade.");
+                    toast.success("Publicação enviada para a comunidade.");
                   } catch (postError) {
                     toast.error(postError instanceof Error ? postError.message : "Falha ao publicar.");
                   } finally {
@@ -164,7 +164,7 @@ export default function ComunidadePage() {
         </SectionCard>
       ) : null}
 
-      <SectionCard title="Feed social" description="M�dulo dedicado para engajamento da comunidade">
+      <SectionCard title="Feed social" description="Módulo dedicado para engajamento da comunidade">
         {loading ? (
           <LoadingState lines={4} />
         ) : feed && hasPosts ? (
@@ -177,7 +177,7 @@ export default function ComunidadePage() {
                 try {
                   await createCommunityComment({ accessToken, postId, text });
                   await loadFeed({ page: 1 });
-                  toast.success("Coment�rio enviado.");
+                  toast.success("Comentário enviado.");
                 } catch (commentError) {
                   toast.error(commentError instanceof Error ? commentError.message : "Falha ao comentar.");
                 }
@@ -206,7 +206,7 @@ export default function ComunidadePage() {
           </>
         ) : feed ? (
           <EmptyState
-            title="Comunidade ainda sem publica��es"
+            title="Comunidade ainda sem publicações"
             description={
               feed.message ??
               "Este espaco esta ativo, mas sua organizacao ainda nao publicou nenhum conteudo."
@@ -221,7 +221,7 @@ export default function ComunidadePage() {
                     element?.focus();
                   }}
                 >
-                  Criar primeira publica��o
+                  Criar primeira publicação
                 </ActionButton>
               ) : (
                 <ActionButton size="sm" intent="secondary" onClick={() => void loadFeed({ page: 1 })}>
@@ -232,8 +232,8 @@ export default function ComunidadePage() {
           />
         ) : (
           <EmptyState
-            title="Comunidade indispon�vel"
-            description={error ?? "N�o foi poss�vel carregar o feed neste momento."}
+            title="Comunidade indisponível"
+            description={error ?? "Não foi possível carregar o feed neste momento."}
             action={
               <ActionButton size="sm" intent="secondary" onClick={() => void loadFeed({ page: 1 })}>
                 Tentar novamente

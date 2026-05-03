@@ -28,16 +28,16 @@ function optionalNumber(schema: z.ZodNumber) {
 
 const distanceSchema = z.object({
   label: z.string().trim().min(1, "Informe o label"),
-  distance_km: z.coerce.number().positive("Informe a distÃ¢ncia"),
-  price_brl: z.coerce.number().min(0, "Valor invÃ¡lido"),
+  distance_km: z.coerce.number().positive("Informe a distância"),
+  price_brl: z.coerce.number().min(0, "Valor inválido"),
   max_slots: z.union([z.coerce.number().int().positive(), z.nan()]).optional(),
 });
 
 const eventFormSchema = z
   .object({
     name: z.string().trim().min(3, "Nome deve ter ao menos 3 caracteres"),
-    city: z.string().trim().min(2, "Cidade obrigatÃ³ria"),
-    state: z.string().trim().length(2, "UF invÃ¡lida"),
+    city: z.string().trim().min(2, "Cidade obrigatória"),
+    state: z.string().trim().length(2, "UF inválida"),
     address: z.string().trim().optional(),
     latitude: optionalNumber(z.number().min(-90, "Latitude invalida").max(90, "Latitude invalida")),
     longitude: optionalNumber(
@@ -45,12 +45,12 @@ const eventFormSchema = z
     ),
     check_in_radius_m: z.coerce.number().int().min(25).max(1000).default(100),
     proximity_radius_m: z.coerce.number().int().min(50).max(2000).default(200),
-    event_date: z.string().min(1, "Data obrigatÃ³ria"),
+    event_date: z.string().min(1, "Data obrigatória"),
     registration_deadline: z.string().optional(),
     description: z.string().optional(),
     image_url: z.string().trim().optional(),
     external_url: z.string().trim().optional(),
-    distances: z.array(distanceSchema).min(1, "Adicione ao menos uma distÃ¢ncia"),
+    distances: z.array(distanceSchema).min(1, "Adicione ao menos uma distância"),
   })
   .refine((value) => (value.latitude == null) === (value.longitude == null), {
     message: "Informe latitude e longitude do ponto da prova",
@@ -198,7 +198,7 @@ export function EventForm({
       status: submitMode === "PUBLISHED" ? "PUBLISHED" : (initialEvent?.status ?? "DRAFT"),
       registrations_count: initialEvent?.registrations_count ?? 0,
       distances: (values.distances ?? []).map((distance) => ({
-        label: distance.label || "DistÃ¢ncia",
+        label: distance.label || "Distância",
         distance_km: Number(distance.distance_km) || 0,
         price_cents: Math.round((Number(distance.price_brl) || 0) * 100),
         max_slots: Number.isFinite(distance.max_slots as number)
@@ -372,7 +372,7 @@ export function EventForm({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="registration_deadline">Prazo de inscriÃ§Ã£o</Label>
+              <Label htmlFor="registration_deadline">Prazo de inscrição</Label>
               <Input
                 id="registration_deadline"
                 type="date"
@@ -382,7 +382,7 @@ export function EventForm({
             </div>
 
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="description">DescriÃ§Ã£o</Label>
+              <Label htmlFor="description">Descrição</Label>
               <textarea
                 id="description"
                 className="min-h-24 w-full rounded-xl border border-white/15 bg-[#0F2743] px-3 py-2 text-sm"
@@ -460,7 +460,7 @@ export function EventForm({
 
           <div className="space-y-3 rounded-2xl border border-white/10 bg-[#102D4B] p-4">
             <div className="flex items-center justify-between">
-              <h3 className="font-semibold">DistÃ¢ncias</h3>
+              <h3 className="font-semibold">Distâncias</h3>
               <Button
                 type="button"
                 variant="secondary"
@@ -470,7 +470,7 @@ export function EventForm({
                 }
               >
                 <Plus className="h-4 w-4" />
-                Adicionar distÃ¢ncia
+                Adicionar distância
               </Button>
             </div>
 
@@ -490,7 +490,7 @@ export function EventForm({
                   </div>
 
                   <div className="space-y-1">
-                    <Label>DistÃ¢ncia (km)</Label>
+                    <Label>Distância (km)</Label>
                     <Input
                       type="number"
                       step="0.001"

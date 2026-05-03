@@ -170,6 +170,7 @@ export default function RecompensasPage() {
   const [pointsInput, setPointsInput] = useState<Record<string, string>>({});
   const [calculations, setCalculations] = useState<Record<string, CalculationResult>>({});
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [claimingMissionId, setClaimingMissionId] = useState<string | null>(null);
 
   const loadRewards = useCallback(async () => {
     setLoading(true);
@@ -305,6 +306,24 @@ export default function RecompensasPage() {
     }
   };
 
+  const handleClaimMission = async (mission: LoyaltyMission) => {
+    setClaimingMissionId(mission.id);
+    try {
+      const response = await fetch(`/api/missions/${mission.id}/claim`, {
+        method: "POST",
+        headers: buildAuthHeaders(accessToken),
+      });
+      const payload = (await response.json()) as { error?: { message?: string }; alreadyClaimed?: boolean };
+      if (!response.ok) throw new Error(payload.error?.message ?? "Falha ao resgatar missão.");
+      toast.success(payload.alreadyClaimed ? "Missão já resgatada." : `Missão resgatada: +${mission.rewardPoints} pts.`);
+      await loadRewards();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Falha ao resgatar missão.");
+    } finally {
+      setClaimingMissionId(null);
+    }
+  };
+
   const activityStatusTone = (status: UserPointActivityEntry["status"]) => {
     if (status === "APPROVED") return "border-emerald-300/20 bg-emerald-400/10 text-emerald-100";
     if (status === "REJECTED") return "border-rose-300/20 bg-rose-400/10 text-rose-100";
@@ -431,6 +450,20 @@ export default function RecompensasPage() {
                         style={{ width: `${mission.progressPercent}%` }}
                       />
                     </div>
+                    {mission.status === "COMPLETED" ? (
+                      <ActionButton
+                        size="sm"
+                        className="mt-4 w-full"
+                        disabled={claimingMissionId === mission.id}
+                        onClick={() => void handleClaimMission(mission)}
+                      >
+                        {claimingMissionId === mission.id ? "Resgatando..." : "Resgatar missão"}
+                      </ActionButton>
+                    ) : mission.status === "CLAIMED" ? (
+                      <div className="mt-4 rounded-xl border border-emerald-300/20 bg-emerald-400/10 px-3 py-2 text-center text-xs font-semibold text-emerald-100">
+                        Pontos resgatados
+                      </div>
+                    ) : null}
                   </div>
                 </article>
               ))}
@@ -512,7 +545,7 @@ export default function RecompensasPage() {
           <LoadingState lines={5} />
         ) : error ? (
           <EmptyState
-            title="CatÃ¡logo indisponÃ­vel"
+            title="Catálogo indisponível"
             description={error}
             action={
               <ActionButton intent="secondary" onClick={() => void loadRewards()}>

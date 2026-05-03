@@ -376,6 +376,25 @@ export default function CoachTreinosPage() {
     }
   };
 
+  const reviewRecommendation = async (recommendationId: string, status: "APPLIED" | "DISMISSED") => {
+    try {
+      const response = await fetch(`/api/coach/training/recommendations/${recommendationId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+        body: JSON.stringify({ status }),
+      });
+      const payload = (await response.json()) as { error?: { message?: string } };
+      if (!response.ok) throw new Error(payload.error?.message ?? "Falha ao revisar recomendação.");
+      toast.success(status === "APPLIED" ? "Recomendação aplicada." : "Recomendação descartada.");
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Falha ao revisar recomendação.");
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -398,6 +417,41 @@ export default function CoachTreinosPage() {
             <MetricCard label="Sugestoes IA" value={dashboard.metrics.pendingRecommendations} />
             <MetricCard label="Carga semana" value={dashboard.metrics.currentWeekLoad} />
           </div>
+
+          <SectionCard
+            title="Fila de recomendações IA"
+            description="Alertas vindos dos feedbacks e planos gerados ficam pendentes até revisão do coach."
+          >
+            {dashboard.recentRecommendations.length === 0 ? (
+              <EmptyState
+                title="Sem recomendações pendentes"
+                description="Quando a IA detectar risco, progressão ou ajuste de carga, a fila aparecerá aqui."
+              />
+            ) : (
+              <div className="grid gap-3 xl:grid-cols-3">
+                {dashboard.recentRecommendations.map((item) => (
+                  <article key={item.id} className="rounded-xl border border-white/10 bg-[#102640] p-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <StatusBadge label={item.recommendationType} tone="info" />
+                      <StatusBadge label={item.status} tone={item.status === "PENDING" ? "warning" : "neutral"} />
+                    </div>
+                    <p className="mt-3 text-sm font-semibold text-white">{item.summary}</p>
+                    {item.rationale ? <p className="mt-2 text-xs leading-5 text-slate-400">{item.rationale}</p> : null}
+                    {item.status === "PENDING" ? (
+                      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                        <ActionButton size="sm" onClick={() => void reviewRecommendation(item.id, "APPLIED")}>
+                          Aplicar
+                        </ActionButton>
+                        <ActionButton size="sm" intent="secondary" onClick={() => void reviewRecommendation(item.id, "DISMISSED")}>
+                          Descartar
+                        </ActionButton>
+                      </div>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
+            )}
+          </SectionCard>
 
           <div className="grid gap-4 2xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
             <SectionCard

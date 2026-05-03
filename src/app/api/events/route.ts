@@ -17,7 +17,7 @@ const listQuerySchema = z.object({
 const createEventSchema = z
   .object({
     name: z.string().trim().min(3, "Nome deve ter ao menos 3 caracteres"),
-    city: z.string().trim().min(1, "Cidade Ã© obrigatÃ³ria"),
+    city: z.string().trim().min(1, "Cidade é obrigatória"),
     state: z
       .string()
       .trim()
@@ -50,7 +50,7 @@ const createEventSchema = z
           max_slots: z.number().int().positive().optional(),
         }),
       )
-      .min(1, "Informe ao menos uma distÃ¢ncia"),
+      .min(1, "Informe ao menos uma distância"),
   })
   .refine((value) => (value.latitude == null) === (value.longitude == null), {
     message: "Informe latitude e longitude do ponto exato da prova.",
@@ -72,10 +72,10 @@ function isAdminRole(role: UserRole): boolean {
 function prismaToApiError(error: unknown): NextResponse {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === "P2002") {
-      return apiError("VALIDATION_ERROR", "Conflito de dados Ãºnicos.", 409);
+      return apiError("VALIDATION_ERROR", "Conflito de dados únicos.", 409);
     }
     if (error.code === "P2025") {
-      return apiError("USER_NOT_FOUND", "Registro nÃ£o encontrado.", 404);
+      return apiError("USER_NOT_FOUND", "Registro não encontrado.", 404);
     }
   }
   return apiError("INTERNAL_ERROR", "Erro interno ao processar evento.", 500);
@@ -93,7 +93,7 @@ export async function GET(req: NextRequest) {
     search: req.nextUrl.searchParams.get("search") ?? undefined,
   });
   if (!parsed.success) {
-    return apiError("VALIDATION_ERROR", parsed.error.errors[0]?.message ?? "Query invÃ¡lida.", 400);
+    return apiError("VALIDATION_ERROR", parsed.error.errors[0]?.message ?? "Query inválida.", 400);
   }
 
   const { limit, status, search } = parsed.data;
@@ -165,14 +165,14 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return apiError("VALIDATION_ERROR", "Body invÃ¡lido.", 400);
+    return apiError("VALIDATION_ERROR", "Body inválido.", 400);
   }
 
   const parsed = createEventSchema.safeParse(body);
   if (!parsed.success) {
     return apiError(
       "VALIDATION_ERROR",
-      parsed.error.errors[0]?.message ?? "Dados invÃ¡lidos.",
+      parsed.error.errors[0]?.message ?? "Dados inválidos.",
       400,
     );
   }

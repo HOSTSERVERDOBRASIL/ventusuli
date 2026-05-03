@@ -315,17 +315,17 @@ export function LoginForm() {
       }
       description={<>Entre para seguir direto ao painel do seu perfil.</>}
     >
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-3" noValidate>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-2.5" noValidate>
         {error ? (
           <div
-            className="rounded-[14px] border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-100"
+            className="rounded-[14px] border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-100"
             role="alert"
           >
             {error}
           </div>
         ) : null}
 
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <Label htmlFor="email" className="text-sm font-bold text-slate-50">
             E-mail
           </Label>
@@ -338,7 +338,7 @@ export function LoginForm() {
               autoComplete="email"
               aria-invalid={Boolean(errors.email)}
               aria-describedby={errors.email ? "email-error" : undefined}
-              className="h-11 rounded-xl border-transparent bg-[#edf4ff] pl-12 text-[15px] text-slate-950 placeholder:text-slate-500 shadow-none ring-offset-transparent focus-visible:border-[#ffc229] focus-visible:ring-[#ffc229]/20 sm:h-12"
+              className="h-10 rounded-xl border-transparent bg-[#edf4ff] pl-12 text-[15px] text-slate-950 placeholder:text-slate-500 shadow-none ring-offset-transparent focus-visible:border-[#ffc229] focus-visible:ring-[#ffc229]/20 sm:h-11"
               {...register("email")}
             />
           </div>
@@ -349,7 +349,7 @@ export function LoginForm() {
           ) : null}
         </div>
 
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <Label htmlFor="password" className="text-sm font-bold text-slate-50">
             Senha
           </Label>
@@ -362,7 +362,7 @@ export function LoginForm() {
               autoComplete="current-password"
               aria-invalid={Boolean(errors.password)}
               aria-describedby={errors.password ? "password-error" : undefined}
-              className="h-11 rounded-xl border-transparent bg-[#edf4ff] pl-12 pr-12 text-[15px] text-slate-950 placeholder:text-slate-500 shadow-none ring-offset-transparent focus-visible:border-[#ffc229] focus-visible:ring-[#ffc229]/20 sm:h-12"
+              className="h-10 rounded-xl border-transparent bg-[#edf4ff] pl-12 pr-12 text-[15px] text-slate-950 placeholder:text-slate-500 shadow-none ring-offset-transparent focus-visible:border-[#ffc229] focus-visible:ring-[#ffc229]/20 sm:h-11"
               {...register("password")}
             />
             <button
@@ -401,7 +401,7 @@ export function LoginForm() {
         <Button
           type="submit"
           disabled={isSubmitting || !isValid}
-          className="h-12 w-full rounded-xl bg-[linear-gradient(180deg,#ffca3a,#f3ad12)] px-5 text-base font-extrabold text-[#07111f] shadow-[0_14px_30px_rgba(255,194,41,0.25)] hover:-translate-y-0.5 hover:bg-[#ffca3a] hover:shadow-[0_18px_38px_rgba(255,194,41,0.32)] disabled:opacity-55"
+          className="h-11 w-full rounded-xl bg-[linear-gradient(180deg,#ffca3a,#f3ad12)] px-5 text-base font-extrabold text-[#07111f] shadow-[0_14px_30px_rgba(255,194,41,0.25)] hover:-translate-y-0.5 hover:bg-[#ffca3a] hover:shadow-[0_18px_38px_rgba(255,194,41,0.32)] disabled:opacity-55 sm:h-12"
         >
           {isSubmitting ? (
             <span className="flex items-center justify-center gap-2 text-center">
@@ -416,7 +416,7 @@ export function LoginForm() {
           )}
         </Button>
 
-        <p className="flex flex-wrap items-center justify-center gap-2 text-[13px] font-semibold text-slate-100">
+        <p className="flex flex-wrap items-center justify-center gap-2 text-[13px] font-semibold leading-5 text-slate-100">
           Ainda não tem conta?
           <Link
             href={registrationHref}
@@ -429,7 +429,7 @@ export function LoginForm() {
 
         <div className="h-px bg-white/12" />
 
-        <div className="grid gap-2 sm:grid-cols-3">
+        <div className="grid gap-2 sm:grid-cols-3 lg:gap-1.5">
           <TrustItem
             icon={ShieldCheck}
             label={
@@ -462,7 +462,7 @@ export function LoginForm() {
           />
         </div>
 
-        <p className="text-center text-[12px] leading-5 text-slate-300">
+        <p className="text-center text-[11px] leading-4 text-slate-300">
           Ao continuar, você concorda com nossos
           <br />
           <Link href="#" className="font-bold text-sky-300 transition hover:text-sky-200">
