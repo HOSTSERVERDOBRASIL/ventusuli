@@ -1176,7 +1176,147 @@ Prioridade:
 9. Fotos e pontos pos-prova.
 10. BI e IA assistiva.
 
-## 15. Definition of Done Global
+## 15. Revisao Tecnica da Spec de Expansao
+
+Esta revisao consolida a spec de expansao enviada para evitar retrabalho, duplicacao de modelos e mudancas estruturais desnecessarias em um sistema que ja esta em producao.
+
+### 15.1 Decisao Arquitetural
+
+Decisao:
+
+- Nao criar um novo sistema nem mover a aplicacao para uma arvore paralela `app/admin`, `app/coach` e `app/atleta`.
+- Manter o padrao atual do projeto: `src/app/(dashboard)/admin`, `src/app/(dashboard)/coach`, rotas de atleta dentro do dashboard e APIs em `src/app/api`.
+- Evoluir os modulos existentes por dentro dos dominios atuais.
+- Usar `prisma/schema.prisma` existente como fonte da verdade, adicionando somente modelos que ainda nao existam.
+- Evitar recriar modelos ja existentes com nomes diferentes.
+
+Motivo:
+
+- O projeto ja possui rotas, layouts, policies, servicos e modelos maduros.
+- Criar modelos paralelos como `TrainingCycle` quando ja existem `TrainingPlan`, `TrainingWeek`, `TrainingDay`, `TrainingDayItem`, `WorkoutSession` e `AthleteFeedback` aumenta risco de inconsistencia.
+- Criar novos `Sponsor`, `Photo`, `NotificationTemplate` ou `ExternalPlatform` duplicados quebraria relacoes ja usadas.
+- Em producao, a melhor evolucao e incremental, com migracoes pequenas e compatibilidade reversivel.
+
+### 15.2 Mapa da Spec Enviada para o Sistema Atual
+
+| Modulo proposto | Estado no VentuSuli | Decisao senior |
+| --- | --- | --- |
+| Treinos | Ja existe com `TrainingPlan`, semanas, dias, sessoes, feedback, dashboard coach/atleta e IA de treino | Nao criar `TrainingCycle`/`TrainingSession`; evoluir o modulo atual |
+| CRM esportivo do atleta | Parcial via atleta, treino, pagamentos, inscricoes, pontos e perfil | Criar camada agregadora e adicionar notas/alertas/timeline se ainda nao existirem |
+| Cockpit da prova | Parcial via detalhe de evento, inscricoes, check-in e lista da assessoria | Criar cockpit como tela agregadora usando `Event` e `OrganizationRacePlan` |
+| Inscricao coletiva | Ja existe base com `CollectiveSignup` e `CollectiveMember` | Evoluir estes modelos em vez de criar `GroupRegistrationCampaign` duplicado |
+| TicketSports | Modelo de integracao esta na spec e ha arquivos locais nao versionados | Fechar implementacao, versionar e validar antes de marcar como pronto |
+| Financeiro por prova | Financeiro geral existe; por prova ainda precisa agregacao dedicada | Adicionar itens financeiros por evento ou vinculo claro com `FinancialEntry` |
+| Segmentacao inteligente | Ainda nao ha dominio consolidado | Criar `AthleteSegment` e membros, ligado a notificacoes e provas |
+| Notificacoes por momento | Templates/preferencias/logs ja existem | Adicionar regras por evento, nao recriar `NotificationTemplate` |
+| Patrocinadores por prova | Ja existem `Sponsor`, campanhas, placements e vinculo campanha-evento | Evoluir relatorios/entregas por prova, nao recriar patrocinador |
+| Fotos e memoria | Ja existem galerias, fotos, matches, compras e unlocks | Usar galerias por evento e criar memoria como experiencia agregada |
+| BI | Ainda e camada de leitura/analytics | Criar APIs agregadoras sem duplicar dados transacionais |
+| IA assistiva | Ja existe IA em treino; falta governanca e novos casos | Criar logs/limites e expandir para evento, CRM e financeiro |
+| Portal publico | Ainda nao consolidado | Criar `PublicProfile` e leads como modulo novo, mantendo dados sensiveis autenticados |
+
+### 15.3 Ajustes Necessarios na Spec Enviada
+
+Treinos:
+
+- Nao adotar os modelos `TrainingCycle`, `TrainingSession` e `TrainingFeedback` como novos modelos.
+- Mapear `TrainingCycle` para `TrainingPlan`.
+- Mapear `TrainingSession` para `WorkoutSession`.
+- Mapear `TrainingFeedback` para `AthleteFeedback`.
+- Se faltar algum campo, adicionar no modelo atual em migracao pequena.
+
+Inscricao coletiva:
+
+- Nao criar `GroupRegistrationCampaign` sem avaliar `CollectiveSignup`.
+- Usar `CollectiveSignup` como campanha/lote.
+- Usar `CollectiveMember` como atleta participante.
+- Adicionar campos faltantes somente se necessarios: `price_rules`, `required_fields`, `external_platform`, `external_event_id`, `status` por membro e dados de formulario.
+
+TicketSports:
+
+- Nao criar `ExternalCredential` e `ExternalSyncLog` se o schema atual ja usa `PlatformCredential` e `SyncLog`.
+- Manter `ExternalPlatform`, `PlatformCredential`, `ExternalEvent`, `ExternalRegistration`, `ExternalOrder` e `SyncLog`.
+- Variaveis globais como `TICKETSPORTS_API_TOKEN` so devem ser fallback operacional; a regra principal deve ser credencial por organizacao.
+
+Patrocinadores:
+
+- Nao recriar `Sponsor`.
+- Usar `SponsorCampaignEvent` para vinculo com prova.
+- Se precisar de cotas e entregas por prova, adicionar modelo complementar como `EventSponsorDeliverable` ou evoluir `SponsorCampaignEvent` com campos de entrega, status e valor.
+
+Fotos:
+
+- Nao criar `EventMedia` se `PhotoGallery`, `Photo`, `PhotoAthleteMatch`, `PhotoPurchase` e `PhotoUnlock` ja resolvem o dominio.
+- Criar "memoria" como tela/servico agregador por atleta, usando fotos, provas e participacoes.
+
+Notificacoes:
+
+- Nao recriar `NotificationTemplate`.
+- Criar `EventNotificationRule` como novo modelo de orquestracao por momento da prova.
+- Integrar regras com preferencias do usuario e logs existentes.
+
+Financeiro por prova:
+
+- Antes de criar `EventFinancialItem`, avaliar se `FinancialEntry` ja cobre categoria, valor, status, organizacao e origem.
+- Se `FinancialEntry` cobrir o necessario, adicionar apenas vinculo forte com `eventId` e relatorios por prova.
+- Se nao cobrir, criar `EventFinancialItem` como complemento com relacao clara para `Event`.
+
+### 15.4 Ordem de Implementacao Revisada
+
+Fase 1 tecnica:
+
+1. Cockpit da prova usando dados existentes.
+2. Evolucao da inscricao coletiva em cima de `CollectiveSignup`.
+3. Financeiro por prova com menor mudanca possivel no modelo financeiro atual.
+4. CRM esportivo como agregador de dados ja existentes.
+5. Segmentacao basica para alimentar agenda oficial e notificacoes.
+
+Fase 2 tecnica:
+
+1. Notificacoes por momento da prova usando templates existentes.
+2. TicketSports com credenciais por organizacao, sync idempotente e logs.
+3. Patrocinadores por prova usando campanhas existentes.
+4. Fotos e memoria usando galerias/eventos/participacoes existentes.
+
+Fase 3 tecnica:
+
+1. BI com consultas agregadas e endpoints somente leitura.
+2. IA assistiva com logs, revisao humana e limites por permissao.
+3. Portal publico com perfil publicado, leads e interesse em provas.
+4. Automacoes avancadas com filas/jobs quando houver volume.
+
+### 15.5 O Que Vale a Pena Mudar Agora
+
+Vale mudar agora:
+
+- Criar cockpit da prova como camada agregadora.
+- Melhorar a lista oficial da assessoria para virar centro operacional.
+- Adicionar status e dados faltantes na inscricao coletiva existente.
+- Criar segmentacao basica e conectar com abertura de provas.
+- Criar notificacao automatica ao abrir prova.
+
+Nao vale mudar agora:
+
+- Reescrever modulo de treinos.
+- Renomear estrutura de rotas para `app/admin`, `app/coach` e `app/atleta`.
+- Duplicar modelos de fotos, patrocinadores, notificacoes e integracoes.
+- Criar BI complexo antes de ter eventos de dominio e metricas estaveis.
+- Colocar IA tomando decisoes automaticas.
+
+### 15.6 Critério de Aceite para Novos Modulos
+
+Todo novo modulo desta expansao deve cumprir:
+
+- Reaproveitar modelo existente quando houver equivalencia.
+- Ter `organizationId` ou relacao equivalente em dados de tenant.
+- Ter policy explicita em API e tela.
+- Ter isolamento por organizacao em todas as queries.
+- Ter migracao pequena, reversivel em rollout e compativel com producao.
+- Ter UI com estados de carregando, vazio, erro e sucesso.
+- Ter contrato de API documentado na spec.
+- Ter teste ou checklist manual de regressao para fluxo principal.
+
+## 16. Definition of Done Global
 
 Uma entrega do sistema so deve ser considerada pronta quando:
 
