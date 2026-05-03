@@ -287,6 +287,7 @@ export function MfaChallengeForm() {
   return (
     <AuthShell
       fitViewport
+      logoScale="hero"
       title={setupRequired ? "Confirme sua identidade" : "Confirme sua identidade"}
       description={
         setupRequired

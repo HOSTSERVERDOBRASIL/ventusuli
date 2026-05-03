@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CalendarRange, Search } from "lucide-react";
+import { CalendarRange, LayoutGrid, List, Search, Trophy } from "lucide-react";
 import { EventCard } from "@/components/events/event-card";
 import { EventStatusBadge } from "@/components/events/event-status-badge";
 import { useAuthToken } from "@/components/auth/AuthTokenProvider";
@@ -14,20 +14,90 @@ import { SectionCard } from "@/components/system/section-card";
 import { Select } from "@/components/ui/select";
 import { StatusBadge } from "@/components/system/status-badge";
 import { getAthleteEvents } from "@/services/events-service";
-import { getAthleteIdentity } from "@/services/registrations-service";
-import type { AthleteIdentity, ServiceEvent } from "@/services/types";
+import { getAthleteRacePlans, joinRacePlan } from "@/services/race-plans-service";
+import { getAthleteIdentity, getRegistrations } from "@/services/registrations-service";
+import type { AthleteIdentity, ServiceEvent, ServiceRacePlan } from "@/services/types";
 import { getEventRecommendation, getFirstRaceGuidance } from "@/lib/race-recommendations";
+import { useInscricoesStore, type Inscricao } from "@/store/inscricoes";
+import { toast } from "sonner";
+
+type ViewMode = "cards" | "list";
+
+function ViewModeToggle({
+  value,
+  onChange,
+}: {
+  value: ViewMode;
+  onChange: (value: ViewMode) => void;
+}) {
+  const items = [
+    { value: "cards" as const, label: "Cards", icon: LayoutGrid },
+    { value: "list" as const, label: "Lista", icon: List },
+  ];
+
+  return (
+    <div className="inline-flex h-10 rounded-lg border border-white/10 bg-[#0F2743] p-1">
+      {items.map((item) => {
+        const Icon = item.icon;
+        const active = value === item.value;
+        return (
+          <button
+            key={item.value}
+            type="button"
+            onClick={() => onChange(item.value)}
+            className={`inline-flex items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition ${
+              active ? "bg-[#1E90FF] text-white" : "text-slate-300 hover:bg-white/[0.06]"
+            }`}
+          >
+            <Icon className="h-3.5 w-3.5" />
+            {item.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function formatRegistrationLabel(registration?: Inscricao): string {
+  if (!registration) return "Escolher";
+  if (registration.status === "CONFIRMED") return registration.distanceLabel;
+  if (registration.status === "PENDING_PAYMENT") return "Pagamento pendente";
+  if (registration.status === "INTERESTED") return "Interesse";
+  return "Cancelada";
+}
+
+function racePlanParticipationLabel(plan: ServiceRacePlan): string {
+  const status = plan.myParticipation?.status;
+  if (status === "CONFIRMED") return "Confirmado";
+  if (status === "REGISTERED_EXTERNALLY") return "Inscrito fora";
+  if (status === "IN_TEAM_REGISTRATION") return "Inscricao coletiva";
+  if (status === "PENDING_PAYMENT") return "Pagamento pendente";
+  if (status === "CANCELLED") return "Cancelado";
+  if (status === "ATTENDED") return "Presente";
+  if (status === "NO_SHOW") return "Ausente";
+  if (status === "INTERESTED") return "Interesse registrado";
+  return "Aberta";
+}
 
 export default function ProvasPage() {
   const { accessToken } = useAuthToken();
   const [events, setEvents] = useState<ServiceEvent[]>([]);
+  const [racePlans, setRacePlans] = useState<ServiceRacePlan[]>([]);
   const [athlete, setAthlete] = useState<AthleteIdentity | null>(null);
+  const inscricoes = useInscricoesStore((state) => state.inscricoes);
+  const setInscricoes = useInscricoesStore((state) => state.setInscricoes);
+  const hydrate = useInscricoesStore((state) => state.hydrate);
   const [search, setSearch] = useState("");
   const [cityFilter, setCityFilter] = useState("ALL");
   const [fitFilter, setFitFilter] = useState("ALL");
+  const [viewMode, setViewMode] = useState<ViewMode>("cards");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    hydrate();
+  }, [hydrate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -36,13 +106,17 @@ export default function ProvasPage() {
       setLoading(true);
       setError(null);
       try {
-        const [payload, athletePayload] = await Promise.all([
+        const [payload, athletePayload, registrationPayload, racePlansPayload] = await Promise.all([
           getAthleteEvents(accessToken),
           getAthleteIdentity(accessToken).catch(() => null),
+          getRegistrations(accessToken).catch(() => []),
+          getAthleteRacePlans(accessToken).catch(() => []),
         ]);
         if (!cancelled) {
           setEvents(payload);
           setAthlete(athletePayload);
+          setInscricoes(registrationPayload);
+          setRacePlans(racePlansPayload);
         }
       } catch {
         if (!cancelled) {
@@ -58,7 +132,7 @@ export default function ProvasPage() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken, reloadKey]);
+  }, [accessToken, reloadKey, setInscricoes]);
 
   const cities = useMemo(() => {
     const uniques = Array.from(new Set(events.map((event) => event.city)));
@@ -102,6 +176,14 @@ export default function ProvasPage() {
       visibleEvents.map((event) => [event.id, getEventRecommendation(event, athlete)]),
     );
   }, [athlete, visibleEvents]);
+
+  const registrationByEventId = useMemo(() => {
+    return inscricoes.reduce<Map<string, Inscricao>>((acc, registration) => {
+      if (registration.status === "CANCELLED") return acc;
+      if (!acc.has(registration.eventId)) acc.set(registration.eventId, registration);
+      return acc;
+    }, new Map());
+  }, [inscricoes]);
 
   return (
     <div className="space-y-6">
@@ -152,11 +234,83 @@ export default function ProvasPage() {
       </SectionCard>
 
       <SectionCard
+        title="Provas da assessoria"
+        description="Agenda oficial que a equipe abriu para participacao dos atletas"
+      >
+        {racePlans.length === 0 ? (
+          <EmptyState
+            title="Nenhuma prova aberta pela assessoria"
+            description="Quando o admin abrir uma prova para o grupo, ela aparece aqui com a acao de participacao."
+          />
+        ) : (
+          <div className="grid gap-3 lg:grid-cols-2">
+            {racePlans.map((plan) => (
+              <div
+                key={plan.id}
+                className="rounded-lg border border-white/10 bg-[#0f233d] p-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <Trophy className="h-4 w-4 text-amber-200" />
+                      <p className="truncate text-sm font-bold text-white">{plan.event.name}</p>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-400">
+                      {plan.event.city}/{plan.event.state} |{" "}
+                      {new Date(plan.event.eventDate).toLocaleDateString("pt-BR")}
+                    </p>
+                  </div>
+                  <StatusBadge
+                    label={racePlanParticipationLabel(plan)}
+                    tone={plan.myParticipation ? "positive" : "info"}
+                  />
+                </div>
+
+                {plan.instructions ? (
+                  <p className="mt-3 text-xs leading-5 text-slate-300">{plan.instructions}</p>
+                ) : null}
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <ActionButton asChild intent="secondary">
+                    <Link href={`/provas/${plan.eventId}`}>Ver detalhes</Link>
+                  </ActionButton>
+                  <ActionButton
+                    disabled={Boolean(plan.myParticipation)}
+                    onClick={async () => {
+                      try {
+                        const participation = await joinRacePlan(plan.id, {}, accessToken);
+                        setRacePlans((prev) =>
+                          prev.map((item) =>
+                            item.id === plan.id
+                              ? { ...item, myParticipation: participation }
+                              : item,
+                          ),
+                        );
+                        toast.success("Participacao registrada para a assessoria.");
+                      } catch (error) {
+                        toast.error(
+                          error instanceof Error
+                            ? error.message
+                            : "Nao foi possivel registrar participacao.",
+                        );
+                      }
+                    }}
+                  >
+                    {plan.myParticipation ? "Participacao registrada" : "Quero participar"}
+                  </ActionButton>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </SectionCard>
+
+      <SectionCard
         title="Catalogo de provas"
         description="Experiencia de selecao otimizada para atleta"
       >
         <div className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-[1fr_220px_220px_auto]">
+          <div className="grid gap-3 md:grid-cols-[1fr_220px_220px_auto_auto]">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
@@ -195,6 +349,8 @@ export default function ProvasPage() {
               <CalendarRange className="h-4 w-4 text-[#98bce8]" />
               {visibleEvents.length} provas visiveis
             </div>
+
+            <ViewModeToggle value={viewMode} onChange={setViewMode} />
           </div>
 
           {loading ? (
@@ -218,19 +374,77 @@ export default function ProvasPage() {
               title="Nenhuma prova encontrada"
               description="Ajuste os filtros para ver outras provas disponiveis."
             />
-          ) : (
+          ) : viewMode === "cards" ? (
             <div className="grid auto-rows-fr gap-4 md:grid-cols-2 xl:grid-cols-3">
               {visibleEvents.map((event) => (
-                <Link key={event.id} href={`/provas/${event.id}`} className="flex">
-                  <EventCard
-                    event={event}
-                    mode="athlete"
-                    recommendation={recommendationByEventId.get(event.id)}
-                    ctaLabel={event.status === "PUBLISHED" ? "Ver detalhes" : "Acompanhar"}
-                    ctaDisabled={event.status !== "PUBLISHED"}
-                  />
-                </Link>
+                (() => {
+                  const registration = registrationByEventId.get(event.id);
+                  return (
+                    <Link key={event.id} href={`/provas/${event.id}`} className="flex">
+                      <EventCard
+                        event={event}
+                        mode="athlete"
+                        recommendation={recommendationByEventId.get(event.id)}
+                        registration={
+                          registration
+                            ? {
+                                status: registration.status,
+                                distanceLabel: registration.distanceLabel,
+                              }
+                            : null
+                        }
+                        ctaLabel={event.status === "PUBLISHED" ? undefined : "Acompanhar"}
+                        ctaDisabled={event.status !== "PUBLISHED"}
+                      />
+                    </Link>
+                  );
+                })()
               ))}
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-lg border border-white/10 bg-[#071b31]">
+              {visibleEvents.map((event) => {
+                const registration = registrationByEventId.get(event.id);
+                const distanceLabel =
+                  event.distances.map((distance) => distance.label).join(" / ") ||
+                  "Distancia a definir";
+                return (
+                  <Link
+                    key={event.id}
+                    href={`/provas/${event.id}`}
+                    className="grid gap-3 border-b border-white/10 px-3 py-3 transition last:border-b-0 hover:bg-white/[0.04] md:grid-cols-[minmax(0,1fr)_140px_150px_130px]"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-white">{event.name}</p>
+                      <p className="mt-1 truncate text-xs text-slate-400">
+                        {event.city}/{event.state} | {distanceLabel}
+                      </p>
+                    </div>
+                    <p className="text-xs font-semibold text-slate-200">
+                      {new Date(event.event_date).toLocaleDateString("pt-BR")}
+                    </p>
+                    <StatusBadge
+                      label={formatRegistrationLabel(registration)}
+                      tone={
+                        registration?.status === "CONFIRMED"
+                          ? "positive"
+                          : registration?.status === "PENDING_PAYMENT"
+                            ? "warning"
+                            : registration?.status === "INTERESTED"
+                              ? "info"
+                              : "neutral"
+                      }
+                    />
+                    <span className="inline-flex h-8 items-center justify-center rounded-md bg-[#0868bd] px-3 text-xs font-bold text-white">
+                      {registration?.status === "PENDING_PAYMENT"
+                        ? "Concluir"
+                        : registration
+                          ? "Ver prova"
+                          : "Participar"}
+                    </span>
+                  </Link>
+                );
+              })}
             </div>
           )}
         </div>

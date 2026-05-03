@@ -4,22 +4,25 @@ import React from "react";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import {
   BarChart3,
+  CalendarCheck,
   CircleDollarSign,
   CopyPlus,
   Eye,
+  LayoutGrid,
+  List,
+  Megaphone,
   Pencil,
   Plus,
   Rocket,
   Search,
+  TicketCheck,
   Users,
   XCircle,
 } from "lucide-react";
+import { EventCard } from "@/components/events/event-card";
 import { ActionButton } from "@/components/system/action-button";
-import { type DataTableColumn, DataTable } from "@/components/system/data-table";
 import { EmptyState } from "@/components/system/empty-state";
 import { LoadingState } from "@/components/system/loading-state";
 import { MetricCard } from "@/components/system/metric-card";
@@ -38,11 +41,48 @@ import {
   getAdminEvents,
   publishAdminEvent,
 } from "@/services/events-service";
+import { openAdminRacePlan } from "@/services/race-plans-service";
 import { toast } from "sonner";
 
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
-type EventsTab = "overview" | "attention" | "list";
+type EventsTab = "upcoming" | "drafts" | "checkin" | "registrations" | "finished";
+type ViewMode = "cards" | "list";
+
+function ViewModeToggle({
+  value,
+  onChange,
+}: {
+  value: ViewMode;
+  onChange: (value: ViewMode) => void;
+}) {
+  const items = [
+    { value: "cards" as const, label: "Cards", icon: LayoutGrid },
+    { value: "list" as const, label: "Lista", icon: List },
+  ];
+
+  return (
+    <div className="inline-flex h-10 rounded-lg border border-white/10 bg-white/[0.05] p-1">
+      {items.map((item) => {
+        const Icon = item.icon;
+        const active = value === item.value;
+        return (
+          <button
+            key={item.value}
+            type="button"
+            onClick={() => onChange(item.value)}
+            className={`inline-flex items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition ${
+              active ? "bg-[#1E90FF] text-white" : "text-slate-300 hover:bg-white/[0.07]"
+            }`}
+          >
+            <Icon className="h-3.5 w-3.5" />
+            {item.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 /* Botão ícone compacto para ações de evento */
 function EventIconBtn({
@@ -94,6 +134,17 @@ function EventIconBtn({
   );
 }
 
+function estimatedRevenue(event: EventView): number {
+  const registrations = event.registrations_count ?? 0;
+  if (registrations <= 0 || event.distances.length === 0) return 0;
+
+  const avgTicket =
+    event.distances.reduce((sum, distance) => sum + distance.price_cents, 0) /
+    event.distances.length;
+
+  return Math.round(avgTicket * registrations);
+}
+
 function eventStatusTone(status: EventStatus): "warning" | "positive" | "danger" | "neutral" {
   if (status === "DRAFT") return "warning";
   if (status === "PUBLISHED") return "positive";
@@ -108,25 +159,40 @@ function eventStatusLabel(status: EventStatus): string {
   return "Finalizado";
 }
 
-function estimatedRevenue(event: EventView): number {
-  const registrations = event.registrations_count ?? 0;
-  if (registrations <= 0 || event.distances.length === 0) return 0;
-
-  const avgTicket =
-    event.distances.reduce((sum, distance) => sum + distance.price_cents, 0) /
-    event.distances.length;
-
-  return Math.round(avgTicket * registrations);
+function daysUntil(value: string): number {
+  const now = new Date();
+  const target = new Date(value);
+  return (target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
 }
 
-function occupancy(event: EventView): { label: string; ratio: number | null } {
-  const totalSlots = event.distances.reduce((sum, distance) => sum + (distance.max_slots ?? 0), 0);
-  const registrations = event.registrations_count ?? 0;
+function eventMatchesOperationalTab(event: EventView, tab: EventsTab): boolean {
+  const diffDays = daysUntil(event.event_date);
 
-  if (!totalSlots) return { label: "-", ratio: null };
+  if (tab === "drafts") return event.status === "DRAFT";
+  if (tab === "finished") return event.status === "FINISHED";
+  if (tab === "checkin") {
+    return event.status === "PUBLISHED" && diffDays >= -1 && diffDays <= 2;
+  }
+  if (tab === "registrations") {
+    return event.status === "PUBLISHED" && diffDays >= 0;
+  }
+  return event.status === "PUBLISHED" && diffDays >= 0;
+}
 
-  const ratio = Math.max(0, Math.min(100, Math.round((registrations / totalSlots) * 100)));
-  return { label: `${ratio}%`, ratio };
+function operationalTabTitle(tab: EventsTab): string {
+  if (tab === "drafts") return "Rascunhos";
+  if (tab === "checkin") return "Check-in";
+  if (tab === "registrations") return "Inscricoes";
+  if (tab === "finished") return "Finalizadas";
+  return "Proximas provas";
+}
+
+function operationalTabDescription(tab: EventsTab): string {
+  if (tab === "drafts") return "Provas em preparacao que ainda precisam ser publicadas.";
+  if (tab === "checkin") return "Provas em janela operacional para presenca, inscritos e apoio.";
+  if (tab === "registrations") return "Provas publicadas com foco em conversao e acompanhamento.";
+  if (tab === "finished") return "Historico de provas encerradas para consulta e auditoria.";
+  return "Agenda publicada para coordenar proximas acoes do grupo.";
 }
 
 export default function AdminEventosPage() {
@@ -140,7 +206,8 @@ export default function AdminEventosPage() {
   const [cancelTarget, setCancelTarget] = useState<EventView | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [actionInFlight, setActionInFlight] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<EventsTab>("overview");
+  const [activeTab, setActiveTab] = useState<EventsTab>("upcoming");
+  const [viewMode, setViewMode] = useState<ViewMode>("cards");
 
   useEffect(() => {
     const statusParam = searchParams.get("status");
@@ -160,6 +227,9 @@ export default function AdminEventosPage() {
 
     setSearch(searchParam ?? "");
     setWindowFilter(windowParam === "next14d" ? "next14d" : "ALL");
+    if (statusParam === "DRAFT") setActiveTab("drafts");
+    if (statusParam === "FINISHED") setActiveTab("finished");
+    if (windowParam === "next14d" || statusParam === "PUBLISHED") setActiveTab("upcoming");
   }, [searchParams]);
 
   useEffect(() => {
@@ -192,6 +262,7 @@ export default function AdminEventosPage() {
   const filtered = useMemo(() => {
     const now = new Date();
     return events.filter((event) => {
+      const matchesTab = eventMatchesOperationalTab(event, activeTab);
       const matchesSearch = event.name.toLowerCase().includes(search.toLowerCase());
       const matchesStatus = statusFilter === "ALL" ? true : event.status === statusFilter;
       const matchesWindow =
@@ -202,9 +273,9 @@ export default function AdminEventosPage() {
               return diffDays >= 0 && diffDays <= 14;
             })()
           : true;
-      return matchesSearch && matchesStatus && matchesWindow;
+      return matchesTab && matchesSearch && matchesStatus && matchesWindow;
     });
-  }, [events, search, statusFilter, windowFilter]);
+  }, [activeTab, events, search, statusFilter, windowFilter]);
 
   const metrics = useMemo(() => {
     const total = events.length;
@@ -225,192 +296,166 @@ export default function AdminEventosPage() {
     };
   }, [events]);
 
-  const attention = useMemo(() => {
-    const now = new Date();
-    const soonDeadline = events.filter((event) => {
-      if (!event.registration_deadline || event.status !== "PUBLISHED") return false;
-      const deadline = new Date(event.registration_deadline);
-      const diffDays = (deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
-      return diffDays >= 0 && diffDays <= 7;
-    });
-
-    const noRegistrations = events.filter(
-      (event) => event.status === "PUBLISHED" && (event.registrations_count ?? 0) === 0,
-    );
-
-    return {
-      draftCount: metrics.draft,
-      soonDeadlineCount: soonDeadline.length,
-      noRegistrationsCount: noRegistrations.length,
-    };
-  }, [events, metrics.draft]);
+  const operationalCounts = useMemo(
+    () => ({
+      upcoming: events.filter((event) => eventMatchesOperationalTab(event, "upcoming")).length,
+      drafts: events.filter((event) => eventMatchesOperationalTab(event, "drafts")).length,
+      checkin: events.filter((event) => eventMatchesOperationalTab(event, "checkin")).length,
+      registrations: events.filter((event) =>
+        eventMatchesOperationalTab(event, "registrations"),
+      ).length,
+      finished: events.filter((event) => eventMatchesOperationalTab(event, "finished")).length,
+    }),
+    [events],
+  );
 
   const tabs = useMemo<ModuleTabItem<EventsTab>[]>(
     () => [
       {
-        key: "overview",
-        label: "Painel",
-        audience: "Gestao",
-        description: "Volume de provas, publicadas, inscricoes e receita.",
-        icon: BarChart3,
-        metricLabel: "Provas",
-        metricValue: metrics.total,
+        key: "upcoming",
+        label: "Proximas",
+        audience: "Agenda",
+        description: "Provas publicadas que ainda vao acontecer.",
+        icon: CalendarCheck,
+        metricLabel: "Abertas",
+        metricValue: operationalCounts.upcoming,
         metricTone: "info",
       },
       {
-        key: "attention",
-        label: "Atencao",
+        key: "drafts",
+        label: "Rascunhos",
         audience: "Operacao",
-        description: "Rascunhos, prazos proximos e baixa tracao.",
+        description: "Itens que precisam ser revisados e publicados.",
         icon: Rocket,
         metricLabel: "Rascunhos",
-        metricValue: attention.draftCount,
-        metricTone: attention.draftCount > 0 ? "warning" : "positive",
+        metricValue: operationalCounts.drafts,
+        metricTone: operationalCounts.drafts > 0 ? "warning" : "positive",
       },
       {
-        key: "list",
-        label: "Lista",
-        audience: "Secretaria",
-        description: "Filtros, acoes e acompanhamento de provas.",
+        key: "checkin",
+        label: "Check-in",
+        audience: "Dia da prova",
+        description: "Janela de presenca e suporte operacional.",
+        icon: TicketCheck,
+        metricLabel: "Agora",
+        metricValue: operationalCounts.checkin,
+        metricTone: operationalCounts.checkin > 0 ? "warning" : "neutral",
+      },
+      {
+        key: "registrations",
+        label: "Inscricoes",
+        audience: "Conversao",
+        description: "Acompanhe inscritos e pagamentos por prova.",
         icon: Search,
         metricLabel: "Filtradas",
-        metricValue: filtered.length,
-        metricTone: filtered.length > 0 ? "positive" : "neutral",
+        metricValue: operationalCounts.registrations,
+        metricTone: operationalCounts.registrations > 0 ? "positive" : "neutral",
+      },
+      {
+        key: "finished",
+        label: "Finalizadas",
+        audience: "Historico",
+        description: "Consulta e auditoria de provas encerradas.",
+        icon: BarChart3,
+        metricLabel: "Arquivo",
+        metricValue: operationalCounts.finished,
+        metricTone: "neutral",
       },
     ],
-    [attention.draftCount, filtered.length, metrics.total],
+    [operationalCounts],
   );
 
-  // ─── Colunas: total alvo ≤ 900px ─────────────────────────────────────────────
-  // Prova 200 + Status 90 + Data 100 + Inscrições 120 + Ações 220 = 730px ✓
-  const columns: DataTableColumn<EventView>[] = [
-    {
-      key: "name",
-      header: "Prova",
-      className: "min-w-[200px]",
-      cell: (event) => (
-        <div>
-          <p className="font-semibold text-white">{event.name}</p>
-          <p className="text-[11px] text-white/40">
-            {event.city}/{event.state}
-          </p>
-        </div>
-      ),
-    },
-    {
-      key: "status",
-      header: "Status",
-      className: "min-w-[90px]",
-      cell: (event) => (
-        <StatusBadge tone={eventStatusTone(event.status)} label={eventStatusLabel(event.status)} />
-      ),
-    },
-    {
-      key: "date",
-      header: "Data",
-      className: "min-w-[100px]",
-      cell: (event) => (
-        <span className="text-[12px]">
-          {format(new Date(event.event_date), "dd/MM/yyyy", { locale: ptBR })}
-        </span>
-      ),
-    },
-    {
-      // Inscrições + barra de ocupação fundidas
-      key: "registrations",
-      header: "Inscrições",
-      className: "min-w-[120px]",
-      cell: (event) => {
-        const occ = occupancy(event);
-        return (
-          <div>
-            <p className="font-semibold text-white">{event.registrations_count ?? 0} inscr.</p>
-            {occ.ratio !== null ? (
-              <div className="mt-1.5 h-1 w-full rounded-full bg-white/10">
-                <div
-                  className="h-full rounded-full bg-[#1E90FF]"
-                  style={{ width: `${occ.ratio}%` }}
-                />
-              </div>
-            ) : (
-              <p className="mt-0.5 text-[10px] text-white/25">Sem limite</p>
-            )}
-          </div>
-        );
-      },
-    },
-    {
-      key: "actions",
-      header: "Ações",
-      className: "min-w-[220px]",
-      cell: (event) => (
-        <div className="flex flex-nowrap items-center gap-1">
-          <EventIconBtn href={`/admin/eventos/${event.id}`} icon={Eye} title="Ver prova" />
-          <EventIconBtn
-            href={`/admin/eventos/${event.id}#inscritos`}
-            icon={Users}
-            title="Ver inscritos"
-          />
-          <EventIconBtn
-            href={`/admin/financeiro?status=PENDING&event=${encodeURIComponent(event.name)}`}
-            icon={CircleDollarSign}
-            title="Ver financeiro"
-          />
-          <EventIconBtn
-            href={`/admin/eventos/${event.id}/editar`}
-            icon={Pencil}
-            title="Editar prova"
-          />
-          {event.status === "DRAFT" && (
-            <EventIconBtn
-              icon={Rocket}
-              title="Publicar prova"
-              variant="info"
-              disabled={actionInFlight === `${event.id}:publish`}
-              onClick={async () => {
-                try {
-                  setActionInFlight(`${event.id}:publish`);
-                  const updated = await publishAdminEvent(event.id, accessToken);
-                  setEvents((prev) =>
-                    prev.map((item) => (item.id === updated.id ? updated : item)),
-                  );
-                  toast.success("Prova publicada com sucesso.");
-                } catch (error) {
-                  toast.error(error instanceof Error ? error.message : "Falha ao publicar prova.");
-                } finally {
-                  setActionInFlight(null);
-                }
-              }}
-            />
-          )}
-          <EventIconBtn
-            icon={CopyPlus}
-            title="Duplicar prova"
-            disabled={actionInFlight === `${event.id}:duplicate`}
-            onClick={async () => {
-              try {
-                setActionInFlight(`${event.id}:duplicate`);
-                const duplicated = await duplicateAdminEvent(event.id, accessToken);
-                setEvents((prev) => [duplicated, ...prev]);
-                toast.success("Prova duplicada com sucesso.");
-              } catch (error) {
-                toast.error(error instanceof Error ? error.message : "Falha ao duplicar prova.");
-              } finally {
-                setActionInFlight(null);
-              }
-            }}
-          />
-          <EventIconBtn
-            icon={XCircle}
-            title="Cancelar prova"
-            variant="danger"
-            disabled={actionInFlight === `${event.id}:cancel`}
-            onClick={() => setCancelTarget(event)}
-          />
-        </div>
-      ),
-    },
-  ];
+  const renderEventActions = (event: EventView) => (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <EventIconBtn href={`/admin/eventos/${event.id}`} icon={Eye} title="Ver prova" />
+      <EventIconBtn
+        href={`/admin/eventos/${event.id}#inscritos`}
+        icon={Users}
+        title="Ver inscritos"
+      />
+      <EventIconBtn
+        href={`/admin/financeiro?status=PENDING&event=${encodeURIComponent(event.name)}`}
+        icon={CircleDollarSign}
+        title="Ver financeiro"
+      />
+      <EventIconBtn
+        href={`/admin/eventos/${event.id}/editar`}
+        icon={Pencil}
+        title="Editar prova"
+      />
+      {event.status === "DRAFT" && (
+        <EventIconBtn
+          icon={Rocket}
+          title="Publicar prova"
+          variant="info"
+          disabled={actionInFlight === `${event.id}:publish`}
+          onClick={async () => {
+            try {
+              setActionInFlight(`${event.id}:publish`);
+              const updated = await publishAdminEvent(event.id, accessToken);
+              setEvents((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+              toast.success("Prova publicada com sucesso.");
+            } catch (error) {
+              toast.error(error instanceof Error ? error.message : "Falha ao publicar prova.");
+            } finally {
+              setActionInFlight(null);
+            }
+          }}
+        />
+      )}
+      <EventIconBtn
+        icon={Megaphone}
+        title="Abrir na lista da assessoria"
+        variant="info"
+        disabled={actionInFlight === `${event.id}:race-plan`}
+        onClick={async () => {
+          try {
+            setActionInFlight(`${event.id}:race-plan`);
+            await openAdminRacePlan(
+              {
+                eventId: event.id,
+                athleteAction: "INTEREST",
+                instructions:
+                  "Prova adicionada a agenda oficial da assessoria. Confirme seu interesse para a equipe acompanhar.",
+              },
+              accessToken,
+            );
+            toast.success("Prova aberta na lista oficial da assessoria.");
+          } catch (error) {
+            toast.error(
+              error instanceof Error ? error.message : "Falha ao abrir prova para atletas.",
+            );
+          } finally {
+            setActionInFlight(null);
+          }
+        }}
+      />
+      <EventIconBtn
+        icon={CopyPlus}
+        title="Duplicar prova"
+        disabled={actionInFlight === `${event.id}:duplicate`}
+        onClick={async () => {
+          try {
+            setActionInFlight(`${event.id}:duplicate`);
+            const duplicated = await duplicateAdminEvent(event.id, accessToken);
+            setEvents((prev) => [duplicated, ...prev]);
+            toast.success("Prova duplicada com sucesso.");
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Falha ao duplicar prova.");
+          } finally {
+            setActionInFlight(null);
+          }
+        }}
+      />
+      <EventIconBtn
+        icon={XCircle}
+        title="Cancelar prova"
+        variant="danger"
+        disabled={actionInFlight === `${event.id}:cancel`}
+        onClick={() => setCancelTarget(event)}
+      />
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -435,20 +480,18 @@ export default function AdminEventosPage() {
       />
 
       <SectionCard
-        title="Modulo de provas"
-        description="Separe indicadores, alertas e operacao da agenda esportiva em abas."
+        title="Operacao de provas"
+        description="Fluxo por etapa para coordenar agenda, publicacao, check-in, inscricoes e historico."
       >
         <ModuleTabs
           tabs={tabs}
           activeTab={activeTab}
           onChange={setActiveTab}
-          columnsClassName="md:grid-cols-3"
+          columnsClassName="md:grid-cols-5"
         />
       </SectionCard>
 
-      <div
-        className={activeTab === "overview" ? "grid gap-3 sm:grid-cols-2 xl:grid-cols-5" : "hidden"}
-      >
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <MetricCard label="Total de provas" value={metrics.total} />
         <MetricCard label="Publicadas" value={metrics.published} tone="highlight" />
         <MetricCard label="Rascunhos" value={metrics.draft} />
@@ -457,45 +500,11 @@ export default function AdminEventosPage() {
       </div>
 
       <SectionCard
-        className={activeTab === "attention" ? undefined : "hidden"}
-        title="Precisa de atenção"
-        description="Itens que exigem ação para manter a operação eficiente"
-      >
-        <div className="grid gap-3 md:grid-cols-3">
-          <Link
-            href="/admin/eventos?status=DRAFT"
-            className="rounded-xl border border-amber-300/30 bg-amber-400/10 p-3 transition hover:border-amber-300/60"
-          >
-            <p className="text-xs uppercase tracking-wide text-amber-200">Rascunhos</p>
-            <p className="mt-1 text-2xl font-bold text-white">{attention.draftCount}</p>
-            <p className="mt-1 text-xs text-amber-100">Provas ainda não publicadas</p>
-          </Link>
-          <Link
-            href="/admin/eventos?window=next14d"
-            className="rounded-xl border border-sky-300/30 bg-sky-400/10 p-3 transition hover:border-sky-300/60"
-          >
-            <p className="text-xs uppercase tracking-wide text-sky-200">Prazo próximo</p>
-            <p className="mt-1 text-2xl font-bold text-white">{attention.soonDeadlineCount}</p>
-            <p className="mt-1 text-xs text-sky-100">Inscrições encerram em até 7 dias</p>
-          </Link>
-          <Link
-            href="/admin/eventos?status=PUBLISHED"
-            className="rounded-xl border border-red-300/30 bg-red-400/10 p-3 transition hover:border-red-300/60"
-          >
-            <p className="text-xs uppercase tracking-wide text-red-200">Baixa tração</p>
-            <p className="mt-1 text-2xl font-bold text-white">{attention.noRegistrationsCount}</p>
-            <p className="mt-1 text-xs text-red-100">Publicadas sem inscrições</p>
-          </Link>
-        </div>
-      </SectionCard>
-
-      <SectionCard
-        className={activeTab === "list" ? undefined : "hidden"}
-        title="Provas cadastradas"
-        description="Tabela de gestão com foco em status, ocupação e receita"
+        title={operationalTabTitle(activeTab)}
+        description={operationalTabDescription(activeTab)}
       >
         <div className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-[1fr_240px_220px]">
+          <div className="grid gap-3 md:grid-cols-[1fr_240px_220px_auto]">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
@@ -525,6 +534,8 @@ export default function AdminEventosPage() {
               <option value="ALL">Janela (todas)</option>
               <option value="next14d">Próximos 14 dias</option>
             </Select>
+
+            <ViewModeToggle value={viewMode} onChange={setViewMode} />
           </div>
 
           {loading ? (
@@ -538,8 +549,49 @@ export default function AdminEventosPage() {
               title="Nenhuma prova encontrada"
               description="Ajuste os filtros ou cadastre uma nova prova para continuar."
             />
+          ) : viewMode === "cards" ? (
+            <div className="grid auto-rows-fr gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {filtered.map((event) => (
+                <EventCard
+                  key={event.id}
+                  event={event}
+                  mode="admin"
+                  actions={renderEventActions(event)}
+                />
+              ))}
+            </div>
           ) : (
-            <DataTable columns={columns} data={filtered} getRowKey={(event) => event.id} />
+            <div className="overflow-hidden rounded-lg border border-white/10 bg-[#071b31]">
+              {filtered.map((event) => {
+                const distanceLabel =
+                  event.distances.map((distance) => distance.label).join(" / ") ||
+                  "Distancia a definir";
+                return (
+                  <div
+                    key={event.id}
+                    className="grid gap-3 border-b border-white/10 px-3 py-3 last:border-b-0 md:grid-cols-[minmax(0,1fr)_120px_110px_110px_190px]"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-white">{event.name}</p>
+                      <p className="mt-1 truncate text-xs text-slate-400">
+                        {event.city}/{event.state} | {distanceLabel}
+                      </p>
+                    </div>
+                    <StatusBadge
+                      label={eventStatusLabel(event.status)}
+                      tone={eventStatusTone(event.status)}
+                    />
+                    <p className="text-xs font-semibold text-slate-200">
+                      {new Date(event.event_date).toLocaleDateString("pt-BR")}
+                    </p>
+                    <p className="text-xs font-semibold text-slate-200">
+                      {event.registrations_count ?? 0} inscr.
+                    </p>
+                    {renderEventActions(event)}
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
       </SectionCard>

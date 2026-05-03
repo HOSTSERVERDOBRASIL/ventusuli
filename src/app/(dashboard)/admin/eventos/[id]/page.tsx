@@ -13,6 +13,7 @@ import {
   Pencil,
   Rocket,
   RotateCcw,
+  Trophy,
   UserX,
   Users,
   XCircle,
@@ -36,6 +37,7 @@ import {
   updateEventRegistrationAttendance,
 } from "@/services/events-service";
 import { ServiceEvent } from "@/services/types";
+import { getAdminRacePlanByEvent } from "@/services/race-plans-service";
 
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -58,12 +60,29 @@ const ATTENDANCE_LABEL: Record<ServiceEventRegistration["attendance_status"], st
   ABSENT: "Ausente",
 };
 
+type AdminRacePlan = Awaited<ReturnType<typeof getAdminRacePlanByEvent>>;
+
+function raceParticipationLabel(status: string): string {
+  if (status === "INTERESTED") return "Interesse";
+  if (status === "CONFIRMED") return "Confirmado";
+  if (status === "PENDING_PAYMENT") return "Pagamento pendente";
+  if (status === "PAID") return "Pago";
+  if (status === "REGISTERED_EXTERNALLY") return "Inscrito fora";
+  if (status === "IN_TEAM_REGISTRATION") return "Inscricao coletiva";
+  if (status === "WAITLISTED") return "Espera";
+  if (status === "CANCELLED") return "Cancelado";
+  if (status === "ATTENDED") return "Presente";
+  if (status === "NO_SHOW") return "Ausente";
+  return status;
+}
+
 export default function AdminEventoDetalhesPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { accessToken } = useAuthToken();
   const [event, setEvent] = useState<ServiceEvent | null>(null);
   const [registrations, setRegistrations] = useState<ServiceEventRegistration[]>([]);
+  const [racePlan, setRacePlan] = useState<AdminRacePlan>(null);
   const [attendanceBusyId, setAttendanceBusyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -73,19 +92,22 @@ export default function AdminEventoDetalhesPage() {
     const load = async () => {
       setLoading(true);
       try {
-        const [eventPayload, registrationsPayload] = await Promise.all([
+        const [eventPayload, registrationsPayload, racePlanPayload] = await Promise.all([
           getEventById(params.id, accessToken),
           getEventRegistrations(params.id, accessToken),
+          getAdminRacePlanByEvent(params.id, accessToken).catch(() => null),
         ]);
 
         if (!cancelled) {
           setEvent(eventPayload);
           setRegistrations(registrationsPayload);
+          setRacePlan(racePlanPayload);
         }
       } catch {
         if (!cancelled) {
           setEvent(null);
           setRegistrations([]);
+          setRacePlan(null);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -442,6 +464,55 @@ export default function AdminEventoDetalhesPage() {
           )}
         </SectionCard>
       </div>
+
+      <SectionCard
+        title="Lista da assessoria"
+        description="Atletas que entraram pela agenda oficial da assessoria"
+      >
+        {!racePlan ? (
+          <EmptyState
+            title="Prova ainda nao aberta para a assessoria"
+            description="Abra esta prova em /admin/eventos para que os atletas possam registrar interesse na agenda oficial."
+          />
+        ) : racePlan.participations.length === 0 ? (
+          <EmptyState
+            title="Nenhum atleta na lista da assessoria"
+            description="Quando os atletas clicarem em Quero participar, eles aparecem aqui."
+          />
+        ) : (
+          <div className="overflow-hidden rounded-lg border border-white/10 bg-[#071b31]">
+            {racePlan.participations.map((participation) => (
+              <div
+                key={participation.id}
+                className="grid gap-3 border-b border-white/10 px-3 py-3 last:border-b-0 md:grid-cols-[minmax(0,1fr)_150px_150px_150px_140px]"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-white">
+                    {participation.athleteName}
+                  </p>
+                  <p className="mt-1 truncate text-xs text-slate-400">
+                    {participation.athleteEmail}
+                  </p>
+                </div>
+                <StatusBadge
+                  label={raceParticipationLabel(participation.status)}
+                  tone={toneFromStatus(participation.status)}
+                />
+                <p className="text-xs font-semibold text-slate-200">
+                  {participation.distanceLabel ?? "Distancia pendente"}
+                </p>
+                <p className="text-xs font-semibold text-slate-200">
+                  {participation.paymentStatus ?? participation.registrationStatus ?? "Sem inscricao"}
+                </p>
+                <p className="inline-flex items-center gap-1 text-xs font-semibold text-slate-300">
+                  <Trophy className="h-3.5 w-3.5 text-amber-200" />
+                  {format(new Date(participation.createdAt), "dd/MM HH:mm", { locale: ptBR })}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </SectionCard>
 
       <div className="flex flex-wrap gap-2">
         <ActionButton asChild intent="secondary">

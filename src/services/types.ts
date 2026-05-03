@@ -180,6 +180,76 @@ export interface ServiceEvent {
   registrations_count: number;
 }
 
+export type OrganizationRacePlanStatus =
+  | "PLANNED"
+  | "OPEN_TO_ATHLETES"
+  | "REGISTRATION_CLOSED"
+  | "TEAM_CONFIRMED"
+  | "CANCELLED"
+  | "COMPLETED";
+export type RacePlanAthleteAction =
+  | "INTEREST"
+  | "CONFIRM"
+  | "INTERNAL_REGISTRATION"
+  | "EXTERNAL_LINK"
+  | "TEAM_REGISTRATION"
+  | "PAYMENT";
+export type AthleteRaceParticipationStatus =
+  | "INTERESTED"
+  | "CONFIRMED"
+  | "PENDING_PAYMENT"
+  | "PAID"
+  | "REGISTERED_EXTERNALLY"
+  | "IN_TEAM_REGISTRATION"
+  | "WAITLISTED"
+  | "CANCELLED"
+  | "ATTENDED"
+  | "NO_SHOW";
+
+export interface ServiceRacePlan {
+  id: string;
+  eventId: string;
+  status: OrganizationRacePlanStatus;
+  athleteAction: RacePlanAthleteAction;
+  instructions: string | null;
+  logistics: unknown;
+  registrationUrl: string | null;
+  opensAt: string | null;
+  closesAt: string | null;
+  event: {
+    id: string;
+    name: string;
+    city: string | null;
+    state: string | null;
+    address?: string | null;
+    eventDate: string;
+    registrationDeadline?: string | null;
+    description?: string | null;
+    imageUrl?: string | null;
+    externalUrl?: string | null;
+    distances: Array<{
+      id: string;
+      label: string;
+      distanceKm: number;
+      priceCents: number;
+      maxSlots?: number | null;
+      registeredCount?: number;
+    }>;
+  };
+  myParticipation?: {
+    id: string;
+    status: AthleteRaceParticipationStatus;
+    distanceId: string | null;
+    registrationId: string | null;
+    externalRegistrationUrl: string | null;
+    externalRegistrationCode: string | null;
+    note: string | null;
+    createdAt: string;
+    updatedAt: string;
+  } | null;
+  participationCounts?: Record<string, number>;
+}
+
 export interface EventUpsertPayload {
   name: string;
   city: string;

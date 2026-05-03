@@ -424,6 +424,70 @@ enum SponsorCampaignStatus {
   @@schema("public")
 }
 
+enum ExternalPlatformAuthType {
+  BEARER_TOKEN
+  API_KEY
+  OAUTH2_CLIENT_CREDENTIALS
+  BASIC_AUTH
+
+  @@schema("public")
+}
+
+enum ExternalSyncType {
+  EVENTS
+  REGISTRATIONS
+  ORDERS
+  PAYMENTS
+
+  @@schema("public")
+}
+
+enum ExternalSyncStatus {
+  RUNNING
+  SUCCESS
+  ERROR
+  PARTIAL
+
+  @@schema("public")
+}
+
+enum OrganizationRacePlanStatus {
+  PLANNED
+  OPEN_TO_ATHLETES
+  REGISTRATION_CLOSED
+  TEAM_CONFIRMED
+  CANCELLED
+  COMPLETED
+
+  @@schema("public")
+}
+
+enum RacePlanAthleteAction {
+  INTEREST
+  CONFIRM
+  INTERNAL_REGISTRATION
+  EXTERNAL_LINK
+  TEAM_REGISTRATION
+  PAYMENT
+
+  @@schema("public")
+}
+
+enum AthleteRaceParticipationStatus {
+  INTERESTED
+  CONFIRMED
+  PENDING_PAYMENT
+  PAID
+  REGISTERED_EXTERNALLY
+  IN_TEAM_REGISTRATION
+  WAITLISTED
+  CANCELLED
+  ATTENDED
+  NO_SHOW
+
+  @@schema("public")
+}
+
 model Organization {
   id                 String    @id @default(uuid())
   name               String
@@ -492,6 +556,9 @@ model Organization {
   sponsor_placements        SponsorPlacement[]
   sponsor_metrics           SponsorMetric[]
   user_access_profiles      UserAccessProfile[]
+  platform_credentials      PlatformCredential[]
+  race_plans                OrganizationRacePlan[]
+  race_participations       AthleteRaceParticipation[]
 
   @@index([slug])
   @@index([status])
@@ -560,6 +627,8 @@ model User {
   photo_purchases            PhotoPurchase[]
   photo_unlocks              PhotoUnlock[]
   sponsor_contacts_created   SponsorContact[]        @relation("SponsorContactCreator")
+  created_race_plans         OrganizationRacePlan[]   @relation("RacePlanCreator")
+  race_participations        AthleteRaceParticipation[]
 
   @@index([organization_id])
   @@index([email])
@@ -809,6 +878,139 @@ model StravaSyncLog {
   @@schema("public")
 }
 
+model ExternalPlatform {
+  id        String                   @id @default(cuid())
+  name      String
+  slug      String                   @unique
+  baseUrl   String                   @map("base_url")
+  authType  ExternalPlatformAuthType @map("auth_type")
+  isActive  Boolean                  @default(true) @map("is_active")
+  createdAt DateTime                 @default(now()) @map("created_at")
+  updatedAt DateTime                 @updatedAt @map("updated_at")
+
+  credentials   PlatformCredential[]
+  events        ExternalEvent[]
+  registrations ExternalRegistration[]
+  orders        ExternalOrder[]
+  syncLogs      SyncLog[]
+
+  @@index([slug, isActive])
+  @@map("external_platforms")
+  @@schema("public")
+}
+
+model PlatformCredential {
+  id                    String           @id @default(cuid())
+  platformId            String           @map("platform_id")
+  platform              ExternalPlatform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  organizationId        String           @map("organization_id")
+  organization          Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  encryptedToken        String?          @map("encrypted_token")
+  clientId              String?          @map("client_id")
+  encryptedClientSecret String?          @map("encrypted_client_secret")
+  expiresAt             DateTime?        @map("expires_at")
+  createdAt             DateTime         @default(now()) @map("created_at")
+  updatedAt             DateTime         @updatedAt @map("updated_at")
+
+  @@unique([platformId, organizationId])
+  @@index([organizationId])
+  @@map("platform_credentials")
+  @@schema("public")
+}
+
+model ExternalEvent {
+  id             String           @id @default(cuid())
+  platformId     String           @map("platform_id")
+  platform       ExternalPlatform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  organizationId String           @map("organization_id")
+  externalId     String           @map("external_id")
+  name           String
+  date           DateTime?
+  location       String?
+  status         String?
+  rawPayload     Json             @map("raw_payload")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  registrations ExternalRegistration[]
+  orders        ExternalOrder[]
+  racePlans     OrganizationRacePlan[]
+
+  @@unique([platformId, organizationId, externalId])
+  @@index([organizationId, date])
+  @@index([platformId, status])
+  @@map("external_events")
+  @@schema("public")
+}
+
+model ExternalRegistration {
+  id                  String           @id @default(cuid())
+  platformId          String           @map("platform_id")
+  platform            ExternalPlatform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  organizationId      String           @map("organization_id")
+  externalId          String           @map("external_id")
+  externalEventId     String           @map("external_event_id")
+  externalEvent       ExternalEvent    @relation(fields: [externalEventId], references: [id], onDelete: Cascade)
+  participantName     String?          @map("participant_name")
+  participantEmail    String?          @map("participant_email")
+  participantDocument String?          @map("participant_document")
+  category            String?
+  status              String?
+  rawPayload          Json             @map("raw_payload")
+  createdAt           DateTime         @default(now()) @map("created_at")
+  updatedAt           DateTime         @updatedAt @map("updated_at")
+
+  @@unique([platformId, organizationId, externalId])
+  @@index([organizationId, externalEventId])
+  @@index([platformId, status])
+  @@map("external_registrations")
+  @@schema("public")
+}
+
+model ExternalOrder {
+  id             String            @id @default(cuid())
+  platformId     String            @map("platform_id")
+  platform       ExternalPlatform  @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  organizationId String            @map("organization_id")
+  externalId     String            @map("external_id")
+  externalEventId String?          @map("external_event_id")
+  externalEvent   ExternalEvent?   @relation(fields: [externalEventId], references: [id], onDelete: SetNull)
+  buyerName      String?           @map("buyer_name")
+  buyerEmail     String?           @map("buyer_email")
+  amount         Int?
+  paymentStatus  String?           @map("payment_status")
+  orderStatus    String?           @map("order_status")
+  rawPayload     Json              @map("raw_payload")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  @@unique([platformId, organizationId, externalId])
+  @@index([organizationId, externalEventId])
+  @@index([platformId, paymentStatus])
+  @@map("external_orders")
+  @@schema("public")
+}
+
+model SyncLog {
+  id             String             @id @default(cuid())
+  platformId     String             @map("platform_id")
+  platform       ExternalPlatform   @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  organizationId String             @map("organization_id")
+  syncType       ExternalSyncType   @map("sync_type")
+  status         ExternalSyncStatus @default(RUNNING)
+  startedAt      DateTime           @default(now()) @map("started_at")
+  finishedAt     DateTime?          @map("finished_at")
+  totalRecords   Int                @default(0) @map("total_records")
+  errorMessage   String?            @map("error_message")
+  metadata       Json?
+
+  @@index([organizationId, startedAt(sort: Desc)])
+  @@index([platformId, syncType, startedAt(sort: Desc)])
+  @@index([status, startedAt(sort: Desc)])
+  @@map("sync_logs")
+  @@schema("public")
+}
+
 model RankingSnapshot {
   id              String                @id @default(uuid())
   organization_id String
@@ -856,6 +1058,7 @@ model Event {
   photo_galleries         PhotoGallery[]
   photos                  Photo[]
   sponsor_campaign_events SponsorCampaignEvent[]
+  race_plans              OrganizationRacePlan[]
 
   @@index([organization_id])
   @@index([event_date])
@@ -876,6 +1079,7 @@ model EventDistance {
 
   registrations      Registration[]
   collective_members CollectiveMember[]
+  race_participations AthleteRaceParticipation[]
 
   @@index([event_id])
   @@map("event_distances")
@@ -908,6 +1112,7 @@ model Registration {
   registered_at         DateTime           @default(now())
 
   payment Payment?
+  race_participation AthleteRaceParticipation?
 
   @@unique([user_id, event_id, distance_id])
   @@index([organization_id])
@@ -915,6 +1120,68 @@ model Registration {
   @@index([organization_id, event_id, attendance_status])
   @@index([organization_id, event_id, check_in_at])
   @@map("registrations")
+  @@schema("public")
+}
+
+model OrganizationRacePlan {
+  id              String                     @id @default(cuid())
+  organizationId  String                     @map("organization_id")
+  organization    Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  eventId         String                     @map("event_id")
+  event           Event                      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  externalEventId String?                    @map("external_event_id")
+  externalEvent   ExternalEvent?             @relation(fields: [externalEventId], references: [id], onDelete: SetNull)
+  createdBy       String                     @map("created_by")
+  creator         User                       @relation("RacePlanCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+  status          OrganizationRacePlanStatus @default(PLANNED)
+  athleteAction   RacePlanAthleteAction      @default(INTEREST) @map("athlete_action")
+  audience        Json?
+  instructions    String?
+  logistics       Json?
+  registrationUrl String?                    @map("registration_url")
+  opensAt         DateTime?                  @map("opens_at")
+  closesAt        DateTime?                  @map("closes_at")
+  publishedAt     DateTime?                  @map("published_at")
+  createdAt       DateTime                   @default(now()) @map("created_at")
+  updatedAt       DateTime                   @updatedAt @map("updated_at")
+
+  participations AthleteRaceParticipation[]
+
+  @@unique([organizationId, eventId])
+  @@index([organizationId, status, opensAt])
+  @@index([organizationId, status, closesAt])
+  @@index([eventId])
+  @@index([externalEventId])
+  @@map("organization_race_plans")
+  @@schema("public")
+}
+
+model AthleteRaceParticipation {
+  id                       String                         @id @default(cuid())
+  racePlanId               String                         @map("race_plan_id")
+  racePlan                 OrganizationRacePlan           @relation(fields: [racePlanId], references: [id], onDelete: Cascade)
+  organizationId           String                         @map("organization_id")
+  organization             Organization                   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId                   String                         @map("user_id")
+  user                     User                           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  distanceId               String?                        @map("distance_id")
+  distance                 EventDistance?                 @relation(fields: [distanceId], references: [id], onDelete: SetNull)
+  registrationId           String?                        @unique @map("registration_id")
+  registration             Registration?                  @relation(fields: [registrationId], references: [id], onDelete: SetNull)
+  status                   AthleteRaceParticipationStatus @default(INTERESTED)
+  externalRegistrationUrl  String?                        @map("external_registration_url")
+  externalRegistrationCode String?                        @map("external_registration_code")
+  note                     String?
+  createdAt                DateTime                       @default(now()) @map("created_at")
+  updatedAt                DateTime                       @updatedAt @map("updated_at")
+  cancelledAt              DateTime?                      @map("cancelled_at")
+  attendedAt               DateTime?                      @map("attended_at")
+
+  @@unique([racePlanId, userId])
+  @@index([organizationId, status, createdAt(sort: Desc)])
+  @@index([organizationId, userId, createdAt(sort: Desc)])
+  @@index([racePlanId, status])
+  @@map("athlete_race_participations")
   @@schema("public")
 }
 
