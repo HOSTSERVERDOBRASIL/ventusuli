@@ -405,7 +405,7 @@ export default function AdminEventosPage() {
       )}
       <EventIconBtn
         icon={Megaphone}
-        title="Abrir na lista da assessoria"
+        title="Abrir na lista da produtora"
         variant="info"
         disabled={actionInFlight === `${event.id}:race-plan`}
         onClick={async () => {
@@ -416,11 +416,11 @@ export default function AdminEventosPage() {
                 eventId: event.id,
                 athleteAction: "INTEREST",
                 instructions:
-                  "Prova adicionada a agenda oficial da assessoria. Confirme seu interesse para a equipe acompanhar.",
+                  "Prova adicionada a agenda oficial da produtora. Confirme seu interesse para a equipe acompanhar.",
               },
               accessToken,
             );
-            toast.success("Prova aberta na lista oficial da assessoria.");
+            toast.success("Prova aberta na lista oficial da produtora.");
           } catch (error) {
             toast.error(
               error instanceof Error ? error.message : "Falha ao abrir prova para atletas.",

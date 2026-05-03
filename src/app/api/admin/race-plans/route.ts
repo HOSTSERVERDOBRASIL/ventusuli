@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import {
   AthleteRaceParticipationStatus,
   OrganizationRacePlanStatus,
@@ -100,7 +100,7 @@ export async function GET(req: NextRequest) {
   const auth = getAuthContext(req);
   if (!auth) return apiError("UNAUTHORIZED", "Token de acesso ausente.", 401);
   if (!canManageRacePlans(auth.role)) {
-    return apiError("FORBIDDEN", "Apenas administradores podem gerenciar a agenda da assessoria.", 403);
+    return apiError("FORBIDDEN", "Apenas administradores podem gerenciar a agenda da produtora.", 403);
   }
 
   const parsed = listQuerySchema.safeParse({
@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
   const auth = getAuthContext(req);
   if (!auth) return apiError("UNAUTHORIZED", "Token de acesso ausente.", 401);
   if (!canManageRacePlans(auth.role)) {
-    return apiError("FORBIDDEN", "Apenas administradores podem gerenciar a agenda da assessoria.", 403);
+    return apiError("FORBIDDEN", "Apenas administradores podem gerenciar a agenda da produtora.", 403);
   }
 
   let body: unknown;
@@ -154,7 +154,7 @@ export async function POST(req: NextRequest) {
     select: { id: true },
   });
 
-  if (!event) return apiError("USER_NOT_FOUND", "Prova nao encontrada nesta assessoria.", 404);
+  if (!event) return apiError("USER_NOT_FOUND", "Prova nao encontrada nesta produtora.", 404);
 
   if (input.externalEventId) {
     const externalEvent = await prisma.externalEvent.findFirst({
@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (!externalEvent) {
-      return apiError("USER_NOT_FOUND", "Prova externa nao encontrada nesta assessoria.", 404);
+      return apiError("USER_NOT_FOUND", "Prova externa nao encontrada nesta produtora.", 404);
     }
   }
 

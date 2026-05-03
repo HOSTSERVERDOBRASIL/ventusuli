@@ -202,7 +202,7 @@ export default function InscricaoPage() {
         hint:
           athlete.city && athlete.state
             ? `${athlete.city}/${athlete.state}`
-            : "Ajuda na logistica da assessoria.",
+            : "Ajuda na logistica da produtora.",
       },
       {
         label: "Pagamento",
@@ -355,7 +355,7 @@ export default function InscricaoPage() {
                       href="/perfil"
                       className="mt-2 inline-block rounded-lg bg-amber-400/20 px-3 py-1.5 text-xs font-semibold text-amber-200 hover:bg-amber-400/30"
                     >
-                      Completar perfil agora →
+                      Completar perfil agora ?
                     </Link>
                   </div>
                 </div>

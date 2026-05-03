@@ -466,17 +466,17 @@ export default function AdminEventoDetalhesPage() {
       </div>
 
       <SectionCard
-        title="Lista da assessoria"
-        description="Atletas que entraram pela agenda oficial da assessoria"
+        title="Lista da produtora"
+        description="Atletas que entraram pela agenda oficial da produtora"
       >
         {!racePlan ? (
           <EmptyState
-            title="Prova ainda nao aberta para a assessoria"
+            title="Prova ainda nao aberta para a produtora"
             description="Abra esta prova em /admin/eventos para que os atletas possam registrar interesse na agenda oficial."
           />
         ) : racePlan.participations.length === 0 ? (
           <EmptyState
-            title="Nenhum atleta na lista da assessoria"
+            title="Nenhum atleta na lista da produtora"
             description="Quando os atletas clicarem em Quero participar, eles aparecem aqui."
           />
         ) : (

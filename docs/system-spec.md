@@ -1,16 +1,16 @@
-# Spec Forte do Sistema VentuSuli
+﻿# Spec Forte do Sistema VentuSuli
 
 Data: 2026-05-03
 
 ## 1. Visao
 
-O VentuSuli e uma plataforma SaaS multi-tenant para assessorias esportivas, organizadores e comunidades de atletas. O sistema centraliza operacao de eventos, atletas, inscricoes, pagamentos, financeiro, treinos, pontuacao, recompensas, fotos, patrocinadores, comunicados, comunidade, auditoria e integracoes externas.
+O VentuSuli e uma plataforma SaaS multi-tenant para produtoras esportivas, organizadores e comunidades de atletas. O sistema centraliza operacao de eventos, atletas, inscricoes, pagamentos, financeiro, treinos, pontuacao, recompensas, fotos, patrocinadores, comunicados, comunidade, auditoria e integracoes externas.
 
 O produto deve funcionar como um modular monolith: uma aplicacao Next.js full-stack com dominios bem separados, PostgreSQL como fonte transacional principal, Prisma como camada de persistencia, Redis para rate limit/cache/filas quando habilitado e storage externo/local para imagens e fotos.
 
 ## 2. Objetivos
 
-- Permitir que uma assessoria esportiva opere sua base de atletas com controle de acesso, eventos, pagamentos, financeiro e comunicacao.
+- Permitir que uma produtora esportiva opere sua base de atletas com controle de acesso, eventos, pagamentos, financeiro e comunicacao.
 - Entregar uma jornada clara para atletas: descobrir provas, inscrever-se, acompanhar pagamentos, treinos, evolucao, pontos, recompensas, fotos e avisos.
 - Separar plataforma, tenant e jornadas pessoais com RBAC explicito e sem heranca implicita perigosa.
 - Manter todos os dados criticos isolados por organizacao.
@@ -33,7 +33,7 @@ Opera a camada plataforma. Gerencia organizacoes, convites de administradores, b
 
 ### ADMIN
 
-Opera a assessoria. Gerencia eventos, atletas, financeiro, pontos, recompensas, resgates, fotos, patrocinadores, avisos e configuracoes da organizacao.
+Opera a produtora. Gerencia eventos, atletas, financeiro, pontos, recompensas, resgates, fotos, patrocinadores, avisos e configuracoes da organizacao.
 
 ### FINANCE
 
@@ -142,7 +142,7 @@ Responsabilidades:
 - Conversao de prova importada em evento oficial da organizacao somente apos decisao do admin.
 - Distancias, categorias, preco, capacidade, imagem, local, datas e geofence/check-in quando configurado.
 - Catalogo de provas para atletas.
-- Lista oficial de provas da assessoria, representando as provas em que a equipe pretende participar.
+- Lista oficial de provas da produtora, representando as provas em que a equipe pretende participar.
 - Envio/divulgacao de provas selecionadas para atletas apos adicao/publicacao pelo admin.
 - Disponibilizacao da prova adicionada na ferramenta do atleta com acao clara para participar/manifestar interesse/inscrever-se.
 - Inscricao individual e coletiva.
@@ -155,7 +155,7 @@ Criterios de aceite:
 - Prova importada nao aparece para atletas ate ser aprovada/adicionada por admin autorizado.
 - Prova importada deve preservar origem, ID externo, payload original e status de curadoria.
 - Prova adicionada pelo admin deve ficar visivel para atletas elegiveis no catalogo e/ou dashboard com botao de participacao.
-- Prova adicionada deve entrar na lista oficial da assessoria quando marcada como participacao da equipe.
+- Prova adicionada deve entrar na lista oficial da produtora quando marcada como participacao da equipe.
 - Publicacao valida campos obrigatorios e capacidade.
 - Atleta nao confirma inscricao paga sem pagamento confirmado ou isencao administrativa registrada.
 - Cancelamento preserva historico financeiro e de presenca.
@@ -170,10 +170,10 @@ Responsabilidades:
 - Normalizar dados externos em um formato unico: nome, data, local, cidade, estado, distancias, categorias, preco, link externo, imagem, organizador, status e origem.
 - Deduplicar provas repetidas entre fontes usando ID externo, nome, data, cidade, local e distancia.
 - Exibir uma tela de curadoria para o admin revisar provas encontradas.
-- Permitir que o admin ignore, arquive, marque como relevante, edite dados normalizados ou adicione a prova ao calendario da assessoria.
+- Permitir que o admin ignore, arquive, marque como relevante, edite dados normalizados ou adicione a prova ao calendario da produtora.
 - Permitir selecao de audiencia antes do envio: todos os atletas, grupos, niveis, modalidades, cidade/estado, atletas premium ou atletas escolhidos manualmente.
 - Enviar a prova escolhida aos atletas via catalogo interno, aviso/notificacao e destaque no dashboard quando configurado.
-- Tornar a prova escolhida participavel na ferramenta do atleta, respeitando o tipo de acao configurado: interesse, inscricao interna, link externo ou inscricao coletiva pela assessoria.
+- Tornar a prova escolhida participavel na ferramenta do atleta, respeitando o tipo de acao configurado: interesse, inscricao interna, link externo ou inscricao coletiva pela produtora.
 - Manter vinculo entre prova importada e evento criado internamente.
 
 Estados da prova importada:
@@ -198,68 +198,68 @@ Criterios de aceite:
 - Reprocessar a mesma fonte externa nao duplica prova nem evento.
 - Se a plataforma externa remover ou alterar a prova, o sistema registra diferenca para revisao em vez de sobrescrever cegamente campos editados pelo admin.
 
-### 6.4.2 Lista Oficial de Provas da Assessoria
+### 6.4.2 Lista Oficial de Provas da produtora
 
 Responsabilidades:
 
-- Manter uma lista central das provas em que a assessoria vai participar.
+- Manter uma lista central das provas em que a produtora vai participar.
 - Permitir que o admin monte a agenda da equipe a partir de provas importadas por API ou eventos criados manualmente.
-- Separar prova descoberta/importada de prova assumida pela assessoria como participacao oficial.
-- Exibir para atletas uma lista clara de "provas da assessoria" com data, local, distancias, status, prazo, orientacoes e acao de participacao.
+- Separar prova descoberta/importada de prova assumida pela produtora como participacao oficial.
+- Exibir para atletas uma lista clara de "provas da produtora" com data, local, distancias, status, prazo, orientacoes e acao de participacao.
 - Permitir ao admin acompanhar quais atletas demonstraram interesse, confirmaram participacao, estao pendentes de pagamento, entraram em inscricao coletiva ou foram confirmados externamente.
 - Permitir comunicados especificos por prova para os atletas participantes ou interessados.
-- Permitir estados operacionais da participacao da assessoria: planejada, aberta para atletas, encerrada, cancelada e concluida.
+- Permitir estados operacionais da participacao da produtora: planejada, aberta para atletas, encerrada, cancelada e concluida.
 
-Estados da participacao da assessoria:
+Estados da participacao da produtora:
 
 - `PLANNED`: prova escolhida pelo admin, mas ainda nao aberta aos atletas.
 - `OPEN_TO_ATHLETES`: prova visivel e aberta para atletas participarem.
 - `REGISTRATION_CLOSED`: prova visivel, mas sem novas participacoes.
-- `TEAM_CONFIRMED`: grupo/assessoria confirmou participacao.
-- `CANCELLED`: assessoria desistiu ou prova foi cancelada.
+- `TEAM_CONFIRMED`: grupo/produtora confirmou participacao.
+- `CANCELLED`: produtora desistiu ou prova foi cancelada.
 - `COMPLETED`: prova realizada e historico fechado.
 
 Criterios de aceite:
 
-- Atleta deve enxergar prioritariamente as provas que a assessoria selecionou para participar.
-- A lista da assessoria deve diferenciar provas abertas para participacao de provas apenas planejadas.
+- Atleta deve enxergar prioritariamente as provas que a produtora selecionou para participar.
+- A lista da produtora deve diferenciar provas abertas para participacao de provas apenas planejadas.
 - Admin consegue abrir ou fechar participacao dos atletas sem apagar a prova.
 - Cada participacao de atleta gera registro interno para acompanhamento da equipe.
 - Prova externa com inscricao em outro site ainda deve gerar registro interno de interesse/participacao no VentuSuli.
 - A lista oficial deve alimentar dashboard do atleta, calendario, notificacoes e modulo de inscricoes quando aplicavel.
 
-### 6.4.3 Jornada Operacional da Prova da Assessoria
+### 6.4.3 Jornada Operacional da Prova da produtora
 
 Esta jornada e o fluxo central do produto para provas:
 
-`prova externa -> curadoria admin -> lista oficial da assessoria -> atleta participa -> admin acompanha -> prova concluida`
+`prova externa -> curadoria admin -> lista oficial da produtora -> atleta participa -> admin acompanha -> prova concluida`
 
 Responsabilidades:
 
 - Transformar provas externas ou cadastradas manualmente em oportunidades oficiais da equipe.
 - Dar ao admin uma visao operacional por prova, nao apenas um formulario de cadastro.
-- Dar ao atleta uma acao simples e clara para entrar na participacao da assessoria.
+- Dar ao atleta uma acao simples e clara para entrar na participacao da produtora.
 - Registrar todo interesse/participacao do atleta, mesmo quando a inscricao final acontece fora do VentuSuli.
-- Permitir que a assessoria acompanhe a equipe antes, durante e depois da prova.
+- Permitir que a produtora acompanhe a equipe antes, durante e depois da prova.
 
-Tela do admin por prova da assessoria:
+Tela do admin por prova da produtora:
 
 - Resumo da prova: nome, data, local, origem, link externo, distancias, status e observacoes.
-- Status operacional da assessoria: planejada, aberta, encerrada, confirmada, cancelada ou concluida.
+- Status operacional da produtora: planejada, aberta, encerrada, confirmada, cancelada ou concluida.
 - Participantes por status: interessados, confirmados, pendentes de pagamento, inscritos externamente, inscricao coletiva e cancelados.
 - Participantes por distancia/categoria.
-- Pagamentos vinculados quando houver inscricao interna ou cobranca da assessoria.
+- Pagamentos vinculados quando houver inscricao interna ou cobranca da produtora.
 - Comunicados enviados e rascunhos por prova.
 - Logistica: ponto de encontro, retirada de kit, tenda, transporte, horarios e orientacoes do coach.
 - Acoes: abrir para atletas, fechar participacao, enviar aviso, exportar lista, marcar presenca e concluir prova.
 
-Tela do atleta por prova da assessoria:
+Tela do atleta por prova da produtora:
 
 - Detalhes essenciais: data, local, distancias, prazo, valor, link externo e orientacoes.
-- Sinal claro de que a prova faz parte da agenda da assessoria.
+- Sinal claro de que a prova faz parte da agenda da produtora.
 - Botao principal conforme configuracao: "Quero participar", "Tenho interesse", "Entrar na inscricao coletiva", "Pagar inscricao" ou "Inscrever-se no site externo".
 - Status da minha participacao.
-- Orientacoes atualizadas da assessoria.
+- Orientacoes atualizadas da produtora.
 - Historico de avisos relacionados a prova.
 - Confirmacao de inscricao externa quando aplicavel.
 
@@ -270,7 +270,7 @@ Status da participacao do atleta:
 - `PENDING_PAYMENT`: participacao depende de pagamento.
 - `PAID`: pagamento interno confirmado.
 - `REGISTERED_EXTERNALLY`: atleta informou que se inscreveu em plataforma externa.
-- `IN_TEAM_REGISTRATION`: atleta entrou em inscricao coletiva gerenciada pela assessoria.
+- `IN_TEAM_REGISTRATION`: atleta entrou em inscricao coletiva gerenciada pela produtora.
 - `WAITLISTED`: atleta esta em lista de espera.
 - `CANCELLED`: atleta cancelou ou foi removido da participacao.
 - `ATTENDED`: presenca confirmada no dia da prova.
@@ -278,8 +278,8 @@ Status da participacao do atleta:
 
 Regras de negocio:
 
-- Uma prova pode existir como importada sem estar na agenda da assessoria.
-- Uma prova so aparece como "prova da assessoria" quando o admin cria uma participacao oficial da equipe.
+- Uma prova pode existir como importada sem estar na agenda da produtora.
+- Uma prova so aparece como "prova da produtora" quando o admin cria uma participacao oficial da equipe.
 - Uma prova planejada pode ficar invisivel aos atletas ate o admin abrir participacao.
 - O admin define a acao principal do atleta por prova.
 - Quando a acao for link externo, o sistema ainda registra interesse/confirmacao para acompanhamento interno.
@@ -290,7 +290,7 @@ Regras de negocio:
 
 Criterios de aceite:
 
-- Admin consegue transformar uma prova importada em prova oficial da assessoria em poucos passos.
+- Admin consegue transformar uma prova importada em prova oficial da produtora em poucos passos.
 - Atleta elegivel entende que aquela prova faz parte da agenda da equipe.
 - Atleta consegue manifestar participacao sem precisar falar fora do sistema.
 - Admin consegue ver rapidamente quem vai, quem esta pendente e quem ja se inscreveu fora.
@@ -299,7 +299,7 @@ Criterios de aceite:
 
 ### 6.4.4 Modelo Conceitual de Provas
 
-Para evitar confusao entre prova encontrada, prova cadastrada e prova assumida pela assessoria, o dominio deve separar quatro conceitos:
+Para evitar confusao entre prova encontrada, prova cadastrada e prova assumida pela produtora, o dominio deve separar quatro conceitos:
 
 `ExternalEvent`
 
@@ -315,14 +315,14 @@ Para evitar confusao entre prova encontrada, prova cadastrada e prova assumida p
 
 `OrganizationRacePlan`
 
-- Representa a decisao da assessoria de participar de uma prova.
+- Representa a decisao da produtora de participar de uma prova.
 - Define se a prova entra na lista oficial da equipe.
 - Controla status operacional, audiencia, orientacoes, logistica e acao principal do atleta.
 - Pode apontar para um `Event` interno e preservar origem externa quando houver.
 
 `AthleteRaceParticipation`
 
-- Representa a relacao do atleta com uma prova da assessoria.
+- Representa a relacao do atleta com uma prova da produtora.
 - Guarda status, distancia escolhida, pagamento, inscricao externa, presenca, observacoes e timestamps.
 - Permite acompanhar interesse e confirmacao mesmo quando a inscricao final acontece fora da plataforma.
 
@@ -330,16 +330,16 @@ Relacionamento esperado:
 
 - Uma `ExternalEvent` pode gerar ou atualizar um `Event`.
 - Um `Event` pode ter zero ou mais planos de participacao por organizacao.
-- Um `OrganizationRacePlan` pertence a uma organizacao e define a agenda oficial daquela assessoria.
+- Um `OrganizationRacePlan` pertence a uma organizacao e define a agenda oficial daquela produtora.
 - Um `AthleteRaceParticipation` pertence a um atleta e a um `OrganizationRacePlan`.
-- Notificacoes, pagamentos, pontos, fotos e comunicados devem se vincular ao plano da assessoria ou a participacao do atleta quando o contexto for a equipe.
+- Notificacoes, pagamentos, pontos, fotos e comunicados devem se vincular ao plano da produtora ou a participacao do atleta quando o contexto for a equipe.
 
 Criterios de aceite:
 
-- O sistema nao mistura prova descoberta com prova oficialmente escolhida pela assessoria.
+- O sistema nao mistura prova descoberta com prova oficialmente escolhida pela produtora.
 - O mesmo evento pode ser reaproveitado por mais de uma organizacao sem misturar atletas.
-- Cada assessoria controla sua propria agenda, audiencia e participacoes.
-- Cada atleta tem um status individual por prova da assessoria.
+- Cada produtora controla sua propria agenda, audiencia e participacoes.
+- Cada atleta tem um status individual por prova da produtora.
 
 ### 6.5 Pagamentos e Financeiro
 
@@ -347,7 +347,7 @@ Responsabilidades:
 
 - Gerar pagamentos de inscricoes, recompensas, fotos e cobrancas manuais.
 - Acompanhar status: pendente, pago, expirado, reembolsado e cancelado.
-- Registrar receitas, despesas, recorrencias, mensalidades, relatórios e conciliacao.
+- Registrar receitas, despesas, recorrencias, mensalidades, relatÃ³rios e conciliacao.
 - Webhook de pagamento com autenticacao.
 - Criar entradas financeiras a partir de eventos internos quando aplicavel.
 
@@ -454,7 +454,7 @@ Responsabilidades:
 
 - Cadastro de patrocinadores, contatos, campanhas, placements e metricas.
 - Vinculo de campanhas a eventos.
-- Orçamento financeiro e orçamento em pontos.
+- OrÃ§amento financeiro e orÃ§amento em pontos.
 - Areas de exibicao patrocinada.
 
 Criterios de aceite:
@@ -510,7 +510,7 @@ Fluxos principais:
 - Auditar acoes.
 - Prestar suporte sem acessar tenant diretamente.
 
-### Admin da Assessoria
+### Admin da produtora
 
 Entrada: `/admin`.
 
@@ -542,7 +542,7 @@ Entrada: `/`.
 Fluxos principais:
 
 - Ver provas disponiveis.
-- Ver a lista oficial de provas em que a assessoria vai participar.
+- Ver a lista oficial de provas em que a produtora vai participar.
 - Inscrever-se e pagar.
 - Acompanhar minhas inscricoes.
 - Ver treinos, evolucao e calendario.
@@ -560,7 +560,7 @@ Entidades operacionais:
 
 - `AthleteProfile`, `Event`, `EventDistance`, `Registration`, `Payment`, `FinancialEntry`, `CollectiveSignup`, `CollectiveMember`.
 - Para a central de provas: `ExternalPlatform`, `ExternalEvent`, `SyncLog` e vinculo entre prova externa e `Event` interno.
-- Modelo conceitual recomendado para evolucao da agenda da assessoria: `OrganizationRacePlan` e `AthleteRaceParticipation`.
+- Modelo conceitual recomendado para evolucao da agenda da produtora: `OrganizationRacePlan` e `AthleteRaceParticipation`.
 
 Entidades tecnicas/esportivas:
 
@@ -631,8 +631,8 @@ Grupos principais:
 - Plataforma: `/api/super-admin/*`
 - Admin: `/api/admin/*`
 - Eventos: `/api/events/*`
-- Agenda oficial da assessoria: `/api/admin/race-plans/*`, `/api/race-plans/*`
-- Participacao do atleta em provas da assessoria: `/api/race-plans/:id/participations/*`, `/api/me/race-participations/*`
+- Agenda oficial da produtora: `/api/admin/race-plans/*`, `/api/race-plans/*`
+- Participacao do atleta em provas da produtora: `/api/race-plans/:id/participations/*`, `/api/me/race-participations/*`
 - Inscricoes: `/api/registrations/*`
 - Pagamentos: `/api/payments/*`
 - Financeiro: `/api/finance/*`, `/api/reports/*`
@@ -688,7 +688,7 @@ Aceite:
 4. Admin acessa a central de provas importadas.
 5. Admin filtra por data, local, modalidade, plataforma ou status.
 6. Admin seleciona uma prova e revisa dados normalizados.
-7. Admin adiciona a prova a lista oficial de provas da assessoria.
+7. Admin adiciona a prova a lista oficial de provas da produtora.
 8. Sistema cria ou atualiza um evento interno em rascunho, planejado ou aberto aos atletas conforme decisao do admin.
 9. Admin escolhe audiencia e canal de divulgacao.
 10. Sistema deixa a prova visivel na ferramenta dos atletas elegiveis.
@@ -706,7 +706,7 @@ Aceite:
 - Atleta elegivel visualiza a prova na ferramenta e tem uma acao clara para participar.
 - A acao de participacao gera registro interno, mesmo quando a inscricao final acontecer em plataforma externa.
 
-### Fluxo 2.2: Gestao da equipe em uma prova da assessoria
+### Fluxo 2.2: Gestao da equipe em uma prova da produtora
 
 1. Admin abre uma prova da lista oficial para participacao dos atletas.
 2. Atletas elegiveis entram como interessados, confirmados ou participantes de inscricao coletiva.
@@ -791,7 +791,7 @@ Testes automatizados devem cobrir:
 - Tenant isolation em APIs criticas.
 - Eventos, inscricoes e pagamentos.
 - Central de provas importadas: sync externo, normalizacao, deduplicacao, curadoria e envio para atletas.
-- Lista oficial da assessoria: abrir prova para atletas, registrar participacao, fechar participacao e concluir prova.
+- Lista oficial da produtora: abrir prova para atletas, registrar participacao, fechar participacao e concluir prova.
 - Status de participacao do atleta: interesse, confirmacao, pagamento pendente, inscricao externa, inscricao coletiva, cancelamento e presenca.
 - Webhook autenticado e idempotente.
 - Pontos, ledger, expiracao, recorrencia e resgate.
@@ -807,7 +807,7 @@ Smoke pos-deploy:
 - `/api/health?scope=readiness`
 - Login admin.
 - Listagem de eventos.
-- Listagem de provas da assessoria para admin e atleta.
+- Listagem de provas da produtora para admin e atleta.
 - Listagem de atletas.
 - Fluxo basico de inscricao do atleta em ambiente controlado.
 
@@ -818,8 +818,8 @@ Smoke pos-deploy:
 O primeiro corte de produto deve provar o fluxo principal sem depender de todos os modulos comerciais:
 
 1. Importar/listar provas externas em uma central administrativa.
-2. Permitir curadoria: revisar, ignorar ou adicionar a prova a lista oficial da assessoria.
-3. Criar a lista oficial de provas da assessoria com status planejada/aberta/encerrada/concluida.
+2. Permitir curadoria: revisar, ignorar ou adicionar a prova a lista oficial da produtora.
+3. Criar a lista oficial de provas da produtora com status planejada/aberta/encerrada/concluida.
 4. Mostrar para o atleta apenas as provas abertas para sua audiencia.
 5. Permitir ao atleta clicar em "Tenho interesse" ou "Quero participar".
 6. Permitir ao admin acompanhar participantes por prova.
@@ -841,7 +841,7 @@ Fora do MVP inicial:
 - Garantir tenant isolation em queries criticas.
 - Consolidar audit logs para acoes sensiveis.
 - Fortalecer readiness e scripts de deploy.
-- Definir modelo de agenda oficial da assessoria e status de participacao do atleta.
+- Definir modelo de agenda oficial da produtora e status de participacao do atleta.
 
 ### Fase 2: Receita e recorrencia
 

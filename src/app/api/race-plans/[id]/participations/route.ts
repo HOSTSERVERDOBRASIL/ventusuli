@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import {
   AthleteRaceParticipationStatus,
   OrganizationRacePlanStatus,
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   });
 
   if (!plan) {
-    return apiError("USER_NOT_FOUND", "Prova da assessoria nao encontrada ou fechada.", 404);
+    return apiError("USER_NOT_FOUND", "Prova da produtora nao encontrada ou fechada.", 404);
   }
 
   if (input.distanceId && !plan.event.distances.some((distance) => distance.id === input.distanceId)) {
