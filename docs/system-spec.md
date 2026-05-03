@@ -950,7 +950,233 @@ Fora do MVP inicial:
 - Analytics separado.
 - Impersonation de suporte com auditoria forte.
 
-## 14. Definition of Done Global
+## 14. Ideias Adicionais Recomendadas
+
+Esta secao registra melhorias que fazem sentido considerando o estado atual do VentuSuli, o foco em assessorias esportivas e a nova agenda oficial de provas.
+
+### 14.1 Painel de Decisao da Assessoria
+
+Objetivo:
+
+- Dar ao admin uma visao executiva da operacao: proximas provas, atletas interessados, pendencias de pagamento, provas sem comunicados, eventos com baixa adesao e acoes urgentes.
+
+Funcionalidades:
+
+- Cards de "Precisa de acao": provas abertas sem participantes, provas proximas sem orientacoes, pagamentos pendentes, atletas sem resposta e check-in pendente.
+- Ranking de provas por interesse dos atletas.
+- Linha do tempo das proximas provas da assessoria.
+- Alertas operacionais por prazo: fechamento de inscricao, retirada de kit, comunicados e dia da prova.
+
+Prioridade:
+
+- Alta. Ajuda o admin a operar melhor sem depender de planilha ou conversa fora do sistema.
+
+### 14.2 Jornada Completa da Prova
+
+Objetivo:
+
+- Transformar cada prova em um cockpit operacional unico, desde a decisao de participar ate o pos-prova.
+
+Funcionalidades:
+
+- Checklist por prova: abrir para atletas, confirmar tenda/logistica, enviar comunicado, fechar lista, marcar presenca, concluir prova.
+- Bloco de orientacoes visivel ao atleta: local de encontro, horario, retirada de kit, transporte, coach responsavel e link externo.
+- Historico de alteracoes da prova da assessoria.
+- Exportacao de participantes em CSV.
+- Acoes em lote para mudar status de atletas.
+
+Prioridade:
+
+- Alta. E o passo natural apos a primeira versao da lista oficial.
+
+### 14.3 Segmentacao Inteligente de Atletas
+
+Objetivo:
+
+- Enviar cada prova para os atletas certos, reduzindo ruido e aumentando adesao.
+
+Funcionalidades:
+
+- Audiencias salvas: todos, iniciantes, intermediarios, avancados, corrida de rua, trail, cidade/estado, premium e grupos manuais.
+- Sugestao automatica de audiencia com base em distancia, cidade, historico e nivel do atleta.
+- Indicador de alcance antes de publicar: quantos atletas receberao a prova.
+- Simulacao de audiencia antes do envio.
+
+Prioridade:
+
+- Alta para notificacoes e curadoria; media para sugestao automatica.
+
+### 14.4 Notificacoes por Momento da Prova
+
+Objetivo:
+
+- Automatizar a comunicacao sem o admin precisar lembrar de cada etapa.
+
+Funcionalidades:
+
+- Ao abrir prova: notificar atletas elegiveis.
+- Antes do prazo: lembrar interessados que ainda nao confirmaram.
+- Apos fechamento: avisar confirmados com orientacoes finais.
+- No dia anterior: enviar checklist de prova.
+- Apos a prova: agradecer, pedir feedback, liberar fotos/pontos quando configurado.
+
+Prioridade:
+
+- Alta. A comunicacao e uma das maiores dores operacionais de assessoria.
+
+### 14.5 CRM Esportivo do Atleta
+
+Objetivo:
+
+- Fazer o sistema entender melhor cada atleta para recomendações, comunicacao e retencao.
+
+Funcionalidades:
+
+- Preferencias de prova: distancia favorita, cidade, tipo de terreno, faixa de preco e disponibilidade.
+- Historico de participacoes na assessoria.
+- Indicador de engajamento: treinos, provas, pontos, comunidade, pagamentos e avisos lidos.
+- Tags internas: competitivo, iniciante, retorno de lesao, mensalidade critica, potencial premium.
+
+Prioridade:
+
+- Media. Gera valor forte, mas depende de dados organizados.
+
+### 14.6 Inscricao Coletiva Gerenciada
+
+Objetivo:
+
+- Ajudar a assessoria quando ela concentra inscricoes de um grupo em uma plataforma externa.
+
+Funcionalidades:
+
+- Lista de atletas para inscricao coletiva.
+- Status: entrou na lista, aguardando pagamento, pago, enviado para organizador, inscrito externamente.
+- Campo para codigo/comprovante externo.
+- Exportacao no formato necessario para a plataforma externa.
+- Auditoria de quem colocou ou removeu atleta da lista.
+
+Prioridade:
+
+- Alta quando a assessoria costuma operar grupos em provas externas.
+
+### 14.7 Financeiro Ligado a Provas da Assessoria
+
+Objetivo:
+
+- Amarrar participacao, pagamento, receita e custos da prova em um so lugar.
+
+Funcionalidades:
+
+- Cobrança interna por prova ou por servico adicional: tenda, transporte, kit, inscricao, foto, pacote.
+- Despesas por prova: tenda, staff, transporte, brindes, taxas e patrocinio.
+- Resultado financeiro por prova.
+- Relatorio de inadimplencia por prova.
+
+Prioridade:
+
+- Media-alta. Importante para gestao, mas pode vir depois da agenda operacional.
+
+### 14.8 Patrocinador por Prova
+
+Objetivo:
+
+- Transformar provas com alta adesao em oportunidade comercial.
+
+Funcionalidades:
+
+- Vincular patrocinadores a provas especificas.
+- Registrar entregas: banner, tenda, cupom, post, camiseta, brinde.
+- Relatorio para patrocinador: alcance, participantes, fotos, cliques e resgates.
+- Cupom ou beneficio por prova para atletas.
+
+Prioridade:
+
+- Media. Boa para receita e profissionalizacao da assessoria.
+
+### 14.9 Fotos e Memoria da Prova
+
+Objetivo:
+
+- Usar a prova como ponto de engajamento depois do evento.
+
+Funcionalidades:
+
+- Galeria vinculada ao `OrganizationRacePlan`.
+- Marcar atletas participantes nas fotos.
+- Liberar pacote de fotos para confirmados/premium.
+- Criar mural historico da assessoria por prova.
+
+Prioridade:
+
+- Media. Forte para retencao, mas depende do modulo de fotos estar maduro.
+
+### 14.10 Indicadores e BI
+
+Objetivo:
+
+- Ajudar dono/admin a tomar decisao sobre calendario, receita e engajamento.
+
+Funcionalidades:
+
+- Taxa de adesao por prova: atletas impactados, interessados, confirmados e presentes.
+- Conversao por canal de notificacao.
+- Provas com melhor retorno financeiro.
+- Provas com maior engajamento por distancia/cidade.
+- Atletas mais ativos e atletas em risco de churn.
+
+Prioridade:
+
+- Media. Deve crescer depois que eventos e participacoes tiverem volume.
+
+### 14.11 IA Assistiva para Operacao
+
+Objetivo:
+
+- Reduzir trabalho repetitivo do admin e do coach.
+
+Funcionalidades:
+
+- Sugestao de provas relevantes para a assessoria a partir de historico, cidade, modalidade e perfil dos atletas.
+- Geracao de comunicado de prova com tom da assessoria.
+- Sugestao de audiencia para prova importada.
+- Resumo operacional: "o que falta resolver nesta prova".
+- Analise pos-prova: adesao, ausencias, pagamentos, fotos, pontos e proximas acoes.
+
+Prioridade:
+
+- Media. Deve entrar como assistente, nunca como decisor automatico.
+
+### 14.12 Portal Publico da Assessoria
+
+Objetivo:
+
+- Permitir que a assessoria divulgue sua agenda oficial para captacao, mantendo acoes sensiveis autenticadas.
+
+Funcionalidades:
+
+- Pagina publica com proximas provas da assessoria.
+- Destaque para provas abertas para novos atletas.
+- Formulario de interesse para lead.
+- Conversao de lead para atleta com aprovacao admin.
+
+Prioridade:
+
+- Baixa-media. Bom para crescimento, mas nao deve atrasar a operacao interna.
+
+### 14.13 Ordem Recomendada de Execucao
+
+1. Cockpit completo da prova da assessoria.
+2. Segmentacao basica de audiencia.
+3. Notificacao ao abrir prova e lembretes por prazo.
+4. Formulario avancado do atleta para participacao.
+5. Inscricao coletiva gerenciada.
+6. Central de provas importadas com curadoria.
+7. Sync real com TicketSports.
+8. Financeiro por prova.
+9. Fotos e pontos pos-prova.
+10. BI e IA assistiva.
+
+## 15. Definition of Done Global
 
 Uma entrega do sistema so deve ser considerada pronta quando:
 
